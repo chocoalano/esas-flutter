@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <key>CFBundleDisplayName</key>
+    <string>Esas</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>esas</key>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$(FLUTTER_BUILD_NAME)</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>CFBundleVersion</key>
+    <string>$(FLUTTER_BUILD_NUMBER)</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>UILaunchStoryboardName</key>
+    <string>LaunchScreen</string>
+    <key>UIMainStoryboardFile</key>
+    <string>Main</string>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Aplikasi ini membutuhkan akses lokasi Anda saat digunakan untuk memverifikasi lokasi absensi Anda.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Aplikasi ini membutuhkan akses lokasi Anda setiap saat untuk memverifikasi lokasi absensi Anda secara akurat bahkan saat aplikasi tidak digunakan.</string>
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>Aplikasi ini membutuhkan akses lokasi Anda setiap saat untuk memverifikasi lokasi absensi Anda.</string>
+
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>location</string>
+    </array>
+
+    <key>NSCameraUsageDescription</key>
+    <string>Aplikasi ini membutuhkan akses ke kamera Anda untuk memindai QR Code absensi dan mengambil foto profil.</string>
+
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Aplikasi ini membutuhkan akses ke galeri foto Anda untuk mengunggah foto profil.</string>
+
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Aplikasi ini membutuhkan akses ke mikrofon Anda untuk merekam video (jika ada fitur terkait).</string>
+
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+        <string>sms</string>
+        <string>tel</string>
+    </array>
+
+    <key>CADisableMinimumFrameDurationOnPhone</key>
+    <true/>
+    <key>UIApplicationSupportsIndirectInputEvents</key>
+    <true/>
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <false/>
+</dict>
+</plist>
