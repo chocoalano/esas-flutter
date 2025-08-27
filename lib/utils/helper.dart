@@ -141,7 +141,7 @@ Widget buildAvatar(
   return CircleAvatar(
     radius: 24,
     backgroundColor: cs.primary,
-    foregroundImage: hasImage ? NetworkImage(imageUrl!) : null,
+    foregroundImage: hasImage ? NetworkImage(imageUrl) : null,
     onForegroundImageError: hasImage
         ? (_, __) {
             // opsional log
