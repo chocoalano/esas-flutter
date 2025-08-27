@@ -36,8 +36,8 @@ class NotificationController extends GetxController {
 
   Future<void> fetchNotifications({bool isLoadMore = false}) async {
     // Prevent fetching if already loading or no more data
-    if (isLoading.value || isMoreLoading.value) return;
-    if (isLoadMore && !hasMore.value) return;
+    // if (isLoading.value || isMoreLoading.value) return;
+    // if (isLoadMore && !hasMore.value) return;
 
     if (isLoadMore) {
       isMoreLoading.value = true;

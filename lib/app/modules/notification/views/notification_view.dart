@@ -154,10 +154,8 @@ class NotificationView extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: textTheme.bodyMedium?.copyWith(
                             color: isRead
-                                ? colorScheme.onSurfaceVariant.withAlpha(29)
-                                : colorScheme.onPrimaryContainer.withAlpha(
-                                    29,
-                                  ), // Themed text colors
+                                ? colorScheme.onSurfaceVariant
+                                : colorScheme.onPrimaryContainer,
                           ),
                         ),
                         trailing: Text(
