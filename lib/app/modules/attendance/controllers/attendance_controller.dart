@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:esas/app/routes/app_pages.dart';
 import 'package:esas/app/services/api_provider.dart';
 import 'package:esas/app/widgets/controllers/storage_keys.dart';
 import 'package:flutter/material.dart'; // Import for debugPrint
@@ -224,6 +225,7 @@ class AttendanceController extends GetxController {
           ), // Shorter timeout as location should already be valid
         );
       } catch (e) {
+        Get.offAllNamed(Routes.ATTENDANCE_LIST);
         debugPrint("Could not get current position for submission: $e");
         // Optionally, show a warning if location can't be re-acquired right before submission
         showWarningSnackbar(
@@ -288,7 +290,7 @@ class AttendanceController extends GetxController {
       );
     } finally {
       isProcessing.value = false;
-      // Get.offAllNamed(Routes.HOME);
+      Get.offAllNamed(Routes.ATTENDANCE_LIST);
     }
   }
 

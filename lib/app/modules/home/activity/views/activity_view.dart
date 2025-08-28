@@ -106,8 +106,8 @@ class ActivityView extends GetView<ActivityController> {
             _iconText(Icons.wifi, 'IP: ${item.ipAddress}', theme),
             const SizedBox(height: 8),
             _iconText(Icons.access_time, formatDateTime(item.createdAt), theme),
-            _iconText(Icons.link, item.url, theme),
 
+            // _iconText(Icons.link, item.url, theme),
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerRight,
@@ -152,7 +152,7 @@ class ActivityView extends GetView<ActivityController> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: theme.iconTheme.color?.withAlpha(27)),
+          Icon(icon, size: 16, color: theme.iconTheme.color?.withAlpha(100)),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -171,7 +171,7 @@ class ActivityView extends GetView<ActivityController> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withAlpha(1),
+        color: color.withAlpha(40),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(

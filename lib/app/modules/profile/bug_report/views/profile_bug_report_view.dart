@@ -97,6 +97,7 @@ class ProfileBugReportView extends GetView<ProfileBugReportController> {
 
                 // --- Submit Button (Interactive and Themed) ---
                 _buildSubmitButton(context),
+                const SizedBox(height: 32),
               ],
             ),
           ),
