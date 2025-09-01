@@ -163,6 +163,9 @@ class HomeController extends GetxController {
   }
 
   void _updateAttendanceCards(Map<String, dynamic> data) {
+    if (kDebugMode) {
+      print("================ kesini boss ${data.toString()}");
+    }
     final inTime = data['time_in'] as String? ?? '--:--';
     final outTime = data['time_out'] as String? ?? '--:--';
     final inStatus = data['status_in'] as String? ?? '—';
