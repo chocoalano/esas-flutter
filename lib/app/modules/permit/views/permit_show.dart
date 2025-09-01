@@ -30,7 +30,11 @@ class PermitShowView extends GetView<PermitShowController> {
         if (didPop) {
           return;
         }
-        Get.offAllNamed(Routes.PERMIT_LIST, arguments: controller.permitType);
+        // print(controller.permitType.value);
+        Get.offAllNamed(
+          Routes.PERMIT_LIST,
+          arguments: controller.permitType.value,
+        );
       },
       child: Scaffold(
         appBar: AppBar(

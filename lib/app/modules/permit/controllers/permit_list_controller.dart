@@ -56,9 +56,30 @@ class PermitListController extends GetxController {
   // --- PERBAIKAN UTAMA DI SINI ---
   // Menangani berbagai tipe argumen yang mungkin masuk
   void _initializeArguments() {
-    final dynamic args = Get.arguments;
-    permitType.value = args;
-    appBarTitle.value = permitType.value?.type ?? 'Daftar Perizinan';
+    final args = Get.arguments;
+
+    LeaveType? arg;
+
+    if (args is LeaveType) {
+      // langsung nilai
+      arg = args;
+    } else if (args is Rx<LeaveType?>) {
+      // unbox dari Rx
+      arg = args.value;
+    } else if (args is Map) {
+      final dynamic p = args['permitType'];
+      if (p is LeaveType) {
+        arg = p;
+      } else if (p is Rx<LeaveType?>) {
+        arg = p.value;
+      }
+    } else {
+      // bentuk lain, biarkan null
+      arg = null;
+    }
+
+    permitType.value = arg; // <-- sekarang selalu LeaveType?
+    appBarTitle.value = arg?.type ?? 'Daftar Perizinan';
   }
   // --- AKHIR PERBAIKAN UTAMA ---
 
@@ -142,7 +163,6 @@ class PermitListController extends GetxController {
       if (kDebugMode) debugPrint('PlatformException: ${e.message}');
       if (loadMore) page.value--;
     } catch (e) {
-      print(e);
       if (kDebugMode) debugPrint('General Error in fetchPermits: $e');
       showErrorSnackbar(
         'Terjadi kesalahan yang tidak terduga saat mengambil data.',

@@ -120,7 +120,7 @@ class LoginController extends GetxController {
     required Map<String, dynamic> user,
     required String nip,
     required String password,
-    required String avatar,
+    String? avatar,
   }) async {
     await _storage.write(StorageKeys.token, token);
     await _storage.write(StorageKeys.tokenType, tokenType);
@@ -200,7 +200,8 @@ class LoginController extends GetxController {
     } on PlatformException catch (e) {
       showErrorSnackbar('Gagal mendapatkan info perangkat: ${e.message}');
     } catch (e) {
-      if (kDebugMode) print('Login error (catch-all): $e');
+      print(e.toString());
+      // if (kDebugMode) print('Login error (catch-all): ${e.toString()}');
       showErrorSnackbar('Terjadi kesalahan tidak terduga. Mohon coba lagi.');
     } finally {
       isLoading.value = false;

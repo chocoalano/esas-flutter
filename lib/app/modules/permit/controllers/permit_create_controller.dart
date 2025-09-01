@@ -117,7 +117,7 @@ class PermitCreateController extends GetxController {
       if (response.statusCode == 200) {
         final data = response.body['form'] as Map<String, dynamic>?;
         if (data == null) return;
-
+        print(data['schedules']);
         scheduleList.assignAll(
           (data['schedules'] as List?)
                   ?.map((e) => Schedule.fromJson(e))

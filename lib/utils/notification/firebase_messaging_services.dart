@@ -155,9 +155,10 @@ class FirebaseMessagingService extends GetxService {
       datapost,
     );
     if (response.statusCode == 200) {
-      showSuccessSnackbar('Token FCM anda berhasil ditetapkan');
+      debugPrint("fcm ditetapkan");
+      // showSuccessSnackbar('Token FCM anda berhasil ditetapkan');
     } else {
-      showErrorSnackbar('Terjadi kesalahan');
+      showErrorSnackbar('Terjadi kesalahan saat menetapkan token FCM');
     }
   }
 

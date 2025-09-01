@@ -2,8 +2,7 @@ import 'package:esas/utils/api_constants.dart';
 import 'package:esas/utils/helper.dart';
 import 'package:flutter/material.dart';
 
-/// Helper aman untuk mengambil properti opsional yang mungkin tidak ada.
-/// Menghindari NoSuchMethodError pada objek dinamis/class yang tidak punya getter tsb.
+// --- helpers (tetap) ---
 T? _tryGet<T>(T? Function() getter) {
   try {
     return getter();
@@ -16,7 +15,6 @@ void showAttendanceDetailSheet(BuildContext context, dynamic attendance) {
   final theme = Theme.of(context);
   final colorScheme = theme.colorScheme;
 
-  // Ambil field opsional dengan aman (tidak error jika getter tidak ada)
   final String imageIn = (_tryGet<String?>(() => attendance.imageIn) ?? '')
       .toString();
   final String imageOut = (_tryGet<String?>(() => attendance.imageOut) ?? '')
@@ -51,11 +49,13 @@ void showAttendanceDetailSheet(BuildContext context, dynamic attendance) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
+    enableDrag: true, // pastikan bisa di-drag
+    isDismissible: true,
     backgroundColor: colorScheme.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
-    builder: (_) {
+    builder: (sheetContext) {
       return DraggableScrollableSheet(
         initialChildSize: 0.6,
         minChildSize: 0.4,
@@ -68,6 +68,7 @@ void showAttendanceDetailSheet(BuildContext context, dynamic attendance) {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: ListView(
                 controller: scrollController,
+                physics: const ClampingScrollPhysics(), // stabil di Android
                 children: [
                   // Grab handle
                   Center(
@@ -76,7 +77,7 @@ void showAttendanceDetailSheet(BuildContext context, dynamic attendance) {
                       height: 4,
                       margin: const EdgeInsets.only(bottom: 12),
                       decoration: BoxDecoration(
-                        color: theme.dividerColor.withAlpha(10),
+                        color: theme.dividerColor.withAlpha(60),
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
@@ -114,7 +115,8 @@ void showAttendanceDetailSheet(BuildContext context, dynamic attendance) {
                       ),
                       IconButton(
                         tooltip: 'Tutup',
-                        onPressed: () => Navigator.of(context).maybePop(),
+                        // gunakan pop() langsung agar selalu menutup sheet ini
+                        onPressed: () => Navigator.of(sheetContext).pop(),
                         icon: const Icon(Icons.close),
                       ),
                     ],
@@ -157,7 +159,7 @@ void showAttendanceDetailSheet(BuildContext context, dynamic attendance) {
                   ),
                   const SizedBox(height: 12),
 
-                  // Opsional: Foto In/Out
+                  // Foto In/Out
                   if (imageIn.isNotEmpty || imageOut.isNotEmpty) ...[
                     Text('Lampiran Foto', style: theme.textTheme.titleSmall),
                     const SizedBox(height: 8),
@@ -188,7 +190,7 @@ void showAttendanceDetailSheet(BuildContext context, dynamic attendance) {
                     const SizedBox(height: 12),
                   ],
 
-                  // Opsional: Lokasi In/Out
+                  // Lokasi
                   if (locationIn != null || locationOut != null) ...[
                     Text('Lokasi', style: theme.textTheme.titleSmall),
                     const SizedBox(height: 8),
@@ -209,13 +211,13 @@ void showAttendanceDetailSheet(BuildContext context, dynamic attendance) {
                     const SizedBox(height: 12),
                   ],
 
-                  // Actions
-                  const SizedBox(width: 8),
-                  Expanded(
+                  // Actions (JANGAN pakai Expanded di dalam ListView)
+                  SizedBox(
+                    width: double.infinity,
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.check),
                       label: const Text('Tutup'),
-                      onPressed: () => Navigator.of(context).maybePop(),
+                      onPressed: () => Navigator.of(sheetContext).pop(),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -285,9 +287,9 @@ Widget _statusRow(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: color.withAlpha(10),
+                color: color.withAlpha(20),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: color.withAlpha(10)),
+                border: Border.all(color: color.withAlpha(30)),
               ),
               child: Text(
                 valueText,
@@ -316,14 +318,24 @@ Widget _imageTile(
     onTap: () {
       showDialog(
         context: context,
-        builder: (_) => Dialog(
+        builder: (dCtx) => Dialog(
+          insetPadding: const EdgeInsets.all(16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: InteractiveViewer(
-              child: Image.network(url, fit: BoxFit.cover),
+              child: Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => SizedBox(
+                  height: 220,
+                  child: Center(
+                    child: Icon(Icons.broken_image, color: cs.outline),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
