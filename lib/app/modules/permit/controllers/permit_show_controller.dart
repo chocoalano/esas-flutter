@@ -153,7 +153,6 @@ class PermitShowController extends GetxController {
       'approval_id': approvalToSubmit.id, // ID approval yang akan di-update
       'user_approve': actionStatus,
     };
-
     if (notes != null && notes.isNotEmpty) {
       payload['notes'] = notes;
     }

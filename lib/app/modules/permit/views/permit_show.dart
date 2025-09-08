@@ -228,14 +228,14 @@ class PermitShowView extends GetView<PermitShowController> {
                       ),
                     ),
                     const SizedBox(height: 5),
-                    // Text(
-                    //   permit.notes.isNotEmpty
-                    //       ? permit.notes
-                    //       : 'Tidak ada catatan.',
-                    //   style: theme.textTheme.bodyMedium?.copyWith(
-                    //     color: theme.colorScheme.onSurface,
-                    //   ),
-                    // ),
+                    Text(
+                      permit.notes ?? 'Tidak ada catatan.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface,
+                      ),
+                      softWrap: true,
+                      overflow: TextOverflow.visible,
+                    ),
                     const SizedBox(height: 16),
                     // Tampilkan tombol lihat dokumen jika ada file
                     if ((permit.file ?? '').isNotEmpty)
