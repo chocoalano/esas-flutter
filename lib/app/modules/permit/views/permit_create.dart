@@ -88,6 +88,9 @@ class PermitCreate extends GetView<PermitCreateController> {
                 if (val.length > 50) return 'Nomor Izin maksimal 50 karakter';
                 return null;
               },
+              description:
+                  'Setiap permohonan akan memiliki nomor unik yang akan menjadi identitas data.',
+              readOnly: true,
             ),
             _spacer(),
             if (controller.selectedPermitTypeId.value == 15) ...[
@@ -96,6 +99,8 @@ class PermitCreate extends GetView<PermitCreateController> {
                 theme,
                 'Jam Masuk Penyesuaian',
                 controller.timeinAdjustC,
+                description:
+                    'Masukkan jam dengan format 24 jam (misalnya 08:30), lalu pilih jam masuk yang akan dijadikan acuan untuk penyesuaian data.',
               ),
               _spacer(),
               _buildTimePickerField(
@@ -104,6 +109,8 @@ class PermitCreate extends GetView<PermitCreateController> {
                 'Jam Pulang Penyesuaian',
                 controller.timeoutAdjustC,
                 validateAfter: controller.timeinAdjustC,
+                description:
+                    'Masukkan jam dengan format 24 jam (misalnya 08:30), lalu pilih jam pulang yang akan dijadikan acuan untuk penyesuaian data.',
               ),
               _spacer(),
             ],
@@ -127,6 +134,8 @@ class PermitCreate extends GetView<PermitCreateController> {
                 theme,
                 'Tanggal Mulai',
                 controller.startDateC,
+                description:
+                    'Masukkan tanggal dengan format YYYY-MM-DD, atau pilih tanggal mulai aktual saat ini yang akan dijadikan acuan untuk penyesuaian data.',
               ),
               _spacer(),
               _buildDatePickerField(
@@ -135,6 +144,8 @@ class PermitCreate extends GetView<PermitCreateController> {
                 'Tanggal Selesai',
                 controller.endDateC,
                 validateAfterDate: controller.startDateC,
+                description:
+                    'Masukkan tanggal dengan format YYYY-MM-DD, atau pilih tanggal selesai aktual saat ini yang akan dijadikan acuan untuk penyesuaian data.',
               ),
             ],
             _spacer(),
@@ -144,6 +155,8 @@ class PermitCreate extends GetView<PermitCreateController> {
               'Jam Mulai',
               controller.startTimeC,
               isRequired: true,
+              description:
+                  'Masukkan jam dengan format 24 jam (misalnya 08:30), lalu pilih jam masuk aktual saat ini yang akan dijadikan acuan untuk penyesuaian data.',
             ),
             _spacer(),
             _buildTimePickerField(
@@ -152,6 +165,8 @@ class PermitCreate extends GetView<PermitCreateController> {
               'Jam Selesai',
               controller.endTimeC,
               isRequired: true,
+              description:
+                  'Masukkan jam dengan format 24 jam (misalnya 08:30), lalu pilih jam pulang aktual saat ini yang akan dijadikan acuan untuk penyesuaian data.',
             ),
             _spacer(),
             _buildTextFormField(
@@ -160,6 +175,8 @@ class PermitCreate extends GetView<PermitCreateController> {
               'Catatan (opsional)',
               maxLines: 3,
               maxLength: 255,
+              description:
+                  'Kamu bisa menambahkan keterangan untuk memberikan informasi tentang permohonan yang kamu ajukan.',
             ),
             _spacer(),
             _buildFilePicker(theme),
@@ -212,17 +229,38 @@ class PermitCreate extends GetView<PermitCreateController> {
   Widget _buildTextFormField(
     TextEditingController ctrl,
     ThemeData theme,
-    String label, {
+    String? label, { // label nullable
     String? Function(String?)? validator,
     int maxLines = 1,
     int? maxLength,
-  }) => TextFormField(
-    controller: ctrl,
-    decoration: inputDecoration(theme, label),
-    validator: validator,
-    maxLines: maxLines,
-    maxLength: maxLength,
-  );
+    String? description, // opsional
+    bool readOnly = false, // <-- opsi tambahan
+  }) {
+    return TextFormField(
+      controller: ctrl,
+      decoration:
+          inputDecoration(
+            theme,
+            label ?? '-', // fallback label
+          ).copyWith(
+            helper: (description?.isNotEmpty ?? false)
+                ? Text(
+                    description!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    softWrap: true,
+                    overflow: TextOverflow.visible,
+                    maxLines: null, // biar bisa multi-line tanpa batas
+                  )
+                : null,
+          ),
+      validator: validator,
+      maxLines: maxLines,
+      maxLength: maxLength,
+      readOnly: readOnly, // <-- dipakai di sini
+    );
+  }
 
   Widget _buildDatePickerField(
     BuildContext context,
@@ -230,34 +268,62 @@ class PermitCreate extends GetView<PermitCreateController> {
     String label,
     TextEditingController controller, {
     TextEditingController? validateAfterDate,
+    String? description, // <- opsional & null-safety
   }) => TextFormField(
     controller: controller,
     readOnly: true,
     onTap: () async => await this.controller.pickDate(context, controller),
-    decoration: inputDecoration(
-      theme,
-      label,
-      hintText: 'YYYY-MM-DD',
-      suffixIcon: Icon(
-        Icons.calendar_today,
-        color: theme.colorScheme.onSurfaceVariant,
-      ),
-    ),
+    decoration:
+        inputDecoration(
+          theme,
+          label,
+          hintText: 'YYYY-MM-DD',
+          suffixIcon: Icon(
+            Icons.calendar_today,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ).copyWith(
+          // helper sebagai widget: bisa multi-line, tidak overflow
+          helper: (description?.isNotEmpty ?? false)
+              ? Text(
+                  description!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  softWrap: true,
+                  overflow: TextOverflow.visible,
+                  maxLines: null,
+                )
+              : null,
+        ),
     validator: (val) {
-      if (val == null || val.isEmpty) return '$label wajib diisi';
-      try {
-        final DateTime date = DateTime.parse(val);
-        if (validateAfterDate != null) {
-          final DateTime afterDate = DateTime.parse(validateAfterDate.text);
-          if (label.contains('Selesai') && date.isBefore(afterDate)) {
+      final value = val?.trim();
+      if (value == null || value.isEmpty) return '$label wajib diisi';
+
+      // Validasi format dasar YYYY-MM-DD (opsional, sebelum parse)
+      final basic = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+      if (!basic.hasMatch(value))
+        return 'Format tanggal tidak valid (YYYY-MM-DD)';
+
+      final date = DateTime.tryParse(value);
+      if (date == null) return 'Format tanggal tidak valid';
+
+      // Validasi terhadap validateAfterDate (jika ada & valid)
+      final afterRaw = validateAfterDate?.text.trim();
+      if (afterRaw != null && afterRaw.isNotEmpty && basic.hasMatch(afterRaw)) {
+        final afterDate = DateTime.tryParse(afterRaw);
+        if (afterDate != null) {
+          // Heuristik label: jika mengandung "Selesai" harus setelah Mulai
+          if (label.toLowerCase().contains('selesai') &&
+              !date.isAfter(afterDate)) {
             return 'Harus setelah tanggal mulai';
           }
-          if (label.contains('Mulai') && date.isAfter(afterDate)) {
+          // Jika label mengandung "Mulai" harus sebelum Selesai
+          if (label.toLowerCase().contains('mulai') &&
+              !date.isBefore(afterDate)) {
             return 'Harus sebelum tanggal selesai';
           }
         }
-      } catch (_) {
-        return 'Format tanggal tidak valid';
       }
       return null;
     },
@@ -270,19 +336,33 @@ class PermitCreate extends GetView<PermitCreateController> {
     TextEditingController controller, {
     bool isRequired = false,
     TextEditingController? validateAfter,
+    String? description, // opsional & null safety
   }) => TextFormField(
     controller: controller,
     readOnly: true,
     onTap: () => this.controller.pickTime(context, controller),
-    decoration: inputDecoration(
-      theme,
-      label,
-      hintText: 'HH:mm',
-      suffixIcon: Icon(
-        Icons.access_time,
-        color: theme.colorScheme.onSurfaceVariant,
-      ),
-    ),
+    decoration:
+        inputDecoration(
+          theme,
+          label,
+          hintText: 'HH:mm',
+          suffixIcon: Icon(
+            Icons.access_time,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ).copyWith(
+          helper: (description?.isNotEmpty ?? false)
+              ? Text(
+                  description!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  softWrap: true,
+                  overflow: TextOverflow.visible,
+                  maxLines: null, // biar bisa multi-line tanpa batas
+                )
+              : null,
+        ),
     validator: (val) {
       final cleanedVal = val
           ?.replaceAll(
@@ -295,10 +375,15 @@ class PermitCreate extends GetView<PermitCreateController> {
       if (!isRequired && (cleanedVal == null || cleanedVal.isEmpty)) {
         return null;
       }
-      if (cleanedVal == null || cleanedVal.isEmpty) return '$label wajib diisi';
-      final reg = RegExp(r'^\d{2}:\d{2}$');
+      if (cleanedVal == null || cleanedVal.isEmpty) {
+        return '$label wajib diisi';
+      }
 
-      if (!reg.hasMatch(cleanedVal)) return 'Format jam tidak valid (HH:mm)';
+      final reg = RegExp(r'^\d{2}:\d{2}$');
+      if (!reg.hasMatch(cleanedVal)) {
+        return 'Format jam tidak valid (HH:mm)';
+      }
+
       if (validateAfter != null &&
           validateAfter.text.isNotEmpty &&
           cleanedVal.compareTo(validateAfter.text.trim()) <= 0) {
