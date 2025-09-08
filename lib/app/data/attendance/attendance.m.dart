@@ -16,6 +16,7 @@ class Attendance {
   String? imageOut;
   String? statusIn;
   String? statusOut;
+  String? datePresence;
   int? createdBy;
   int? updatedBy;
   DateTime? createdAt;
@@ -39,6 +40,7 @@ class Attendance {
     this.imageOut,
     this.statusIn,
     this.statusOut,
+    this.datePresence,
     this.createdBy,
     this.updatedBy,
     this.createdAt,
@@ -63,6 +65,7 @@ class Attendance {
     imageOut: json["image_out"],
     statusIn: json["status_in"], // Added null check
     statusOut: json["status_out"], // Added null check
+    datePresence: json["date_presence"],
     createdBy: json["created_by"],
     updatedBy: json["updated_by"],
     createdAt: json["created_at"] == null
@@ -91,6 +94,7 @@ class Attendance {
     "image_out": imageOut,
     "status_in": statusIn, // Added null check
     "status_out": statusOut, // Added null check
+    "date_presence": datePresence,
     "created_by": createdBy,
     "updated_by": updatedBy,
     "created_at": createdAt?.toIso8601String(),

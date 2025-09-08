@@ -202,7 +202,9 @@ class LoginController extends GetxController {
     } catch (e) {
       print(e.toString());
       // if (kDebugMode) print('Login error (catch-all): ${e.toString()}');
-      showErrorSnackbar('Terjadi kesalahan tidak terduga. Mohon coba lagi.');
+      showErrorSnackbar(
+        'Terjadi kesalahan tidak terduga. Mohon coba lagi dan pastikan anda memiliki koneksi internet.',
+      );
     } finally {
       isLoading.value = false;
     }

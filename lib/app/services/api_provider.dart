@@ -7,26 +7,63 @@ import 'package:flutter/foundation.dart'; // For kDebugMode
 class ApiProvider extends GetConnect {
   final GetStorage _storage = GetStorage();
 
+  // === Utility ===
+  bool _isAbsoluteUrl(String? url) {
+    if (url == null) return false;
+    final uri = Uri.tryParse(url);
+    return uri != null && uri.hasScheme && uri.host.isNotEmpty;
+  }
+
+  bool _isInternalUri(Uri uri) {
+    if ((httpClient.baseUrl ?? '').isEmpty) return false;
+    final base = Uri.tryParse(httpClient.baseUrl!);
+    if (base == null || base.host.isEmpty) return false;
+    return uri.host == base.host;
+  }
+
   @override
   void onInit() {
-    httpClient.baseUrl = baseApiUrl;
+    // OPTIONAL: aktifkan baseUrl hanya kalau kamu memang ingin pakai untuk internal.
+    // Jika ingin benar-benar tanpa baseUrl global, cukup komentari baris di bawah.
+    httpClient.baseUrl = (baseApiUrl); // atau komentari jika mau kosong total
+
     allowAutoSignedCert = true;
 
     httpClient.addRequestModifier<dynamic>((request) async {
-      final token = _storage.read(StorageKeys.token);
-      if (token != null) {
-        request.headers['Authorization'] = 'Bearer $token';
+      // Jika ada header pengaman untuk bypass, jangan suntik header apapun.
+      final bypassAuth = request.headers['X-Bypass-Auth'] == 'true';
+
+      // Selalu bisa set Accept default jika tidak di-set caller
+      request.headers.putIfAbsent('Accept', () => 'application/json');
+
+      // Tambah Authorization HANYA jika:
+      // - tidak bypass, DAN
+      // - URL internal (host sama dengan baseUrl) ATAU URL bukan absolute (akan digabung baseUrl)
+      try {
+        final uri = Uri.parse(request.url.toString());
+        final shouldAuth =
+            !bypassAuth &&
+            ((httpClient.baseUrl ?? '').isNotEmpty
+                ? (!_isAbsoluteUrl(request.url.toString()) ||
+                      _isInternalUri(uri))
+                : false);
+
+        if (shouldAuth) {
+          final token = _storage.read(StorageKeys.token);
+          if (token != null && token is String && token.isNotEmpty) {
+            request.headers['Authorization'] = 'Bearer $token';
+          }
+        }
+      } catch (_) {
+        // Abaikan parsing error; jangan suntik auth
       }
-      request.headers['Accept'] = 'application/json';
+
+      // Bersihkan header bypass agar tidak terkirim ke server
+      request.headers.remove('X-Bypass-Auth');
       return request;
     });
 
     httpClient.addResponseModifier((request, response) {
-      // if (kDebugMode) {
-      //   print('API Response for ${request.url}:');
-      //   print('Status Code: ${response.statusCode}');
-      //   print('Body: ${response.bodyString}');
-      // }
       return response;
     });
 
@@ -43,36 +80,43 @@ class ApiProvider extends GetConnect {
     };
   }
 
-  // --- Custom GET method with query parameters ---
-  @override // Added @override for clarity, though not strictly necessary if signature matches
+  // --- GET override: mendukung params/query & bisa bypass auth via header ---
+  @override
   Future<Response<T>> get<T>(
-    String? url, { // Changed to nullable String?
-    Map<String, String>? params,
+    String? url, {
+    Map<String, String>? params, // akan digabung ke query
     Map<String, String>? headers,
     String? contentType,
     Map<String, dynamic>? query,
     Decoder<T>? decoder,
   }) {
+    assert(url != null && url.isNotEmpty, 'URL tidak boleh null/kosong');
+
+    // Gabungkan params (String,String) ke query (String,dynamic)
+    final Map<String, dynamic> finalQuery = {...?query, ...?params};
+
+    // Headers final (boleh kosong)
     final Map<String, String> finalHeaders = {...?headers};
 
-    Uri uri = Uri.parse(url ?? ''); // Handle potential null URL
-    if (params != null && params.isNotEmpty) {
-      uri = uri.replace(queryParameters: {...uri.queryParameters, ...params});
+    // Jika URL absolute (eksternal), otomatis bypass auth & baseUrl
+    if (_isAbsoluteUrl(url)) {
+      finalHeaders['X-Bypass-Auth'] = finalHeaders['X-Bypass-Auth'] ?? 'true';
     }
 
+    // Jika ada params di URL, pastikan tidak dobel: lib GetConnect akan handle merge query
     return super.get(
-      uri.toString(),
+      url!,
       headers: finalHeaders,
       contentType: contentType,
-      query: query,
+      query: finalQuery.isEmpty ? null : finalQuery,
       decoder: decoder,
     );
   }
 
-  // --- Method to send POST requests with JSON body ---
+  // --- POST override: bisa bypass via header X-Bypass-Auth ---
   @override
   Future<Response<T>> post<T>(
-    String? url, // *** FIX: Changed to nullable String? url ***
+    String? url,
     dynamic body, {
     Map<String, String>? headers,
     String? contentType,
@@ -80,32 +124,102 @@ class ApiProvider extends GetConnect {
     Decoder<T>? decoder,
     Progress? uploadProgress,
   }) {
+    assert(url != null && url.isNotEmpty, 'URL tidak boleh null/kosong');
+
+    final Map<String, String> finalHeaders = {...?headers};
+
+    if (_isAbsoluteUrl(url)) {
+      finalHeaders['X-Bypass-Auth'] = finalHeaders['X-Bypass-Auth'] ?? 'true';
+    }
+
     return super.post(
-      url,
+      url!,
       body,
-      headers: headers,
+      headers: finalHeaders,
       contentType: contentType,
-      query: query,
+      query: (query == null || query.isEmpty) ? null : query,
       decoder: decoder,
       uploadProgress: uploadProgress,
     );
   }
 
-  // --- New method to send POST requests with Multipart Form Data (for files) ---
+  // --- POST Multipart/FormData (file upload) ---
   Future<Response<T>> postFormData<T>(
-    String
-    url, // This is a new method, so its 'url' parameter doesn't need to match GetConnect.post
+    String url,
     FormData formData, {
     Map<String, String>? headers,
     Map<String, dynamic>? query,
     Decoder<T>? decoder,
     Progress? uploadProgress,
   }) {
+    final Map<String, String> finalHeaders = {...?headers};
+
+    // Bypass auth otomatis jika absolute URL
+    if (_isAbsoluteUrl(url)) {
+      finalHeaders['X-Bypass-Auth'] = finalHeaders['X-Bypass-Auth'] ?? 'true';
+    }
+
     return super.post(
       url,
       formData,
-      headers: headers,
-      query: query,
+      headers: finalHeaders,
+      query: (query == null || query.isEmpty) ? null : query,
+      decoder: decoder,
+      uploadProgress: uploadProgress,
+    );
+  }
+
+  // === Convenience methods khusus eksternal (tanpa sentuh override) ===
+  Future<Response<T>> externalGet<T>(
+    String absoluteUrl, {
+    Map<String, dynamic>? query,
+    Map<String, String>? headers,
+    Decoder<T>? decoder,
+  }) {
+    final merged = {...?headers, 'X-Bypass-Auth': 'true'};
+    return super.get(
+      absoluteUrl,
+      headers: merged,
+      query: (query == null || query.isEmpty) ? null : query,
+      decoder: decoder,
+    );
+  }
+
+  Future<Response<T>> externalPost<T>(
+    String absoluteUrl,
+    dynamic body, {
+    Map<String, dynamic>? query,
+    Map<String, String>? headers,
+    String? contentType,
+    Decoder<T>? decoder,
+    Progress? uploadProgress,
+  }) {
+    final merged = {...?headers, 'X-Bypass-Auth': 'true'};
+    return super.post(
+      absoluteUrl,
+      body,
+      headers: merged,
+      contentType: contentType,
+      query: (query == null || query.isEmpty) ? null : query,
+      decoder: decoder,
+      uploadProgress: uploadProgress,
+    );
+  }
+
+  Future<Response<T>> externalPostFormData<T>(
+    String absoluteUrl,
+    FormData formData, {
+    Map<String, dynamic>? query,
+    Map<String, String>? headers,
+    Decoder<T>? decoder,
+    Progress? uploadProgress,
+  }) {
+    final merged = {...?headers, 'X-Bypass-Auth': 'true'};
+    return super.post(
+      absoluteUrl,
+      formData,
+      headers: merged,
+      query: (query == null || query.isEmpty) ? null : query,
       decoder: decoder,
       uploadProgress: uploadProgress,
     );

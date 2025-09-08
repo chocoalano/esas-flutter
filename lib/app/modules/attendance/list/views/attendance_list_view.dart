@@ -171,7 +171,7 @@ class AttendanceListView extends GetView<AttendanceListController> {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'Tanggal: ${formatFullDateIndo(attendance.createdAt!.toIso8601String())}',
+                            'Tanggal: ${attendance.datePresence ?? 'N/A'}',
                             style: theme.textTheme.bodySmall,
                           ),
                           const SizedBox(height: 10),

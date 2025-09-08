@@ -49,6 +49,15 @@ class PermitListItem extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
+              Text(
+                'Yang Mengajukan: ${permit.user?.name} | ${permit.user?.nip}',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme
+                      .colorScheme
+                      .onSurfaceVariant, // Gunakan warna dari tema
+                ),
+              ),
+              const SizedBox(height: 4),
               // Memanggil _getOverallPermitStatusText untuk status keseluruhan
               Text(
                 'Status: ${_getOverallPermitStatusText(permit)}',

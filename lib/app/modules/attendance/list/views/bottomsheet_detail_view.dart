@@ -27,11 +27,6 @@ void showAttendanceDetailSheet(BuildContext context, dynamic attendance) {
   final String userNip = (_tryGet<String?>(() => attendance.user?.nip) ?? 'N/A')
       .toString();
 
-  final DateTime? createdAt = _tryGet<DateTime?>(() => attendance.createdAt);
-  final String createdAtStr = createdAt != null
-      ? formatFullDateIndo(createdAt.toIso8601String())
-      : '-';
-
   final String timeIn = (_tryGet<String?>(() => attendance.timeIn) ?? 'N/A')
       .toString();
   final String typeIn = (_tryGet<String?>(() => attendance.typeIn) ?? 'N/A')
@@ -45,6 +40,8 @@ void showAttendanceDetailSheet(BuildContext context, dynamic attendance) {
       .toString();
   final String statusOut =
       (_tryGet<String?>(() => attendance.statusOut) ?? 'N/A').toString();
+  final String datePresence =
+      (_tryGet<String?>(() => attendance.datePresence) ?? 'N/A').toString();
 
   showModalBottomSheet(
     context: context,
@@ -129,7 +126,7 @@ void showAttendanceDetailSheet(BuildContext context, dynamic attendance) {
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.event),
                     title: const Text('Tanggal'),
-                    subtitle: Text(createdAtStr),
+                    subtitle: Text(datePresence),
                   ),
                   const Divider(height: 16),
 

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:esas/app/services/api_external_provider.dart';
 import 'package:esas/utils/notification/firebase_messaging_services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -45,6 +46,7 @@ Future<void> main() async {
   Get.put(BottomNavController(), permanent: true);
   Get.put(ThemeController(), permanent: true);
   Get.put(ApiProvider(), permanent: true);
+  Get.put(ApiExternalProvider(), permanent: true);
 
   final notificationService = Get.put(NotificationService(), permanent: true);
   await notificationService.initialize();

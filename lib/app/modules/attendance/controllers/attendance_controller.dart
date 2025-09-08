@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:esas/app/routes/app_pages.dart';
-import 'package:esas/app/services/api_provider.dart';
+import 'package:esas/app/services/api_external_provider.dart';
 import 'package:esas/app/widgets/controllers/storage_keys.dart';
 import 'package:flutter/material.dart'; // Import for debugPrint
 import 'package:get/get.dart';
@@ -13,7 +13,7 @@ import 'package:flutter/services.dart'; // Required for PlatformException
 import 'package:esas/app/widgets/views/snackbar.dart'; // Ensure this path is correct for your custom snackbars
 
 class AttendanceController extends GetxController {
-  final ApiProvider _apiProvider = Get.find<ApiProvider>();
+  final ApiExternalProvider _apiExtProvider = Get.find<ApiExternalProvider>();
   // Mobile Scanner Controller
   late final MobileScannerController mobileScannerController;
   final GetStorage _storage = GetStorage(); // Instance of GetStorage
@@ -50,15 +50,16 @@ class AttendanceController extends GetxController {
   Future<void> _initializeLocationDataAndValidate() async {
     final user = _storage.read(StorageKeys.userJson);
     debugPrint("======> ini data user: $user");
+    // _targetLatitude.value = -6.2183282; //ini lat rumah
     _targetLatitude.value =
         (user?['company']?['latitude'] as num?)?.toDouble() ??
         -6.17566156928234;
+    // _targetLongitude.value = 106.5411286; //ini lng rumah
     _targetLongitude.value =
         (user?['company']?['longitude'] as num?)?.toDouble() ??
         106.599255891093;
-    _allowedDistanceMeters.value =
-        (user?['company']?['radius'] as num?)?.toDouble() ?? 30.0;
-
+    _allowedDistanceMeters.value = 30.0;
+    // (user?['company']?['radius'] as num?)?.toDouble() ?? 30.0;
     debugPrint("Parsed Latitude: ${_targetLatitude.value}");
     debugPrint("Parsed Longitude: ${_targetLongitude.value}");
     debugPrint("Parsed Radius: ${_allowedDistanceMeters.value}");
@@ -138,6 +139,9 @@ class AttendanceController extends GetxController {
         _targetLatitude.value, // Use .value for RxDouble
         _targetLongitude.value, // Use .value for RxDouble
       );
+      // print("===============>> distance: $distanceInMeters");
+      // print("================> posisi saat ini :${currentPosition.latitude}");
+      // print("================> posisi saat ini :${currentPosition.longitude}");
 
       // 6. Compare distance with the allowed range
       if (distanceInMeters <= _allowedDistanceMeters.value) {
@@ -254,6 +258,8 @@ class AttendanceController extends GetxController {
       final user = _storage.read(StorageKeys.userJson);
       final int? currentStorageDeptId =
           (user?['employee']?['departement_id'] as num?)?.toInt();
+      final int? currentUserId = (user?['employee']?['user_id'] as num?)
+          ?.toInt();
       final int? currentQrDeptId = int.tryParse(qrCodeData['departement_id']);
       final String? qrType = qrCodeData['type'];
       final int? qrId = int.tryParse(qrCodeData['id']);
@@ -263,10 +269,16 @@ class AttendanceController extends GetxController {
       );
       debugPrint("QR Dept ID: $currentQrDeptId");
       if (currentStorageDeptId == currentQrDeptId) {
-        final payload = {"type": qrType, "id_token": qrId};
+        final payload = {
+          "type": qrType,
+          "token_id": qrId,
+          "user_id": currentUserId,
+        };
         debugPrint("========> ini data dikirimnya boss : $payload");
-        final response = await _apiProvider.post(
-          '/hris-module/user-attendances/presence/form-qr-attendance',
+
+        const String baseApiUrl = 'http://128.199.111.239:3000';
+        final response = await _apiExtProvider.postExternal(
+          "$baseApiUrl/attmachine/qr-presence",
           payload,
         );
         if (response.statusCode == 200) {
@@ -275,7 +287,8 @@ class AttendanceController extends GetxController {
           );
         } else {
           final Map<String, dynamic> data = response.body;
-          showErrorSnackbar(data['error'], title: 'Kesalahan Pengiriman');
+          // print("ini response error nya $data");
+          showErrorSnackbar(data['message'], title: 'Kesalahan Pengiriman');
         }
       } else {
         showErrorSnackbar(
@@ -284,6 +297,7 @@ class AttendanceController extends GetxController {
         );
       }
     } catch (e) {
+      print(e.toString());
       showErrorSnackbar(
         'Pengiriman gagal: ${e.toString()}',
         title: 'Kesalahan Pengiriman',
