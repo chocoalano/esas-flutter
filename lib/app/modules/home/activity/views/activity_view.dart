@@ -109,37 +109,37 @@ class ActivityView extends GetView<ActivityController> {
 
             // _iconText(Icons.link, item.url, theme),
             const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                style: TextButton.styleFrom(
-                  foregroundColor: theme.colorScheme.primary,
-                ),
-                onPressed: () {
-                  Future.delayed(Duration.zero, () {
-                    Get.defaultDialog(
-                      title: "Payload",
-                      backgroundColor: theme.colorScheme.surface,
-                      content: SingleChildScrollView(
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Text(
-                            payload.toString(),
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ),
-                      ),
-                      confirm: TextButton(
-                        onPressed: () => Get.back(),
-                        child: const Text("Tutup"),
-                      ),
-                    );
-                  });
-                },
-                icon: const Icon(Icons.visibility_outlined, size: 18),
-                label: const Text('Lihat Payload'),
-              ),
-            ),
+            // Align(
+            //   alignment: Alignment.centerRight,
+            //   child: TextButton.icon(
+            //     style: TextButton.styleFrom(
+            //       foregroundColor: theme.colorScheme.primary,
+            //     ),
+            //     onPressed: () {
+            //       Future.delayed(Duration.zero, () {
+            //         Get.defaultDialog(
+            //           title: "Payload",
+            //           backgroundColor: theme.colorScheme.surface,
+            //           content: SingleChildScrollView(
+            //             child: Padding(
+            //               padding: const EdgeInsets.all(8.0),
+            //               child: Text(
+            //                 payload.toString(),
+            //                 style: theme.textTheme.bodySmall,
+            //               ),
+            //             ),
+            //           ),
+            //           confirm: TextButton(
+            //             onPressed: () => Get.back(),
+            //             child: const Text("Tutup"),
+            //           ),
+            //         );
+            //       });
+            //     },
+            //     icon: const Icon(Icons.visibility_outlined, size: 18),
+            //     label: const Text('Lihat Payload'),
+            //   ),
+            // ),
           ],
         ),
       ),
