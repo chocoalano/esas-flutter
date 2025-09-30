@@ -245,6 +245,7 @@ class AttendanceController extends GetxController {
       Map<String, dynamic> qrCodeData;
       try {
         qrCodeData = json.decode(qrCode)['data'];
+        print("================> ini data qr $qrCodeData");
       } catch (e) {
         // If qrCode is not a valid JSON string, handle the error
         debugPrint("Error decoding QR code as JSON: $e");
