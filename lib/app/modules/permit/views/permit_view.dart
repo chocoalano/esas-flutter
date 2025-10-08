@@ -81,7 +81,6 @@ class PermitView extends StatelessWidget {
               itemCount: leaveTypes.length,
               itemBuilder: (context, index) {
                 final LeaveType item = leaveTypes[index];
-                print(item.type);
                 final IconData icon = _getIconForLeaveType(item.type);
 
                 return TypeCardItem(

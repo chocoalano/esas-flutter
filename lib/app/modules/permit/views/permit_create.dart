@@ -190,7 +190,7 @@ class PermitCreate extends GetView<PermitCreateController> {
 
   Widget _buildDropdownSchedule(ThemeData theme) => Obx(
     () => DropdownButtonFormField<int>(
-      value: controller.selectedScheduleId.value,
+      initialValue: controller.selectedScheduleId.value,
       decoration: inputDecoration(theme, 'Jadwal Kerja'),
       items: controller.scheduleList
           .map(
@@ -213,7 +213,7 @@ class PermitCreate extends GetView<PermitCreateController> {
     String label,
     Rx<int?> selectedValue,
   ) => DropdownButtonFormField<int>(
-    value: selectedValue.value,
+    initialValue: selectedValue.value,
     decoration: inputDecoration(theme, label),
     items: controller.shiftList
         .map(
@@ -302,8 +302,9 @@ class PermitCreate extends GetView<PermitCreateController> {
 
       // Validasi format dasar YYYY-MM-DD (opsional, sebelum parse)
       final basic = RegExp(r'^\d{4}-\d{2}-\d{2}$');
-      if (!basic.hasMatch(value))
+      if (!basic.hasMatch(value)) {
         return 'Format tanggal tidak valid (YYYY-MM-DD)';
+      }
 
       final date = DateTime.tryParse(value);
       if (date == null) return 'Format tanggal tidak valid';

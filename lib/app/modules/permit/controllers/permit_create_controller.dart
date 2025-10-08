@@ -108,7 +108,6 @@ class PermitCreateController extends GetxController {
         'userId': (user['id'] ?? '').toString(),
         'typeId': selectedPermitTypeId.value.toString(),
       };
-      print(params);
 
       final response = await _apiProvider.get(
         '/hris-module/permits/create',
@@ -118,7 +117,6 @@ class PermitCreateController extends GetxController {
       if (response.statusCode == 200) {
         final data = response.body['form'] as Map<String, dynamic>?;
         if (data == null) return;
-        print(data['schedules']);
         scheduleList.assignAll(
           (data['schedules'] as List?)
                   ?.map((e) => Schedule.fromJson(e))

@@ -146,7 +146,7 @@ class ProfileBugReportView extends GetView<ProfileBugReportController> {
 
     return Obx(
       () => DropdownButtonFormField<String>(
-        value: controller.selectedPlatform.value,
+        initialValue: controller.selectedPlatform.value,
         decoration: inputDecoration(
           Theme.of(context),
           'Platform ditemukan',

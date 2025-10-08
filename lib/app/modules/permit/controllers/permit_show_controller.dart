@@ -73,7 +73,7 @@ class PermitShowController extends GetxController {
   /// Fetch detail perizinan dari API
   Future<void> loadPermitDetails() async {
     // Jangan lakukan panggilan API jika permitId tidak valid atau user tidak terautentikasi
-    if (permitId == 0 || currentUserId == 0) {
+    if (permitId.value == 0 || currentUserId == 0) {
       isLoading.value = false;
       return;
     }

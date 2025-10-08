@@ -74,7 +74,7 @@ class PermitShowView extends GetView<PermitShowController> {
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
-                    onPressed: controller.permitId != 0
+                    onPressed: controller.permitId.value != 0
                         ? controller
                               .loadPermitDetails // Panggil ulang fetch jika ID valid
                         : null, // Nonaktifkan tombol jika ID tidak valid

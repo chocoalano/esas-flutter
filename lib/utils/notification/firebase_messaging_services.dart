@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:esas/app/routes/app_pages.dart';
 import 'package:esas/app/services/api_provider.dart';
 import 'package:esas/app/widgets/views/snackbar.dart';
@@ -69,14 +71,19 @@ class FirebaseMessagingService extends GetxService {
     }
 
     // 2. Mengambil dan mencetak token FCM saat ini.
-    final token = await _firebaseMessaging.getToken();
-    if (token != null) {
-      debugPrint("FCM Token: $token");
-      _fcmToken.value = token; // Simpan token ke RxString
-      setupToken(_fcmToken.value);
+    if (Platform.isIOS) {
+      String? apnsToken = await _firebaseMessaging.getAPNSToken();
+      debugPrint("APNs Token: $apnsToken");
     } else {
-      debugPrint("Unable to get FCM Token.");
-      _fcmToken.value = '';
+      final token = await _firebaseMessaging.getToken();
+      if (token != null) {
+        debugPrint("FCM Token: $token");
+        _fcmToken.value = token; // Simpan token ke RxString
+        setupToken(_fcmToken.value);
+      } else {
+        debugPrint("Unable to get FCM Token.");
+        _fcmToken.value = '';
+      }
     }
 
     // 3. Menangani event FCM Token Refresh.

@@ -200,7 +200,6 @@ class LoginController extends GetxController {
     } on PlatformException catch (e) {
       showErrorSnackbar('Gagal mendapatkan info perangkat: ${e.message}');
     } catch (e) {
-      print(e.toString());
       // if (kDebugMode) print('Login error (catch-all): ${e.toString()}');
       showErrorSnackbar(
         'Terjadi kesalahan tidak terduga. Mohon coba lagi dan pastikan anda memiliki koneksi internet.',
