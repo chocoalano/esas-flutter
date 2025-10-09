@@ -128,8 +128,8 @@ class AttendanceController extends GetxController {
           'Terdeteksi penggunaan lokasi palsu (Fake GPS). Absensi tidak diizinkan.',
           title: 'Lokasi Palsu Terdeteksi',
         );
-        isLocationValid.value = false; // Location is invalid if mocked
-        return; // Exit if mock location is detected
+        isLocationValid.value = false;
+        return;
       }
 
       // 5. Calculate distance to the target attendance location
