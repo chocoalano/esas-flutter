@@ -171,10 +171,6 @@ class LoginController extends GetxController {
         payload,
       );
 
-      if (kDebugMode) {
-        print("==========> ini response nya : ${response.body}");
-      }
-
       if (response.statusCode == 200 && response.body != null) {
         final Map<String, dynamic> data = response.body;
         if (kDebugMode) print("========> response data server : $data");
@@ -200,7 +196,6 @@ class LoginController extends GetxController {
     } on PlatformException catch (e) {
       showErrorSnackbar('Gagal mendapatkan info perangkat: ${e.message}');
     } catch (e) {
-      // if (kDebugMode) print('Login error (catch-all): ${e.toString()}');
       showErrorSnackbar(
         'Terjadi kesalahan tidak terduga. Mohon coba lagi dan pastikan anda memiliki koneksi internet.',
       );

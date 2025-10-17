@@ -117,19 +117,21 @@ class AttendanceController extends GetxController {
       // but generally not needed unless specific problems arise.
       Position currentPosition = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(
-          seconds: 15,
-        ), // Increased timeout for better chance of getting a fix
+        timeLimit: const Duration(seconds: 15),
       );
 
       // 4. --- Crucial: Check for Mock Location ---
-      if (currentPosition.isMocked) {
-        showErrorSnackbar(
-          'Terdeteksi penggunaan lokasi palsu (Fake GPS). Absensi tidak diizinkan.',
-          title: 'Lokasi Palsu Terdeteksi',
-        );
-        isLocationValid.value = false;
-        return;
+      debugPrint("===============>> currentPosition: $currentPosition");
+      debugPrint("===============>> isMocked: ${currentPosition.isMocked}");
+      if (GetPlatform.isAndroid) {
+        if (currentPosition.isMocked) {
+          showErrorSnackbar(
+            'Terdeteksi penggunaan lokasi palsu (Fake GPS). Absensi tidak diizinkan.',
+            title: 'Lokasi Palsu Terdeteksi',
+          );
+          isLocationValid.value = false;
+          return;
+        }
       }
 
       // 5. Calculate distance to the target attendance location
@@ -224,9 +226,7 @@ class AttendanceController extends GetxController {
       try {
         currentValidPosition = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(
-            seconds: 5,
-          ), // Shorter timeout as location should already be valid
+          timeLimit: const Duration(seconds: 5),
         );
       } catch (e) {
         Get.offAllNamed(Routes.ATTENDANCE_LIST);
