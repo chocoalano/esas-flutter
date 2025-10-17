@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:esas/app/services/api_external_provider.dart';
 import 'package:esas/utils/notification/firebase_messaging_services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -34,15 +35,48 @@ void _setSystemUIOverlayStyle(bool isDarkMode) {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize local storage
   await GetStorage.init();
 
-  try {
-    await Firebase.initializeApp();
-    debugPrint("Firebase initialized.");
-  } catch (e) {
-    debugPrint("Firebase init error: $e");
+  // Small delay to allow native side to be ready (optional)
+  await Future.delayed(const Duration(milliseconds: 200));
+
+  // --- App Tracking Transparency (iOS only) ---
+  if (Platform.isIOS) {
+    try {
+      final TrackingStatus status =
+          await AppTrackingTransparency.trackingAuthorizationStatus;
+
+      if (status == TrackingStatus.notDetermined) {
+        // You may show a custom explainer dialog here before requesting
+        final TrackingStatus newStatus =
+            await AppTrackingTransparency.requestTrackingAuthorization();
+        debugPrint('ATT new status: $newStatus');
+      }
+
+      // Optionally obtain IDFA (may be empty if not authorized)
+      try {
+        final String uuid =
+            await AppTrackingTransparency.getAdvertisingIdentifier();
+        debugPrint('Advertising ID (IDFA): $uuid');
+      } catch (e) {
+        debugPrint('Could not get advertising identifier: $e');
+      }
+    } catch (e) {
+      debugPrint('AppTrackingTransparency error: $e');
+    }
   }
 
+  // --- Initialize Firebase and services ---
+  try {
+    await Firebase.initializeApp();
+    debugPrint('Firebase initialized.');
+  } catch (e) {
+    debugPrint('Firebase init error: $e');
+  }
+
+  // Register singletons
   Get.put(BottomNavController(), permanent: true);
   Get.put(ThemeController(), permanent: true);
   Get.put(ApiProvider(), permanent: true);
@@ -52,6 +86,7 @@ Future<void> main() async {
   await notificationService.initialize();
   Get.put(FirebaseMessagingService(), permanent: true);
 
+  // Apply system UI style based on saved theme
   final isDarkMode = Get.find<ThemeController>().isDarkMode;
   _setSystemUIOverlayStyle(isDarkMode);
   HttpOverrides.global = MyHttpOverrides();

@@ -69,5 +69,7 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Data ini akan digunakan untuk keperluan aplikasi HRIS, seperti pengelolaan kehadiran, data karyawan, dan fitur terkait lainnya.</string>
 </dict>
 </plist>
