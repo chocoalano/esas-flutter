@@ -1,5 +1,5 @@
+// Semua import harus di bagian paling atas file
 import 'dart:io';
-
 import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:esas/app/services/api_external_provider.dart';
 import 'package:esas/utils/notification/firebase_messaging_services.dart';
@@ -9,7 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-
+import 'package:permission_handler/permission_handler.dart';
 import 'app/services/api_provider.dart';
 import 'app/widgets/controllers/bottom_nav_controller.dart';
 import 'app/widgets/controllers/theme_controller.dart';
@@ -45,17 +45,45 @@ Future<void> main() async {
   // --- App Tracking Transparency (iOS only) ---
   if (Platform.isIOS) {
     try {
+      // 1. Dapatkan status pelacakan saat ini
       final TrackingStatus status =
           await AppTrackingTransparency.trackingAuthorizationStatus;
 
+      // 2. Hanya meminta otorisasi jika statusnya 'notDetermined'
       if (status == TrackingStatus.notDetermined) {
-        // You may show a custom explainer dialog here before requesting
+        // PENTING: Anda harus menampilkan dialog penjelasan kustom (custom explainer dialog)
+        // SEBELUM memanggil requestTrackingAuthorization.
+        // Dialog ini harus menjelaskan MENGAPA Anda membutuhkan izin tersebut.
+        debugPrint('ATT status: Not Determined. Showing explainer...');
+
+        // --- GANTI dengan logika untuk menampilkan Dialog Explainer kustom Anda ---
+        await showCustomExplainerDialog();
+        // ----------------------------------------------------------------------
+
         final TrackingStatus newStatus =
             await AppTrackingTransparency.requestTrackingAuthorization();
-        debugPrint('ATT new status: $newStatus');
+
+        debugPrint('ATT permission granted/denied: $newStatus');
+
+        // JANGAN mengalihkan pengguna ke Pengaturan di sini jika statusnya Denied (newStatus == TrackingStatus.denied)
+        // Tindakan ini melanggar pedoman.
+      } else if (status == TrackingStatus.denied) {
+        // Statusnya 'Denied' (ditolak) atau 'restricted'
+        debugPrint('ATT status: Denied/Restricted. Respecting user\'s choice.');
+
+        // JIKA pengguna mencoba menggunakan fitur yang MEMBUTUHKAN izin ATT
+        // (misalnya, menampilkan iklan yang dipersonalisasi), Anda DAPAT
+        // menampilkan notifikasi informatif.
+        // Opsi: Berikan notifikasi di dalam aplikasi dengan opsi menuju Pengaturan,
+        // BUKAN mengarahkan secara paksa.
+        showInAppNotification(
+          'Fitur personalisasi iklan tidak tersedia tanpa izin pelacakan. Anda dapat mengaktifkannya di Pengaturan.',
+          () =>
+              openAppSettings(), // Hanya panggil openAppSettings jika pengguna mengetuk tombol
+        );
       }
 
-      // Optionally obtain IDFA (may be empty if not authorized)
+      // 3. Mendapatkan IDFA (opsional, mungkin kosong jika tidak diizinkan)
       try {
         final String uuid =
             await AppTrackingTransparency.getAdvertisingIdentifier();
@@ -64,7 +92,7 @@ Future<void> main() async {
         debugPrint('Could not get advertising identifier: $e');
       }
     } catch (e) {
-      debugPrint('AppTrackingTransparency error: $e');
+      debugPrint('AppTrackingTransparency error during handling: $e');
     }
   }
 
@@ -91,6 +119,69 @@ Future<void> main() async {
   _setSystemUIOverlayStyle(isDarkMode);
   HttpOverrides.global = MyHttpOverrides();
   runApp(const MyApp());
+}
+
+/// Menampilkan notifikasi di dalam aplikasi dengan tombol menuju pengaturan (untuk ATT denied)
+void showInAppNotification(String message, Future<bool> Function() onPressed) {
+  Get.dialog(
+    AlertDialog(
+      title: const Text('Izin Pelacakan Diperlukan'),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () async {
+            await onPressed();
+            Get.back();
+          },
+          child: const Text('Buka Pengaturan'),
+        ),
+        TextButton(onPressed: () => Get.back(), child: const Text('Tutup')),
+      ],
+    ),
+    barrierDismissible: false,
+  );
+}
+
+Future<void> showCustomExplainerDialog() async {
+  // Gunakan navigatorKey agar bisa dipanggil dari main()
+  final navigator = Get.key.currentState;
+  if (navigator == null) {
+    // Fallback jika navigator belum siap, tampilkan dialog sederhana
+    return showDialog(
+      context:
+          Get.context ?? (throw Exception('No context for explainer dialog')),
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Izin Pelacakan'),
+        content: const Text(
+          'Aplikasi ini membutuhkan izin pelacakan untuk meningkatkan pengalaman Anda, menampilkan konten yang relevan, dan mendukung fitur personalisasi. Data yang dikumpulkan akan digunakan sesuai kebijakan privasi kami.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Lanjutkan'),
+          ),
+        ],
+      ),
+    );
+  } else {
+    // Jika navigator tersedia, gunakan Get.dialog agar konsisten dengan GetX
+    return Get.dialog(
+      AlertDialog(
+        title: const Text('Izin Pelacakan'),
+        content: const Text(
+          'Aplikasi ini membutuhkan izin pelacakan untuk meningkatkan pengalaman Anda, menampilkan konten yang relevan, dan mendukung fitur personalisasi. Data yang dikumpulkan akan digunakan sesuai kebijakan privasi kami.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => navigator.pop(),
+            child: const Text('Lanjutkan'),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {
