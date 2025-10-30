@@ -1,6 +1,5 @@
 // Semua import harus di bagian paling atas file
 import 'dart:io';
-import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:esas/app/services/api_external_provider.dart';
 import 'package:esas/utils/notification/firebase_messaging_services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -9,7 +8,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'app/services/api_provider.dart';
 import 'app/widgets/controllers/bottom_nav_controller.dart';
 import 'app/widgets/controllers/theme_controller.dart';
@@ -41,60 +39,6 @@ Future<void> main() async {
 
   // Small delay to allow native side to be ready (optional)
   await Future.delayed(const Duration(milliseconds: 200));
-
-  // --- App Tracking Transparency (iOS only) ---
-  if (Platform.isIOS) {
-    try {
-      // 1. Dapatkan status pelacakan saat ini
-      final TrackingStatus status =
-          await AppTrackingTransparency.trackingAuthorizationStatus;
-
-      // 2. Hanya meminta otorisasi jika statusnya 'notDetermined'
-      if (status == TrackingStatus.notDetermined) {
-        // PENTING: Anda harus menampilkan dialog penjelasan kustom (custom explainer dialog)
-        // SEBELUM memanggil requestTrackingAuthorization.
-        // Dialog ini harus menjelaskan MENGAPA Anda membutuhkan izin tersebut.
-        debugPrint('ATT status: Not Determined. Showing explainer...');
-
-        // --- GANTI dengan logika untuk menampilkan Dialog Explainer kustom Anda ---
-        await showCustomExplainerDialog();
-        // ----------------------------------------------------------------------
-
-        final TrackingStatus newStatus =
-            await AppTrackingTransparency.requestTrackingAuthorization();
-
-        debugPrint('ATT permission granted/denied: $newStatus');
-
-        // JANGAN mengalihkan pengguna ke Pengaturan di sini jika statusnya Denied (newStatus == TrackingStatus.denied)
-        // Tindakan ini melanggar pedoman.
-      } else if (status == TrackingStatus.denied) {
-        // Statusnya 'Denied' (ditolak) atau 'restricted'
-        debugPrint('ATT status: Denied/Restricted. Respecting user\'s choice.');
-
-        // JIKA pengguna mencoba menggunakan fitur yang MEMBUTUHKAN izin ATT
-        // (misalnya, menampilkan iklan yang dipersonalisasi), Anda DAPAT
-        // menampilkan notifikasi informatif.
-        // Opsi: Berikan notifikasi di dalam aplikasi dengan opsi menuju Pengaturan,
-        // BUKAN mengarahkan secara paksa.
-        showInAppNotification(
-          'Fitur personalisasi iklan tidak tersedia tanpa izin pelacakan. Anda dapat mengaktifkannya di Pengaturan.',
-          () =>
-              openAppSettings(), // Hanya panggil openAppSettings jika pengguna mengetuk tombol
-        );
-      }
-
-      // 3. Mendapatkan IDFA (opsional, mungkin kosong jika tidak diizinkan)
-      try {
-        final String uuid =
-            await AppTrackingTransparency.getAdvertisingIdentifier();
-        debugPrint('Advertising ID (IDFA): $uuid');
-      } catch (e) {
-        debugPrint('Could not get advertising identifier: $e');
-      }
-    } catch (e) {
-      debugPrint('AppTrackingTransparency error during handling: $e');
-    }
-  }
 
   // --- Initialize Firebase and services ---
   try {
