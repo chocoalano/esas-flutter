@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "437545364197",
-    "project_id": "esas-44d5d",
-    "storage_bucket": "esas-44d5d.firebasestorage.app"
+    "project_number": "873945632876",
+    "project_id": "absensascom",
+    "storage_bucket": "absensascom.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:437545364197:android:a58220e725cefafc0a020c",
+        "mobilesdk_app_id": "1:873945632876:android:201fc1f973509f84138849",
         "android_client_info": {
           "package_name": "com.example.esas"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBB8hFCENgoDRvt69qJEkJ5X0faC_uXAPk"
+          "current_key": "AIzaSyAIHQtplreVHn648SQPCNpEqvLv91tCu8E"
         }
       ],
       "services": {

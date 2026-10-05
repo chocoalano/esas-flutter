@@ -2,5 +2,5 @@
 class Assets {
   Assets._();
 
-  static const String imagesLogoRemovebg = 'assets/images/logo-removebg.png';
+  static const String imagesLogoSquare = 'assets/images/logo-square.png';
 }

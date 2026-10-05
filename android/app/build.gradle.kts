@@ -5,6 +5,8 @@ plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
+    // Add the Google services Gradle plugin
+    id("com.google.gms.google-services")
 }
 
 // Release signing credentials, if this machine has them.
@@ -29,7 +31,7 @@ val missingSigningKeys = releaseSigningKeys.filter { keystoreProperties[it] == n
 val canSignRelease = missingSigningKeys.isEmpty()
 
 dependencies {
-  implementation(platform("com.google.firebase:firebase-bom:33.16.0"))
+  implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
   implementation("com.google.firebase:firebase-analytics")
   coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
@@ -127,4 +129,3 @@ tasks.matching { it.name.startsWith("assembleRelease") || it.name.startsWith("bu
 flutter {
     source = "../.."
 }
-apply(plugin = "com.google.gms.google-services")

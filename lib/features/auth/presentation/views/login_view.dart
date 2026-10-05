@@ -56,7 +56,7 @@ class LoginView extends GetView<LoginController> {
                         border: Border.all(color: palette.borderSubtle),
                       ),
                       child: Image.asset(
-                        'assets/images/logo-removebg.png',
+                        'assets/images/logo-square.png',
                         fit: BoxFit.contain,
                         errorBuilder: (_, _, _) => Icon(
                           Icons.badge_outlined,
