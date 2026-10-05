@@ -1,36 +1,27 @@
 // lib/services/notification_service.dart
-import 'dart:io';
 
-import 'package:esas/app/routes/app_pages.dart';
+import 'package:esas/features/notification/presentation/routes/notification_routes.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 class NotificationService extends GetxService {
   static final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
   // Inisialisasi notifikasi
+  /// Siapkan kanal dan pengaturan notifikasi lokal.
+  ///
+  /// **Tidak meminta izin apa pun.** Dulu ia meminta izin di sini — lewat
+  /// `permission_handler` di Android dan `IOSFlutterLocalNotifications` di iOS —
+  /// dan `FirebaseMessagingService` meminta izin yang SAMA sekali lagi beberapa
+  /// saat kemudian. Dua pustaka memiliki satu keputusan, dan keduanya berjalan
+  /// dari bootstrap: dialog izin muncul sebelum orangnya sempat melihat satu
+  /// layar pun, apalagi masuk.
+  ///
+  /// Sekarang izin diminta satu kali, oleh satu pemilik, sesudah sesi ada —
+  /// lihat `FirebaseMessagingService.ensurePushRegistered`.
   Future<void> initialize() async {
-    // === 1) Minta izin ===
-    if (Platform.isAndroid) {
-      // Android 13+ perlu runtime permission
-      final status = await Permission.notification.status;
-      if (status.isDenied || status.isRestricted) {
-        await Permission.notification.request();
-      }
-    }
-
-    // iOS: permission minta via plugin iOS
-    if (Platform.isIOS) {
-      await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin
-          >()
-          ?.requestPermissions(alert: true, badge: true, sound: true);
-    }
-
-    // === 2) Initialization Settings (Android + iOS WAJIB) ===
+    // === Initialization Settings (Android + iOS WAJIB) ===
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
@@ -58,7 +49,7 @@ class NotificationService extends GetxService {
       onDidReceiveNotificationResponse: (NotificationResponse response) {
         // Tangani ketika user tap notifikasi
         final payload = response.payload;
-        if (payload != null) Get.offAllNamed(Routes.NOTIFICATION);
+        if (payload != null) Get.offAllNamed(NotificationRoutes.notification);
       },
       onDidReceiveBackgroundNotificationResponse:
           _onDidReceiveBackgroundNotificationResponse,

@@ -1,0 +1,20 @@
+# Konfigurasi test suite.
+#
+# Tag `visual` menandai berkas yang MENULIS dan MEMBANDINGKAN berkas PNG
+# (`test/features/home/home_visual_qa_test.dart`). Ia dilewati secara baku, dan
+# itu disengaja: hasil rasterisasi berbeda antar versi Flutter, antar mesin, dan
+# antar font yang terpasang — sehingga sebagai gerbang CI ia akan gagal karena
+# alasan yang tidak ada hubungannya dengan kode.
+#
+# Gunanya diagnostik, bukan baseline: ia menggambar Beranda UTUH dari pohon
+# produksi ke dalam satu PNG tinggi, karena separuh bawah halaman berada di
+# bawah lipatan pada setiap ponsel dan simulator tidak bisa digulir dari baris
+# perintah.
+#
+# Jalankan sengaja:
+#
+#   flutter test test/features/home/home_visual_qa_test.dart --update-goldens
+#
+tags:
+  visual:
+    skip: "Artefak visual. Jalankan berkasnya langsung dengan --update-goldens."

@@ -1,20 +1,47 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:introduction_screen/introduction_screen.dart';
 
+import '../../../../core/theme/app_dimens.dart';
+import '../../../../core/theme/app_palette.dart';
+import '../../../../core/ui/components/app_button.dart';
 import '../controllers/splash_controller.dart';
 
+/// Frame pertama yang dilihat setiap karyawan.
+///
+/// Onboarding empat halaman ini dipertahankan sebagai keputusan produk, tetapi
+/// dua hal yang membuatnya terasa seperti kecelakaan sudah tidak ada:
+///
+/// * **Tombolnya tidak lagi berlomba dengan pemeriksaan sesi.** Menekan "Mulai
+///   Sekarang!" dulu mengirim siapa pun ke layar masuk, termasuk orang yang
+///   sesinya masih sah dan sedang diperiksa saat itu juga — jadi ketukan yang
+///   sedikit terlalu cepat berarti mengetik ulang NIP di gerbang pabrik.
+///   Sekarang ketukan itu menyerahkan tujuannya kepada pemeriksaan yang sedang
+///   berjalan, dan layar mengatakan bahwa pemeriksaan itu ada.
+/// * **Warnanya berasal dari tema.** Judul memakai warna teks utama, bukan
+///   hijau brand — hijau brand di atas putih adalah kombinasi paling tidak
+///   terbaca yang dipunyai palet ini, dan ia dipakai untuk seluruh judul
+///   onboarding.
 class SplashView extends GetView<SplashController> {
   const SplashView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Set status bar transparent
+    final theme = Theme.of(context);
+    final palette = theme.palette;
+
+    // Bilah status mengikuti tema, bukan dipaksa terang. Memaksanya ke
+    // `SystemUiOverlayStyle.light` membuat ikon sistem berwarna terang di atas
+    // latar onboarding yang putih pada mode terang.
+    final bool isDark = theme.brightness == Brightness.dark;
     SystemChrome.setSystemUIOverlayStyle(
-      SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
+      SystemUiOverlayStyle(
+        statusBarColor: theme.scaffoldBackgroundColor,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+      ),
     );
 
     // SVG or PNG image builder
@@ -26,54 +53,73 @@ class SplashView extends GetView<SplashController> {
       }
     }
 
-    final titleStyle = Get.textTheme.headlineSmall!.copyWith(
-      fontWeight: FontWeight.bold,
-      color: Get.theme.colorScheme.primary,
-    );
+    final titleStyle = theme.textTheme.headlineSmall;
 
-    final bodyStyle = Get.textTheme.bodyLarge!.copyWith(
-      color: Get.theme.colorScheme.onSurface.withAlpha(20),
+    // `withAlpha(20)` — 8% opasitas — membuat seluruh teks penjelas onboarding
+    // praktis tak terbaca. Yang dimaksud jelas warna teks sekunder, jadi itulah
+    // yang dipakai sekarang.
+    final bodyStyle = theme.textTheme.bodyMedium?.copyWith(
+      color: palette.textMuted,
     );
 
     final pageDecoration = PageDecoration(
-      titleTextStyle: titleStyle,
-      bodyTextStyle: bodyStyle,
-      bodyPadding: const EdgeInsets.fromLTRB(16.0, 0.0, 16.0, 16.0),
-      pageColor: Get.theme.scaffoldBackgroundColor,
-      imagePadding: const EdgeInsets.symmetric(vertical: 24.0),
-      contentMargin: const EdgeInsets.symmetric(horizontal: 16),
-      titlePadding: const EdgeInsets.only(bottom: 8.0, top: 16.0),
+      titleTextStyle: titleStyle ?? const TextStyle(),
+      bodyTextStyle: bodyStyle ?? const TextStyle(),
+      bodyPadding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        0,
+        AppSpacing.lg,
+        AppSpacing.lg,
+      ),
+      pageColor: theme.scaffoldBackgroundColor,
+      imagePadding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+      contentMargin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      titlePadding: const EdgeInsets.only(
+        bottom: AppSpacing.sm,
+        top: AppSpacing.lg,
+      ),
     );
 
     return IntroductionScreen(
       key: controller.introKey,
-      globalBackgroundColor: Get.theme.scaffoldBackgroundColor,
+      globalBackgroundColor: theme.scaffoldBackgroundColor,
       allowImplicitScrolling: true,
       autoScrollDuration: 3000,
       infiniteAutoScroll: true,
       globalFooter: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-        child: SizedBox(
-          width: double.infinity,
-          height: 56,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Get.theme.colorScheme.primary,
-              foregroundColor: Get.theme.colorScheme.onPrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.0),
-              ),
-              elevation: 5,
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.xxl,
+          AppSpacing.lg,
+          AppSpacing.xxl,
+          AppSpacing.lg,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppButton(
+              label: 'Mulai Sekarang!',
+              onPressed: controller.onIntroEnd,
             ),
-            onPressed: controller.onIntroEnd,
-            child: Text(
-              'Mulai Sekarang!',
-              style: Get.textTheme.titleMedium!.copyWith(
-                color: Get.theme.colorScheme.onPrimary,
-                fontWeight: FontWeight.bold,
-              ),
+            const SizedBox(height: AppSpacing.sm),
+            // Barisnya selalu memesan tingginya, jadi tombol di atasnya tidak
+            // melompat saat kalimatnya muncul dan hilang.
+            SizedBox(
+              height: 20,
+              child: Obx(() {
+                if (!controller.isLoading.value) {
+                  return const SizedBox.shrink();
+                }
+
+                return Text(
+                  'Memeriksa sesi Anda…',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: palette.textMuted,
+                  ),
+                );
+              }),
             ),
-          ),
+          ],
         ),
       ),
 
@@ -116,7 +162,9 @@ class SplashView extends GetView<SplashController> {
             imageFlex: 3,
             bodyAlignment: Alignment.center,
             imageAlignment: Alignment.center,
-            contentMargin: const EdgeInsets.symmetric(horizontal: 24),
+            contentMargin: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xxl,
+            ),
           ),
         ),
       ],
@@ -125,42 +173,44 @@ class SplashView extends GetView<SplashController> {
       onSkip: controller.onIntroEnd,
       showSkipButton: true,
       showBackButton: false,
-      back: Icon(Icons.arrow_back_ios, color: Get.theme.colorScheme.onSurface),
+      back: Icon(
+        Icons.arrow_back_ios_new_rounded,
+        size: AppIconSizes.lg,
+        color: theme.colorScheme.onSurface,
+      ),
       skip: Text(
         'Lewati',
-        style: Get.textTheme.labelLarge!.copyWith(
-          color: Get.theme.colorScheme.onSurface,
-        ),
+        style: theme.textTheme.labelLarge?.copyWith(color: palette.textMuted),
       ),
       next: Icon(
-        Icons.arrow_forward_ios,
-        color: Get.theme.colorScheme.onSurface,
+        Icons.arrow_forward_ios_rounded,
+        size: AppIconSizes.lg,
+        color: theme.colorScheme.onSurface,
       ),
       done: Text(
         'Selesai',
-        style: Get.textTheme.labelLarge!.copyWith(
-          color: Get.theme.colorScheme.primary,
-          fontWeight: FontWeight.bold,
+        style: theme.textTheme.labelLarge?.copyWith(
+          color: theme.colorScheme.primary,
         ),
       ),
-      curve: Curves.easeOutCubic,
-      controlsMargin: const EdgeInsets.all(16),
-      controlsPadding: kIsWeb
-          ? const EdgeInsets.all(12.0)
-          : const EdgeInsets.fromLTRB(8.0, 4.0, 8.0, 4.0),
+      curve: AppMotion.standard,
+      controlsMargin: const EdgeInsets.all(AppSpacing.lg),
+      controlsPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
 
       dotsDecorator: DotsDecorator(
-        size: const Size(10.0, 10.0),
-        color: Get.theme.colorScheme.onSurface.withAlpha(20),
-        activeSize: const Size(22.0, 10.0),
-        activeColor: Get.theme.colorScheme.primary,
-        activeShape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(25.0),
+        size: const Size(AppSpacing.tight, AppSpacing.tight),
+        color: palette.borderStrong,
+        activeSize: const Size(AppSpacing.lg + 2, AppSpacing.tight),
+        activeColor: theme.colorScheme.primary,
+        activeShape: const RoundedRectangleBorder(
+          borderRadius: AppRadii.pillAll,
         ),
       ),
-      dotsContainerDecorator: ShapeDecoration(
-        color: Get.theme.colorScheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+      dotsContainerDecorator: const ShapeDecoration(
+        shape: RoundedRectangleBorder(),
       ),
     );
   }

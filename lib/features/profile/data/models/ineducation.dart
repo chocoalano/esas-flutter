@@ -1,3 +1,5 @@
+import '../../../../core/utils/json_parsers.dart';
+
 class InformalEducationModel {
   final int id;
   final int userId;
@@ -27,22 +29,17 @@ class InformalEducationModel {
 
   factory InformalEducationModel.fromJson(Map<String, dynamic> json) {
     return InformalEducationModel(
-      id: json['id'] as int,
-      userId: json['user_id'] as int,
-      institution: json['institution'] as String,
-      start: json['start'] != null ? DateTime.tryParse(json['start']) : null,
-      finish: json['finish'] != null ? DateTime.tryParse(json['finish']) : null,
-      type: json['type'] as String,
-      duration: json['duration'] as int,
-      status: json['status'] as String,
-      certification:
-          json['certification'] == true || json['certification'] == 1,
-      createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'])
-          : null,
-      updatedAt: json['updated_at'] != null
-          ? DateTime.tryParse(json['updated_at'])
-          : null,
+      id: asInt(json['id']) ?? 0,
+      userId: asInt(json['user_id']) ?? 0,
+      institution: asString(json['institution']) ?? '',
+      start: asYear(json['start']),
+      finish: asYear(json['finish']),
+      type: asString(json['type']) ?? '',
+      duration: asInt(json['duration']) ?? 0,
+      status: asString(json['status']) ?? '',
+      certification: asBool(json['certification']) ?? false,
+      createdAt: asDate(json['created_at']),
+      updatedAt: asDate(json['updated_at']),
     );
   }
 

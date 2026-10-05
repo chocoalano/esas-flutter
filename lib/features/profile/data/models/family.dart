@@ -1,3 +1,5 @@
+import '../../../../core/utils/json_parsers.dart';
+
 class Family {
   int? id;
   int? userId;
@@ -22,21 +24,15 @@ class Family {
   });
 
   factory Family.fromJson(Map<String, dynamic> json) => Family(
-    id: json["id"],
-    userId: json["user_id"],
-    fullname: json["fullname"],
-    relationship: json["relationship"],
-    birthdate: json["birthdate"] == null
-        ? null
-        : DateTime.parse(json["birthdate"]),
-    maritalStatus: json["marital_status"],
-    job: json["job"],
-    createdAt: json["created_at"] == null
-        ? null
-        : DateTime.parse(json["created_at"]),
-    updatedAt: json["updated_at"] == null
-        ? null
-        : DateTime.parse(json["updated_at"]),
+    id: asInt(json["id"]),
+    userId: asInt(json["user_id"]),
+    fullname: asString(json["fullname"]),
+    relationship: asString(json["relationship"]),
+    birthdate: asDate(json["birthdate"]),
+    maritalStatus: asString(json["marital_status"]),
+    job: asString(json["job"]),
+    createdAt: asDate(json["created_at"]),
+    updatedAt: asDate(json["updated_at"]),
   );
 
   Map<String, dynamic> toJson() => {

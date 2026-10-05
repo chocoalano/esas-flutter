@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <application
         android:label="esas"
         android:name="${applicationName}"
@@ -37,20 +38,85 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Pemindai QR absensi (mobile_scanner) dan pengambilan foto profil. -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+    <!-- Geofence absensi (geolocator). Keduanya diminta saat layar absensi
+         membutuhkannya, bukan saat aplikasi dibuka. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Notifikasi: Android 13+ runtime permission, plus dua izin yang memang
+         dibutuhkan flutter_local_notifications untuk menjadwalkan dan
+         membunyikan notifikasi. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- Galeri foto profil dan lampiran pengajuan.
+         Dua izin penyimpanan lama DIBATASI, bukan dihapus: pada API 33+ mereka
+         tidak berarti apa-apa (READ_MEDIA_IMAGES yang berlaku), sementara pada
+         perangkat lama yang masih dipakai di lapangan (minSdk 24) pemilih
+         berkas masih bisa membutuhkannya. Membatasinya menghilangkan izin dari
+         perangkat modern tanpa merusak yang lama. -->
+    <uses-permission
+        android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
+    <!-- DIHAPUS: android.permission.QUERY_ALL_PACKAGES.
+         Ia ada untuk `canLaunchUrl` di layar rincian pengajuan, dan itu bukan
+         alasan yang memenuhi kebijakan Play — izin ini hanya untuk aplikasi
+         yang memang perlu melihat seluruh aplikasi terpasang. Yang dibutuhkan
+         sebenarnya adalah deklarasi <queries> di bawah, yang menyebut persis
+         satu hal: membuka tautan web. -->
+
+    <!-- DIHAPUS: android.permission.READ_PHONE_STATE.
+         Tidak ada satu pun pemanggil. `DeviceInfoService` membaca
+         `AndroidDeviceInfo.id` (Build.ID) dan `identifierForVendor` di iOS;
+         keduanya tidak menyentuh telefoni, dan tidak ada IMEI yang dibaca di
+         mana pun. -->
+
+    <!-- DIHAPUS dari manifest gabungan: com.google.android.gms.permission.AD_ID.
+         Ia disuntikkan `play-services-measurement` lewat firebase_messaging.
+         Aplikasi ini tidak memakai analytics maupun iklan, dan sebuah aplikasi
+         kepegawaian tidak punya alasan membawa izin identitas periklanan —
+         yang juga memicu deklarasi Advertising ID di Play Data Safety. -->
+    <uses-permission
+        android:name="com.google.android.gms.permission.AD_ID"
+        tools:node="remove" />
+
+    <!-- Dua izin Privacy Sandbox yang disuntikkan pustaka yang sama, dengan
+         alasan yang sama: pengukuran periklanan. Aplikasi ini tidak memakai
+         Firebase Analytics maupun iklan — `firebase_messaging` yang menariknya
+         secara transitif — jadi keduanya keluar bersama AD_ID. Verifikasi:
+         keduanya sebelumnya muncul di manifest gabungan meski tidak pernah
+         dideklarasikan aplikasi ini. -->
+    <uses-permission
+        android:name="android.permission.ACCESS_ADSERVICES_AD_ID"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION"
+        tools:node="remove" />
     <queries>
+        <!-- url_launcher: membuka lampiran pengajuan dan tautan di dalam
+             pengumuman di peramban. Inilah pengganti QUERY_ALL_PACKAGES, dan ia
+             menyebut persis apa yang benar-benar dibuka aplikasi ini. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

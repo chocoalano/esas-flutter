@@ -1,3 +1,5 @@
+import '../../../../core/utils/json_parsers.dart';
+
 class WorkExperienceModel {
   final int id;
   final int userId;
@@ -23,20 +25,15 @@ class WorkExperienceModel {
 
   factory WorkExperienceModel.fromJson(Map<String, dynamic> json) {
     return WorkExperienceModel(
-      id: json['id'] as int,
-      userId: json['user_id'] as int,
-      companyName: json['company_name'] as String,
-      start: json['start'] != null ? DateTime.tryParse(json['start']) : null,
-      finish: json['finish'] != null ? DateTime.tryParse(json['finish']) : null,
-      position: json['position'] as String?,
-      certification:
-          json['certification'] == true || json['certification'] == 1,
-      createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'])
-          : null,
-      updatedAt: json['updated_at'] != null
-          ? DateTime.tryParse(json['updated_at'])
-          : null,
+      id: asInt(json['id']) ?? 0,
+      userId: asInt(json['user_id']) ?? 0,
+      companyName: asString(json['company_name']) ?? '',
+      start: asYear(json['start']),
+      finish: asYear(json['finish']),
+      position: asString(json['position']),
+      certification: asBool(json['certification']) ?? false,
+      createdAt: asDate(json['created_at']),
+      updatedAt: asDate(json['updated_at']),
     );
   }
 

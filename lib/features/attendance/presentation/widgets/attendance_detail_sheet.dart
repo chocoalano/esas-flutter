@@ -1,376 +1,420 @@
-import 'package:esas/utils/api_constants.dart';
-import 'package:esas/utils/helper.dart';
+import 'package:esas/core/config/asset_url.dart';
+import 'package:esas/core/theme/app_dimens.dart';
+import 'package:esas/core/theme/app_palette.dart';
+import 'package:esas/core/theme/app_typography.dart';
+import 'package:esas/core/ui/components/app_avatar.dart';
+import 'package:esas/core/ui/components/app_badge.dart';
+import 'package:esas/core/ui/components/app_data_row.dart';
+import 'package:esas/core/ui/components/app_section_header.dart';
+import 'package:esas/core/ui/dialogs/app_bottom_sheet.dart';
+import 'package:esas/features/attendance/data/models/attendance.dart';
+import 'package:esas/features/attendance/presentation/attendance_labels.dart';
 import 'package:flutter/material.dart';
 
-// --- helpers (tetap) ---
-T? _tryGet<T>(T? Function() getter) {
-  try {
-    return getter();
-  } catch (_) {
-    return null;
+/// Rincian satu hari kehadiran.
+///
+/// Parameternya kini bertipe [Attendance], bukan `dynamic`, dan pembacaan
+/// defensif `_tryGet` yang menelan setiap kesalahan ikut hilang bersamanya.
+/// Penangkapan kosong itu bukan pengamanan melainkan penyembunyian: sheet ini
+/// membaca `attendance.locationIn`, `attendance.locationOut`, dan
+/// `attendance.user.avatarUrl` — tiga properti yang tidak ada pada model
+/// (namanya `latIn`/`longIn`, `latOut`/`longOut`, dan `avatar`), jadi ketiganya
+/// selalu bernilai null dan tiga baris rincian tidak pernah sekali pun
+/// tergambar. Koordinat geofence yang aplikasi paksa dipenuhi setiap karyawan
+/// direkam, lalu tidak pernah ditunjukkan kembali kepada pemiliknya.
+///
+/// Metode capture juga turun ke sini dari baris ledger. Ia jarang menjadi
+/// alasan orang membuka riwayat, tetapi ketika sebuah punch dipersoalkan,
+/// "Input manual" adalah jawaban pertama yang dicari.
+void showAttendanceDetailSheet(BuildContext context, Attendance attendance) {
+  final String imageIn = attendance.imageIn ?? '';
+  final String imageOut = attendance.imageOut ?? '';
+
+  final String userName = attendance.user?.name ?? 'Karyawan';
+  final String userNip = attendance.user?.nip ?? attendanceEmptyValue;
+  final String avatar = attendance.user?.avatar ?? '';
+
+  final AttendanceGap? gap = attendanceGapOf(
+    timeIn: attendance.timeIn,
+    timeOut: attendance.timeOut,
+    datePresence: attendance.datePresence,
+  );
+
+  final bool hasSchedule = attendance.hasSchedule;
+  final String? shiftLine = attendanceShiftLine(
+    shift: attendance.shift,
+    shiftIn: attendance.shiftIn,
+    shiftOut: attendance.shiftOut,
+  );
+  final String? dayTypeLabel = attendanceDayTypeLabel(attendance.dayType);
+
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheetContext) => DraggableScrollableSheet(
+      initialChildSize: 0.62,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) {
+        final theme = Theme.of(context);
+        final palette = theme.palette;
+
+        return SafeArea(
+          top: false,
+          child: ListView(
+            controller: scrollController,
+            physics: const ClampingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              0,
+              AppSpacing.xl,
+              AppSpacing.xl,
+            ),
+            children: [
+              // Identitas
+              Row(
+                children: [
+                  AppAvatar(
+                    userName: userName,
+                    imageUrl: avatar.isEmpty ? null : assetUrl(avatar),
+                    size: 40,
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(userName, style: theme.textTheme.titleMedium),
+                        const SizedBox(height: AppSpacing.xxs),
+                        Text(
+                          'NIP $userNip',
+                          style: AppTypography.dataSmall(
+                            color: palette.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Tutup',
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      size: AppIconSizes.xl,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.lg),
+
+              Text(
+                attendanceFullDateLabel(attendance.datePresence),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: palette.textMuted,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+
+              // Jadwal hari itu, di atas jam-jamnya, karena ia yang membuat
+              // "Tepat waktu" berarti sesuatu. Tanpa baris ini, dua lencana di
+              // bawah adalah penilaian tanpa pembanding yang terlihat.
+              if (shiftLine != null || dayTypeLabel != null) ...[
+                Row(
+                  children: [
+                    Icon(
+                      Icons.schedule_rounded,
+                      size: AppIconSizes.sm,
+                      color: palette.textMuted,
+                    ),
+                    const SizedBox(width: AppSpacing.tight),
+                    Expanded(
+                      child: Text(
+                        [
+                          if (dayTypeLabel != null) dayTypeLabel,
+                          if (shiftLine != null) shiftLine,
+                        ].join(' · '),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.lg),
+              ],
+
+              // Dua jam berdampingan.
+              AppDetailPanel(
+                children: [
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _TimeBlock(
+                            label: 'Masuk',
+                            time: attendance.timeIn,
+                            status: attendance.statusIn,
+                            hasSchedule: hasSchedule,
+                            gap: attendanceHasClock(attendance.timeIn)
+                                ? null
+                                : gap,
+                          ),
+                        ),
+                        VerticalDivider(width: 1, color: palette.borderSubtle),
+                        Expanded(
+                          child: _TimeBlock(
+                            label: 'Pulang',
+                            time: attendance.timeOut,
+                            status: attendance.statusOut,
+                            hasSchedule: hasSchedule,
+                            isOut: true,
+                            gap: attendanceHasClock(attendance.timeOut)
+                                ? null
+                                : gap,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: AppSpacing.xxl),
+              const AppSectionHeader(title: 'Rincian'),
+              AppDetailPanel(
+                children: [
+                  AppDataRow(
+                    // "Durasi tercatat", bukan "Lama kerja": yang diketahui
+                    // adalah jarak antara dua punch. Istirahat tidak ada dalam
+                    // payload mana pun, jadi menyebutnya jam kerja berarti
+                    // menghitungkan waktu makan siang sebagai kerja.
+                    label: 'Durasi tercatat',
+                    value: attendanceDuration(
+                      attendance.timeIn,
+                      attendance.timeOut,
+                      overnight: attendance.crossesMidnight,
+                    ),
+                  ),
+                  if (shiftLine != null)
+                    AppDataRow(label: 'Jadwal', value: shiftLine),
+                  AppDataRow(
+                    label: 'Metode masuk',
+                    value: attendanceMethodLabel(attendance.typeIn),
+                    valueStyle: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  AppDataRow(
+                    label: 'Metode pulang',
+                    value: attendanceMethodLabel(attendance.typeOut),
+                    valueStyle: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  AppDataRow(
+                    label: 'Titik masuk',
+                    value: _coordinate(attendance.latIn, attendance.longIn),
+                  ),
+                  AppDataRow(
+                    label: 'Titik pulang',
+                    value: _coordinate(attendance.latOut, attendance.longOut),
+                  ),
+                ],
+              ),
+
+              if (imageIn.isNotEmpty || imageOut.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.xxl),
+                const AppSectionHeader(title: 'Foto absensi'),
+                Row(
+                  children: [
+                    if (imageIn.isNotEmpty)
+                      Expanded(
+                        child: _PhotoTile(
+                          title: 'Masuk',
+                          url: assetUrl('esas-assets/deployment/$imageIn'),
+                        ),
+                      ),
+                    if (imageIn.isNotEmpty && imageOut.isNotEmpty)
+                      const SizedBox(width: AppSpacing.md),
+                    if (imageOut.isNotEmpty)
+                      Expanded(
+                        child: _PhotoTile(
+                          title: 'Pulang',
+                          url: assetUrl('esas-assets/deployment/$imageOut'),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
+/// Sepasang koordinat sebagaimana direkam, atau em dash bila tidak ada.
+String _coordinate(String? latitude, String? longitude) {
+  final lat = latitude?.trim() ?? '';
+  final long = longitude?.trim() ?? '';
+  if (lat.isEmpty || long.isEmpty) return attendanceEmptyValue;
+
+  return '$lat, $long';
+}
+
+class _TimeBlock extends StatelessWidget {
+  const _TimeBlock({
+    required this.label,
+    required this.time,
+    required this.status,
+    required this.hasSchedule,
+    this.isOut = false,
+    this.gap,
+  });
+
+  final String label;
+  final String? time;
+  final String? status;
+
+  /// Apakah hari itu punya shift terjadwal.
+  ///
+  /// `RecordAttendance::status()` mengembalikan `Normal` tanpa syarat ketika
+  /// hari itu tidak punya shift, jadi tanpa ini lencananya berbunyi "Tepat
+  /// waktu" untuk sebuah punch yang tidak pernah diukur terhadap apa pun.
+  final bool hasSchedule;
+
+  /// Punch pulang memakai kosakata sendiri: server menandai pulang terlalu awal
+  /// dengan `AttendanceStatus::Late`, nilai enum yang sama dengan datang
+  /// terlambat.
+  final bool isOut;
+
+  /// Diisi hanya bila jamnya kosong: ia yang membedakan punch hari ini yang
+  /// masih terbuka dari tanggal lampau yang tidak pernah ditutup.
+  final AttendanceGap? gap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
+    final bool recorded = attendanceHasClock(time);
+
+    final String badgeLabel = recorded
+        ? (isOut
+              ? attendanceOutStatusLabelFor(status, hasSchedule: hasSchedule)
+              : attendanceStatusLabelFor(status, hasSchedule: hasSchedule))
+        : (gap?.label ?? attendanceEmptyValue);
+    final AppBadgeTone badgeTone = recorded
+        ? attendanceStatusToneFor(status, hasSchedule: hasSchedule)
+        : (gap?.tone ?? AppBadgeTone.neutral);
+
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: palette.textMuted,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.snug),
+          Text(
+            attendanceClock(time),
+            style: AppTypography.dataLarge(
+              color: recorded ? theme.colorScheme.onSurface : palette.textMuted,
+            ),
+          ),
+          if (badgeLabel != attendanceEmptyValue) ...[
+            const SizedBox(height: AppSpacing.snug),
+            AppBadge(label: badgeLabel, tone: badgeTone, dense: true),
+          ],
+        ],
+      ),
+    );
   }
 }
 
-void showAttendanceDetailSheet(BuildContext context, dynamic attendance) {
-  final theme = Theme.of(context);
-  final colorScheme = theme.colorScheme;
+/// Foto absensi, bisa diperbesar dengan sekali ketuk.
+class _PhotoTile extends StatelessWidget {
+  const _PhotoTile({required this.title, required this.url});
 
-  final String imageIn = (_tryGet<String?>(() => attendance.imageIn) ?? '')
-      .toString();
-  final String imageOut = (_tryGet<String?>(() => attendance.imageOut) ?? '')
-      .toString();
-  final dynamic locationIn = _tryGet<dynamic>(() => attendance.locationIn);
-  final dynamic locationOut = _tryGet<dynamic>(() => attendance.locationOut);
+  final String title;
+  final String url;
 
-  final String userName =
-      (_tryGet<String?>(() => attendance.user?.name) ?? 'Karyawan').toString();
-  final String userNip = (_tryGet<String?>(() => attendance.user?.nip) ?? 'N/A')
-      .toString();
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
 
-  final String timeIn = (_tryGet<String?>(() => attendance.timeIn) ?? 'N/A')
-      .toString();
-  final String typeIn = (_tryGet<String?>(() => attendance.typeIn) ?? 'N/A')
-      .toString();
-  final String statusIn = (_tryGet<String?>(() => attendance.statusIn) ?? 'N/A')
-      .toString();
-
-  final String timeOut = (_tryGet<String?>(() => attendance.timeOut) ?? 'N/A')
-      .toString();
-  final String typeOut = (_tryGet<String?>(() => attendance.typeOut) ?? 'N/A')
-      .toString();
-  final String statusOut =
-      (_tryGet<String?>(() => attendance.statusOut) ?? 'N/A').toString();
-  final String datePresence =
-      (_tryGet<String?>(() => attendance.datePresence) ?? 'N/A').toString();
-
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    enableDrag: true, // pastikan bisa di-drag
-    isDismissible: true,
-    backgroundColor: colorScheme.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-    ),
-    builder: (sheetContext) {
-      return DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.4,
-        maxChildSize: 0.99,
-        expand: false,
-        builder: (context, scrollController) {
-          return SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: ListView(
-                controller: scrollController,
-                physics: const ClampingScrollPhysics(), // stabil di Android
-                children: [
-                  // Grab handle
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: theme.dividerColor.withAlpha(60),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ),
-                  // Header
-                  Row(
-                    children: [
-                      buildAvatar(
-                        context,
-                        userName: userName,
-                        imageUrl:
-                            (_tryGet<String?>(
-                              () => attendance.user?.avatarUrl,
-                            ) ??
-                            ''),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              userName,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'NIP: $userNip',
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Tutup',
-                        // gunakan pop() langsung agar selalu menutup sheet ini
-                        onPressed: () => Navigator.of(sheetContext).pop(),
-                        icon: const Icon(Icons.close),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Tanggal
-                  ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.event),
-                    title: const Text('Tanggal'),
-                    subtitle: Text(datePresence),
-                  ),
-                  const Divider(height: 16),
-
-                  // Masuk
-                  Text('Detail Masuk', style: theme.textTheme.titleSmall),
-                  const SizedBox(height: 8),
-                  _kvRow(context, 'Jam Masuk', timeIn, icon: Icons.login),
-                  _kvRow(context, 'Metode', typeIn),
-                  _statusRow(
-                    context,
-                    'Status',
-                    statusIn,
-                    isLate: statusIn.toUpperCase() == 'LATE',
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Keluar
-                  Text('Detail Keluar', style: theme.textTheme.titleSmall),
-                  const SizedBox(height: 8),
-                  _kvRow(context, 'Jam Keluar', timeOut, icon: Icons.logout),
-                  _kvRow(context, 'Metode', typeOut),
-                  _statusRow(
-                    context,
-                    'Status',
-                    statusOut,
-                    isLate: statusOut.toUpperCase() == 'LATE',
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Foto In/Out
-                  if (imageIn.isNotEmpty || imageOut.isNotEmpty) ...[
-                    Text('Lampiran Foto', style: theme.textTheme.titleSmall),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        if (imageIn.isNotEmpty)
-                          Expanded(
-                            child: _imageTile(
-                              context,
-                              title: 'Masuk',
-                              url:
-                                  "$baseImageUrl/esas-assets/deployment/$imageIn",
-                            ),
-                          ),
-                        if (imageOut.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _imageTile(
-                              context,
-                              title: 'Keluar',
-                              url:
-                                  "$baseImageUrl/esas-assets/deployment/$imageOut",
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-
-                  // Lokasi
-                  if (locationIn != null || locationOut != null) ...[
-                    Text('Lokasi', style: theme.textTheme.titleSmall),
-                    const SizedBox(height: 8),
-                    if (locationIn != null)
-                      _kvRow(
-                        context,
-                        'Lokasi Masuk',
-                        locationIn.toString(),
-                        icon: Icons.location_on,
-                      ),
-                    if (locationOut != null)
-                      _kvRow(
-                        context,
-                        'Lokasi Keluar',
-                        locationOut.toString(),
-                        icon: Icons.location_on_outlined,
-                      ),
-                    const SizedBox(height: 12),
-                  ],
-
-                  // Actions (JANGAN pakai Expanded di dalam ListView)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.check),
-                      label: const Text('Tutup'),
-                      onPressed: () => Navigator.of(sheetContext).pop(),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ),
-            ),
-          );
-        },
-      );
-    },
-  );
-}
-
-Widget _kvRow(
-  BuildContext context,
-  String keyText,
-  String valueText, {
-  IconData? icon,
-}) {
-  final theme = Theme.of(context);
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (icon != null) ...[Icon(icon, size: 18), const SizedBox(width: 8)],
-        Expanded(
-          flex: 4,
-          child: Text(keyText, style: theme.textTheme.bodyMedium),
-        ),
-        Expanded(
-          flex: 6,
-          child: Text(
-            valueText,
-            textAlign: TextAlign.right,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _statusRow(
-  BuildContext context,
-  String keyText,
-  String valueText, {
-  bool isLate = false,
-}) {
-  final theme = Theme.of(context);
-  final cs = theme.colorScheme;
-  final color = isLate ? cs.error : cs.primary;
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4),
-    child: Row(
-      children: [
-        Expanded(
-          flex: 4,
-          child: Text(keyText, style: theme.textTheme.bodyMedium),
-        ),
-        Expanded(
-          flex: 6,
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: color.withAlpha(20),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: color.withAlpha(30)),
-              ),
-              child: Text(
-                valueText,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: .2,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-Widget _imageTile(
-  BuildContext context, {
-  required String title,
-  required String url,
-}) {
-  final theme = Theme.of(context);
-  final cs = theme.colorScheme;
-  return InkWell(
-    onTap: () {
-      showDialog(
+    return InkWell(
+      borderRadius: AppRadii.xlAll,
+      onTap: () => showDialog<void>(
         context: context,
-        builder: (dCtx) => Dialog(
-          insetPadding: const EdgeInsets.all(16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+        builder: (_) => Dialog(
+          insetPadding: const EdgeInsets.all(AppSpacing.lg),
+          // Kerudung yang sama dengan lapisan di atas kamera, bukan ejaan
+          // keempat dari hitam transparan.
+          backgroundColor: palette.overlayScrim,
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: AppRadii.xlAll,
             child: InteractiveViewer(
-              child: Image.network(
-                url,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => SizedBox(
-                  height: 220,
-                  child: Center(
-                    child: Icon(Icons.broken_image, color: cs.outline),
-                  ),
-                ),
-              ),
+              child: Image.network(url, fit: BoxFit.contain),
             ),
           ),
         ),
-      );
-    },
-    child: Container(
-      height: 140,
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.network(
+      ),
+      child: Container(
+        height: 140,
+        decoration: BoxDecoration(
+          color: palette.surfaceSubtle,
+          borderRadius: AppRadii.xlAll,
+          border: Border.all(color: palette.borderSubtle),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.network(
               url,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
-                  Center(child: Icon(Icons.broken_image, color: cs.outline)),
-            ),
-          ),
-          Positioned(
-            left: 8,
-            top: 8,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.black.withAlpha(150),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                title,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: Colors.white,
+              errorBuilder: (_, _, _) => Center(
+                child: Icon(
+                  Icons.image_not_supported_outlined,
+                  size: AppIconSizes.xl,
+                  color: palette.textMuted,
                 ),
               ),
             ),
-          ),
-        ],
+            Positioned(
+              left: AppSpacing.sm,
+              top: AppSpacing.sm,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: palette.overlayScrim,
+                  borderRadius: AppRadii.smAll,
+                ),
+                child: Text(
+                  title.toUpperCase(),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: palette.onOverlay,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

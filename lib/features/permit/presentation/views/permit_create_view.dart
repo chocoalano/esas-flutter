@@ -1,203 +1,296 @@
-import 'package:esas/app/routes/app_pages.dart';
-import 'package:esas/utils/helper.dart';
+import 'package:esas/core/theme/app_dimens.dart';
+import 'package:esas/core/theme/app_palette.dart';
+import 'package:esas/core/ui/components/app_button.dart';
+import 'package:esas/core/ui/components/app_card.dart';
+import 'package:esas/core/ui/components/app_input_decoration.dart';
+import 'package:esas/core/ui/components/app_section_header.dart';
+import 'package:esas/core/ui/components/app_skeleton.dart';
+import 'package:esas/features/permit/presentation/routes/permit_routes.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+
 import '../controllers/permit_create_controller.dart';
 
-class PermitCreate extends GetView<PermitCreateController> {
-  const PermitCreate({super.key});
+/// Formulir pengajuan izin.
+///
+/// Tata letaknya berubah dari satu kolom panjang berisi belasan field sejajar
+/// menjadi tiga bagian bernama — jadwal, waktu, keterangan — sehingga panjang
+/// formulir terbaca sebagai tiga langkah pendek dan bukan satu daftar tanpa
+/// ujung.
+///
+/// Label pindah ke atas kotak isian. Label mengambang bawaan Material bergerak
+/// dan mengecil saat field mendapat fokus; pada formulir sepanjang ini,
+/// belasan label yang bergeser-geser membuat kolom terasa gelisah. Teks
+/// penjelas tetap ada di bawah setiap field — isinya berharga dan itulah yang
+/// menjadikan formulir ini informatif — hanya kini dicetak dengan warna redup
+/// supaya tidak bersaing dengan apa yang diketik pengguna.
+///
+/// Tombol simpan pindah ke bilah tetap di kaki layar, jadi ia tidak perlu
+/// dicari dengan menggulir sampai dasar.
+class PermitCreateView extends GetView<PermitCreateController> {
+  const PermitCreateView({super.key});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    void back() => Get.offAllNamed(
+      PermitRoutes.list,
+      arguments: controller.createType.value,
+    );
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (didPop) {
-          return;
-        }
-        Get.offAllNamed(
-          Routes.PERMIT_LIST,
-          arguments: controller.createType.value,
-        );
+        if (didPop) return;
+        back();
       },
       child: Scaffold(
         appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            tooltip: 'Kembali',
+            onPressed: back,
+          ),
+          titleSpacing: 0,
           title: Obx(
             () => Text(
-              'Buat ${controller.createType.value.type}',
-              style:
-                  theme.appBarTheme.titleTextStyle ??
-                  theme.textTheme.titleLarge?.copyWith(
-                    color: theme.appBarTheme.foregroundColor,
-                  ),
-            ),
-          ),
-          backgroundColor: theme.appBarTheme.backgroundColor,
-          foregroundColor: theme.appBarTheme.foregroundColor,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios),
-            onPressed: () => Get.offAllNamed(
-              Routes.PERMIT_LIST,
-              arguments: controller.createType.value,
+              controller.createType.value.type,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ),
         body: SafeArea(
           child: Obx(() {
             if (controller.isLoading.value) {
-              return _buildLoading(theme);
+              return const Padding(
+                padding: EdgeInsets.only(top: AppSpacing.lg),
+                child: AppSkeletonList(count: 4),
+              );
             }
             return _buildForm(context, theme);
           }),
         ),
-      ),
-    );
-  }
-
-  Widget _buildLoading(ThemeData theme) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(color: theme.colorScheme.primary),
-          const SizedBox(height: 16),
-          Text('Memuat data formulir...', style: theme.textTheme.titleMedium),
-        ],
+        bottomNavigationBar: _SubmitBar(controller: controller),
       ),
     );
   }
 
   Widget _buildForm(BuildContext context, ThemeData theme) {
+    final bool isTimeAdjustment = controller.isTimeAdjustment;
+    final bool isShiftAdjustment = controller.isShiftAdjustment;
+    final bool needsFile = controller.createType.value.withFile;
+
     return Form(
       key: controller.formKey,
+      // Sebuah kolom di dalam penggulir, bukan `ListView`. Bedanya bukan gaya:
+      // `ListView` melepas field yang tergulir keluar layar, dan field yang
+      // lepas ikut lepas dari `Form` — `validate()` melewatinya begitu saja.
+      // Dengan tombol kirim yang menetap di kaki layar, orang bisa menekannya
+      // tanpa pernah menggulir ke bawah, dan "Jam mulai wajib diisi" tidak
+      // pernah sempat berbunyi.
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.page,
+          AppSpacing.xl,
+          AppSpacing.page,
+          AppSpacing.xxl,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildDropdownSchedule(theme),
-            _spacer(),
-            _buildTextFormField(
-              controller.permitNumberC,
-              theme,
-              'Nomor Izin',
-              validator: (val) {
-                if (val == null || val.isEmpty) return 'Nomor Izin wajib diisi';
-                if (val.length > 50) return 'Nomor Izin maksimal 50 karakter';
-                return null;
-              },
-              description:
-                  'Setiap permohonan akan memiliki nomor unik yang akan menjadi identitas data.',
-              readOnly: true,
+            const AppSectionHeader(title: 'Jadwal kerja'),
+            _Field(
+              label: 'Jadwal kerja',
+              required: true,
+              description: controller.scheduleList.isEmpty
+                  ? 'Tidak ada jadwal kerja yang bisa dipakai. Hubungi HR '
+                        'sebelum mengajukan.'
+                  : 'Pilih jadwal kerja yang menjadi acuan pengajuan ini. '
+                        'Tanggal di bawah mengikuti pilihan ini.',
+              child: _buildDropdownSchedule(theme),
             ),
-            _spacer(),
-            if (controller.selectedPermitTypeId.value == 15) ...[
-              _buildTimePickerField(
-                context,
-                theme,
-                'Jam Masuk Penyesuaian',
-                controller.timeinAdjustC,
-                description:
-                    'Masukkan jam dengan format 24 jam (misalnya 08:30), lalu pilih jam masuk yang akan dijadikan acuan untuk penyesuaian data.',
+
+            if (isShiftAdjustment) ...[
+              const SizedBox(height: AppSpacing.lg),
+              const AppSectionHeader(title: 'Penyesuaian shift'),
+              _Field(
+                label: 'Shift saat ini',
+                required: true,
+                description: 'Shift yang berlaku sebelum penyesuaian.',
+                child: _buildDropdownShift(
+                  theme,
+                  'Shift Saat Ini',
+                  controller.selectedCurrentShiftId,
+                  validator: (v) =>
+                      v == null ? 'Shift saat ini wajib diisi' : null,
+                ),
               ),
-              _spacer(),
-              _buildTimePickerField(
-                context,
-                theme,
-                'Jam Pulang Penyesuaian',
-                controller.timeoutAdjustC,
-                validateAfter: controller.timeinAdjustC,
-                description:
-                    'Masukkan jam dengan format 24 jam (misalnya 08:30), lalu pilih jam pulang yang akan dijadikan acuan untuk penyesuaian data.',
+              _Field(
+                label: 'Shift penyesuaian',
+                required: true,
+                description: 'Shift yang diminta setelah penyesuaian.',
+                child: _buildDropdownShift(
+                  theme,
+                  'Shift Penyesuaian',
+                  controller.selectedAdjustShiftId,
+                  validator: (v) {
+                    if (v == null) return 'Shift penyesuaian wajib diisi';
+                    // Tukar shift dengan shift yang sama bukan pengajuan; dulu
+                    // justru itu yang terkirim, karena formulir memilihkan
+                    // shift pertama untuk kedua dropdown.
+                    if (v == controller.selectedCurrentShiftId.value) {
+                      return 'Pilih shift yang berbeda dari shift saat ini';
+                    }
+                    return null;
+                  },
+                ),
               ),
-              _spacer(),
             ],
-            if (controller.selectedPermitTypeId.value == 16) ...[
-              _buildDropdownShift(
-                theme,
-                'Shift Saat Ini (opsional)',
-                controller.selectedCurrentShiftId,
+
+            const SizedBox(height: AppSpacing.lg),
+            const AppSectionHeader(title: 'Waktu'),
+
+            if (isTimeAdjustment) ...[
+              _Field(
+                label: 'Jam masuk penyesuaian',
+                description:
+                    'Format 24 jam, misalnya 08:30. Jam ini menjadi acuan '
+                    'penyesuaian data absensi masuk. Isi minimal salah satu '
+                    'dari dua jam penyesuaian.',
+                child: _buildTimePickerField(
+                  context,
+                  theme,
+                  'Jam Masuk Penyesuaian',
+                  controller.timeinAdjustC,
+                ),
               ),
-              _spacer(),
-              _buildDropdownShift(
-                theme,
-                'Shift Penyesuaian (opsional)',
-                controller.selectedAdjustShiftId,
+              _Field(
+                label: 'Jam pulang penyesuaian',
+                description:
+                    'Format 24 jam, misalnya 17:00. Harus setelah jam masuk '
+                    'penyesuaian.',
+                child: _buildTimePickerField(
+                  context,
+                  theme,
+                  'Jam Pulang Penyesuaian',
+                  controller.timeoutAdjustC,
+                  validateAfter: controller.timeinAdjustC,
+                ),
               ),
-              _spacer(),
             ],
+
             if (controller.selectedScheduleId.value != null) ...[
-              _buildDatePickerField(
-                context,
-                theme,
-                'Tanggal Mulai',
-                controller.startDateC,
-                description:
-                    'Masukkan tanggal dengan format YYYY-MM-DD, atau pilih tanggal mulai aktual saat ini yang akan dijadikan acuan untuk penyesuaian data.',
+              _Field(
+                label: 'Tanggal mulai',
+                required: true,
+                description: 'Hari pertama izin ini berlaku.',
+                child: _buildDatePickerField(
+                  context,
+                  theme,
+                  'Tanggal Mulai',
+                  controller.startDateC,
+                ),
               ),
-              _spacer(),
-              _buildDatePickerField(
-                context,
-                theme,
-                'Tanggal Selesai',
-                controller.endDateC,
-                validateAfterDate: controller.startDateC,
+              _Field(
+                label: 'Tanggal selesai',
+                required: true,
                 description:
-                    'Masukkan tanggal dengan format YYYY-MM-DD, atau pilih tanggal selesai aktual saat ini yang akan dijadikan acuan untuk penyesuaian data.',
+                    'Hari terakhir izin ini berlaku. Untuk izin sehari, '
+                    'sama dengan tanggal mulai.',
+                child: _buildDatePickerField(
+                  context,
+                  theme,
+                  'Tanggal Selesai',
+                  controller.endDateC,
+                  notBeforeDate: controller.startDateC,
+                ),
               ),
             ],
-            _spacer(),
-            _buildTimePickerField(
-              context,
-              theme,
-              'Jam Mulai',
-              controller.startTimeC,
-              isRequired: true,
-              description:
-                  'Masukkan jam dengan format 24 jam (misalnya 08:30), lalu pilih jam masuk aktual saat ini yang akan dijadikan acuan untuk penyesuaian data.',
+
+            _Field(
+              label: 'Jam mulai',
+              required: true,
+              description: 'Format 24 jam, misalnya 08:30.',
+              child: _buildTimePickerField(
+                context,
+                theme,
+                'Jam Mulai',
+                controller.startTimeC,
+                isRequired: true,
+              ),
             ),
-            _spacer(),
-            _buildTimePickerField(
-              context,
-              theme,
-              'Jam Selesai',
-              controller.endTimeC,
-              isRequired: true,
-              description:
-                  'Masukkan jam dengan format 24 jam (misalnya 08:30), lalu pilih jam pulang aktual saat ini yang akan dijadikan acuan untuk penyesuaian data.',
+            _Field(
+              label: 'Jam selesai',
+              required: true,
+              description: 'Format 24 jam, misalnya 17:00.',
+              child: _buildTimePickerField(
+                context,
+                theme,
+                'Jam Selesai',
+                controller.endTimeC,
+                isRequired: true,
+                validateAfter: controller.startTimeC,
+                // Hanya untuk izin sehari. Izin yang melewati tengah malam sah
+                // berakhir pada jam yang lebih kecil daripada jam mulainya.
+                sameDayOnly: true,
+              ),
             ),
-            _spacer(),
-            _buildTextFormField(
-              controller.notesC,
-              theme,
-              'Catatan (opsional)',
-              maxLines: 3,
-              maxLength: 255,
+
+            const SizedBox(height: AppSpacing.lg),
+            const AppSectionHeader(title: 'Keterangan'),
+            _Field(
+              label: 'Catatan',
               description:
-                  'Kamu bisa menambahkan keterangan untuk memberikan informasi tentang permohonan yang kamu ajukan.',
+                  'Opsional. Jelaskan alasan pengajuan agar penyetuju tidak '
+                  'perlu bertanya ulang.',
+              child: _buildTextFormField(
+                controller.notesC,
+                theme,
+                'Catatan',
+                maxLines: 4,
+                // Sepanjang yang diterima `StorePermitRequest`. Batas 255 yang
+                // lama memotong catatan yang sebenarnya sah.
+                maxLength: 2000,
+              ),
             ),
-            _spacer(),
-            _buildFilePicker(theme),
-            const SizedBox(height: 24),
-            _buildSubmitButton(theme),
+            _Field(
+              label: 'Lampiran',
+              // Daftar jenis izin sudah memasang lencana "Perlu lampiran" untuk
+              // jenis ini; formulirnya dulu tetap menyebut lampiran opsional
+              // dan membiarkan pengajuan berangkat tanpa berkas, untuk ditolak
+              // server.
+              required: needsFile,
+              description: needsFile
+                  ? 'Wajib untuk jenis izin ini. JPG, PNG atau PDF, '
+                        'maksimal 5 MB.'
+                  : 'Opsional. JPG, PNG atau PDF, maksimal 5 MB.',
+              child: _FilePicker(controller: controller),
+            ),
           ],
         ),
       ),
     );
   }
 
+  // ---------------------------------------------------------------------
+  // Field builders.
+  // ---------------------------------------------------------------------
+
   Widget _buildDropdownSchedule(ThemeData theme) => Obx(
     () => DropdownButtonFormField<int>(
       initialValue: controller.selectedScheduleId.value,
-      decoration: inputDecoration(theme, 'Jadwal Kerja'),
+      decoration: appInputDecoration(theme, ''),
+      isExpanded: true,
+      hint: const Text('Pilih jadwal kerja'),
       items: controller.scheduleList
           .map(
             (item) => DropdownMenuItem<int>(
               value: item.id,
               child: Text(
-                item.formattedWorkDay,
+                // Tanggal, shift, dan penanda "sudah absen" — server mengirim
+                // ketiganya justru supaya bisa dibaca sebelum memilih.
+                item.optionLabel,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -211,10 +304,13 @@ class PermitCreate extends GetView<PermitCreateController> {
   Widget _buildDropdownShift(
     ThemeData theme,
     String label,
-    Rx<int?> selectedValue,
-  ) => DropdownButtonFormField<int>(
+    Rx<int?> selectedValue, {
+    String? Function(int?)? validator,
+  }) => DropdownButtonFormField<int>(
     initialValue: selectedValue.value,
-    decoration: inputDecoration(theme, label),
+    decoration: appInputDecoration(theme, ''),
+    isExpanded: true,
+    hint: Text('Pilih $label'.toLowerCase()),
     items: controller.shiftList
         .map(
           (item) => DropdownMenuItem<int>(
@@ -224,41 +320,31 @@ class PermitCreate extends GetView<PermitCreateController> {
         )
         .toList(),
     onChanged: (v) => selectedValue.value = v,
+    validator: validator,
   );
 
   Widget _buildTextFormField(
     TextEditingController ctrl,
     ThemeData theme,
-    String? label, { // label nullable
+    String label, {
     String? Function(String?)? validator,
     int maxLines = 1,
     int? maxLength,
-    String? description, // opsional
-    bool readOnly = false, // <-- opsi tambahan
+    bool readOnly = false,
   }) {
     return TextFormField(
       controller: ctrl,
-      decoration:
-          inputDecoration(
-            theme,
-            label ?? '-', // fallback label
-          ).copyWith(
-            helper: (description?.isNotEmpty ?? false)
-                ? Text(
-                    description!,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    softWrap: true,
-                    overflow: TextOverflow.visible,
-                    maxLines: null, // biar bisa multi-line tanpa batas
-                  )
-                : null,
-          ),
+      decoration: appInputDecoration(theme, '').copyWith(
+        hintText: label,
+        // Penghitung karakter disembunyikan: ia menambah satu baris di bawah
+        // setiap field padahal batasnya sudah dipaksakan oleh `maxLength`.
+        counterText: '',
+      ),
       validator: validator,
       maxLines: maxLines,
       maxLength: maxLength,
-      readOnly: readOnly, // <-- dipakai di sini
+      readOnly: readOnly,
+      textCapitalization: TextCapitalization.sentences,
     );
   }
 
@@ -267,35 +353,15 @@ class PermitCreate extends GetView<PermitCreateController> {
     ThemeData theme,
     String label,
     TextEditingController controller, {
-    TextEditingController? validateAfterDate,
-    String? description, // <- opsional & null-safety
+    TextEditingController? notBeforeDate,
   }) => TextFormField(
     controller: controller,
     readOnly: true,
     onTap: () async => await this.controller.pickDate(context, controller),
-    decoration:
-        inputDecoration(
-          theme,
-          label,
-          hintText: 'YYYY-MM-DD',
-          suffixIcon: Icon(
-            Icons.calendar_today,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ).copyWith(
-          // helper sebagai widget: bisa multi-line, tidak overflow
-          helper: (description?.isNotEmpty ?? false)
-              ? Text(
-                  description!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  softWrap: true,
-                  overflow: TextOverflow.visible,
-                  maxLines: null,
-                )
-              : null,
-        ),
+    decoration: appInputDecoration(theme, '').copyWith(
+      hintText: 'YYYY-MM-DD',
+      suffixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
+    ),
     validator: (val) {
       final value = val?.trim();
       if (value == null || value.isEmpty) return '$label wajib diisi';
@@ -309,21 +375,32 @@ class PermitCreate extends GetView<PermitCreateController> {
       final date = DateTime.tryParse(value);
       if (date == null) return 'Format tanggal tidak valid';
 
-      // Validasi terhadap validateAfterDate (jika ada & valid)
-      final afterRaw = validateAfterDate?.text.trim();
-      if (afterRaw != null && afterRaw.isNotEmpty && basic.hasMatch(afterRaw)) {
-        final afterDate = DateTime.tryParse(afterRaw);
-        if (afterDate != null) {
-          // Heuristik label: jika mengandung "Selesai" harus setelah Mulai
-          if (label.toLowerCase().contains('selesai') &&
-              !date.isAfter(afterDate)) {
-            return 'Harus setelah tanggal mulai';
-          }
-          // Jika label mengandung "Mulai" harus sebelum Selesai
-          if (label.toLowerCase().contains('mulai') &&
-              !date.isBefore(afterDate)) {
-            return 'Harus sebelum tanggal selesai';
-          }
+      // Di luar jendela roster, server menolak dengan `permit_no_schedule`.
+      // Pemilih tanggal sudah dibatasi ke jendela itu, tetapi isian field bisa
+      // datang dari tempat lain — state yang dipulihkan, tautan dalam — dan
+      // penolakan yang bisa dijelaskan di sini lebih baik daripada penolakan
+      // yang datang setelah formulir dikirim.
+      final DateTime first = this.controller.earliestDate;
+      final DateTime last = this.controller.latestDate;
+
+      if (date.isBefore(first) || date.isAfter(last)) {
+        final format = this.controller.dateFormatter;
+
+        return 'Di luar jadwal kerja Anda '
+            '(${format.format(first)} s.d. ${format.format(last)})';
+      }
+
+      // Tanggal selesai boleh sama dengan tanggal mulai — izin sehari adalah
+      // bentuk yang paling sering diajukan. Aturan lama menuntut "setelah",
+      // padahal memilih jadwal mengisi kedua tanggal dengan hari yang sama:
+      // formulir terbuka dalam keadaan yang tidak mungkin dikirim.
+      final beforeRaw = notBeforeDate?.text.trim();
+      if (beforeRaw != null &&
+          beforeRaw.isNotEmpty &&
+          basic.hasMatch(beforeRaw)) {
+        final startDate = DateTime.tryParse(beforeRaw);
+        if (startDate != null && date.isBefore(startDate)) {
+          return 'Tidak boleh sebelum tanggal mulai';
         }
       }
       return null;
@@ -337,108 +414,301 @@ class PermitCreate extends GetView<PermitCreateController> {
     TextEditingController controller, {
     bool isRequired = false,
     TextEditingController? validateAfter,
-    String? description, // opsional & null safety
+    bool sameDayOnly = false,
   }) => TextFormField(
     controller: controller,
     readOnly: true,
     onTap: () => this.controller.pickTime(context, controller),
-    decoration:
-        inputDecoration(
-          theme,
-          label,
-          hintText: 'HH:mm',
-          suffixIcon: Icon(
-            Icons.access_time,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ).copyWith(
-          helper: (description?.isNotEmpty ?? false)
-              ? Text(
-                  description!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  softWrap: true,
-                  overflow: TextOverflow.visible,
-                  maxLines: null, // biar bisa multi-line tanpa batas
-                )
-              : null,
-        ),
+    decoration: appInputDecoration(theme, '').copyWith(
+      hintText: 'HH:mm',
+      suffixIcon: const Icon(Icons.access_time_rounded, size: 18),
+    ),
     validator: (val) {
-      final cleanedVal = val
-          ?.replaceAll(
-            RegExp(r'[^\x20-\x7E]'),
-            '',
-          ) // bersihkan karakter non-printable
-          .replaceAll('.', ':') // ubah titik jadi titik dua
-          .trim();
+      final raw = val?.trim() ?? '';
 
-      if (!isRequired && (cleanedVal == null || cleanedVal.isEmpty)) {
-        return null;
-      }
-      if (cleanedVal == null || cleanedVal.isEmpty) {
-        return '$label wajib diisi';
+      if (raw.isEmpty) {
+        return isRequired ? '$label wajib diisi' : null;
       }
 
-      final reg = RegExp(r'^\d{2}:\d{2}$');
-      if (!reg.hasMatch(cleanedVal)) {
+      // Dibandingkan sebagai menit, bukan sebagai teks. `compareTo` atas dua
+      // string jam memberi jawaban yang salah begitu kedua sisi memakai
+      // pemisah yang berbeda, dan itulah keadaan normalnya di sini.
+      final int? minutes = PermitCreateController.minutesOfDay(raw);
+      if (minutes == null) {
         return 'Format jam tidak valid (HH:mm)';
       }
 
-      if (validateAfter != null &&
-          validateAfter.text.isNotEmpty &&
-          cleanedVal.compareTo(validateAfter.text.trim()) <= 0) {
-        return 'Harus setelah ${validateAfter.text}';
+      final String otherRaw = validateAfter?.text.trim() ?? '';
+      final int? other = otherRaw.isEmpty
+          ? null
+          : PermitCreateController.minutesOfDay(otherRaw);
+
+      if (other != null &&
+          (!sameDayOnly || this.controller.isSingleDay) &&
+          minutes <= other) {
+        return 'Harus setelah ${PermitCreateController.canonicalTime(otherRaw)}';
       }
       return null;
     },
   );
+}
 
-  Widget _buildFilePicker(ThemeData theme) => Row(
-    children: [
-      Expanded(
-        child: Obx(
-          () => Text(
-            controller.selectedFile.value?.name ?? 'Belum pilih file',
-            style: theme.textTheme.bodyMedium,
-            overflow: TextOverflow.ellipsis,
+/// Satu field beserta label di atasnya dan teks penjelas di bawahnya.
+class _Field extends StatelessWidget {
+  const _Field({
+    required this.label,
+    required this.child,
+    this.description,
+    this.required = false,
+  });
+
+  final String label;
+  final Widget child;
+  final String? description;
+  final bool required;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppFieldLabel(label, required: required),
+          child,
+          if (description != null) ...[
+            const SizedBox(height: AppSpacing.sm - 2),
+            Text(
+              description!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.palette.textMuted,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Pemilih berkas: satu kartu yang menunjukkan keadaannya sendiri.
+///
+/// Sebelumnya berupa teks "Belum pilih file" di sebelah tombol berwarna
+/// sekunder. Setelah berkas dipilih, satu-satunya perubahan adalah teks itu
+/// berganti nama berkas — dan tidak ada cara untuk membatalkannya.
+class _FilePicker extends StatelessWidget {
+  const _FilePicker({required this.controller});
+
+  final PermitCreateController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
+
+    return Obx(() {
+      final file = controller.selectedFile.value;
+
+      if (file == null) {
+        return AppCard(
+          onTap: controller.pickFile,
+          color: palette.surfaceSubtle,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.lg,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.upload_file_outlined,
+                size: 18,
+                color: palette.textMuted,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Text(
+                  'Pilih berkas',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
+      return AppCard(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.md,
+        ),
+        child: Row(
+          children: [
+            const AppIconBox(icon: Icons.description_outlined, size: 32),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Text(
+                file.name,
+                style: theme.textTheme.titleSmall,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            IconButton(
+              tooltip: 'Ganti berkas',
+              onPressed: controller.pickFile,
+              icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+            ),
+            // Melepas lampiran yang terlanjur dipilih. Sebelumnya satu-satunya
+            // cara adalah membatalkan pemilih berkas, yang memang menghapusnya
+            // — tetapi sebagai efek samping, bukan sebagai pilihan.
+            IconButton(
+              tooltip: 'Hapus lampiran',
+              onPressed: controller.clearFile,
+              icon: const Icon(Icons.close_rounded, size: 18),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+}
+
+/// Bilah simpan di kaki layar, beserta laporan hasil validasinya.
+///
+/// Sebelumnya kegagalan validasi dijawab sebuah toast di TEPI ATAS layar —
+/// sekitar 200px di atas ibu jari yang baru saja menekan tombolnya — yang
+/// berbunyi "Periksa kembali formulir." dan tidak menyebutkan berapa isian
+/// yang salah maupun di mana. Pada formulir sepanjang ini, "periksa kembali"
+/// berarti menggulir seluruh formulir dari awal.
+///
+/// Sekarang jumlahnya dilaporkan di baris tepat di atas tombol yang ditekan,
+/// dan layar menggulir sendiri ke field pertama yang bermasalah.
+class _SubmitBar extends StatefulWidget {
+  const _SubmitBar({required this.controller});
+
+  final PermitCreateController controller;
+
+  @override
+  State<_SubmitBar> createState() => _SubmitBarState();
+}
+
+class _SubmitBarState extends State<_SubmitBar> {
+  /// Berapa field yang gagal divalidasi pada percobaan terakhir. Nol berarti
+  /// belum pernah gagal, atau kegagalan yang lalu sudah dibereskan.
+  int _errorCount = 0;
+
+  void _submit() {
+    final FormState? form = widget.controller.formKey.currentState;
+
+    // `validate()` dipanggil di sini supaya jumlah dan urutan field yang salah
+    // bisa dibaca dari pohon yang sama. `createPermit()` memvalidasi ulang —
+    // validator di sini tidak punya efek samping, jadi menjalankannya dua kali
+    // memberi jawaban yang sama.
+    if (form?.validate() ?? false) {
+      if (_errorCount != 0) setState(() => _errorCount = 0);
+      widget.controller.createPermit();
+      return;
+    }
+
+    final List<FormFieldState<dynamic>> errored = _erroredFields(form);
+
+    setState(() => _errorCount = errored.length);
+
+    if (errored.isEmpty) return;
+
+    // Field pertama dalam urutan pohon adalah field teratas dalam urutan
+    // layar: formulir ini satu kolom di dalam satu penggulir.
+    Scrollable.ensureVisible(
+      errored.first.context,
+      alignment: 0.1,
+      duration: AppDurations.normal,
+      curve: AppMotion.standard,
+    );
+  }
+
+  /// Field yang sedang membawa pesan galat, dalam urutan gambar.
+  ///
+  /// `FormState` tidak mengekspos field-fieldnya, jadi pohonnya yang ditelusuri.
+  /// Hasilnya urut sesuai urutan anak — yang di formulir ini sama dengan urutan
+  /// dari atas ke bawah.
+  static List<FormFieldState<dynamic>> _erroredFields(FormState? form) {
+    final BuildContext? formContext = form?.context;
+
+    if (formContext == null) return const [];
+
+    final List<FormFieldState<dynamic>> found = <FormFieldState<dynamic>>[];
+
+    void visitor(Element element) {
+      if (element is StatefulElement) {
+        final State<StatefulWidget> state = element.state;
+        if (state is FormFieldState<dynamic> && state.hasError) {
+          found.add(state);
+        }
+      }
+      element.visitChildren(visitor);
+    }
+
+    formContext.visitChildElements(visitor);
+
+    return found;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(top: BorderSide(color: palette.borderSubtle)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_errorCount > 0) ...[
+                Semantics(
+                  liveRegion: true,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.error_outline_rounded,
+                        size: AppIconSizes.md,
+                        color: palette.danger.foreground,
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          '$_errorCount isian perlu diperbaiki',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: palette.danger.foreground,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
+              Obx(
+                () => AppButton(
+                  label: 'Kirim pengajuan',
+                  busy: widget.controller.isSubmitting.value,
+                  onPressed: _submit,
+                ),
+              ),
+            ],
           ),
         ),
       ),
-      const SizedBox(width: 8),
-      ElevatedButton.icon(
-        onPressed: controller.pickFile,
-        icon: const Icon(Icons.attach_file),
-        label: const Text('Pilih File'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: theme.colorScheme.secondary,
-          foregroundColor: theme.colorScheme.onSecondary,
-        ),
-      ),
-    ],
-  );
-
-  Widget _buildSubmitButton(ThemeData theme) => Obx(
-    () => ElevatedButton(
-      onPressed: controller.isSubmitting.value ? null : controller.createPermit,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        elevation: 3,
-      ),
-      child: controller.isSubmitting.value
-          ? CircularProgressIndicator(color: theme.colorScheme.onPrimary)
-          : Text(
-              'Simpan Permohonan',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onPrimary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-    ),
-  );
-
-  Widget _spacer() => const SizedBox(height: 16);
+    );
+  }
 }

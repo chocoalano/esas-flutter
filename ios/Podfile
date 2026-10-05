@@ -1,5 +1,5 @@
 # Uncomment this line to define a global platform for your project
-platform :ios, '15.0'
+platform :ios, '15.6'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -39,5 +39,44 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+
+    # ── Why there is NO `EXCLUDED_ARCHS` workaround here ──────────────────
+    #
+    # ML Kit's `MLImage` ships a fat framework whose arm64 slice is built for a
+    # DEVICE, so an arm64 simulator build cannot link against it:
+    #
+    #   Building for 'iOS-simulator', but linking in object file
+    #   (…/MLImage.framework/MLImage[arm64]) built for 'iOS'
+    #
+    # The usual fix is to set `EXCLUDED_ARCHS[sdk=iphonesimulator*] = arm64`
+    # here. It was tried, and then removed, because **the Flutter tool already
+    # does it** — and doing it twice is worse than not doing it at all.
+    #
+    # `xcode_build_settings.dart` writes `EXCLUDED_ARCHS[sdk=iphonesimulator*]`
+    # into `Flutter/Generated.xcconfig` on every build, adding `arm64` whenever
+    # `IosProject.pluginsSupportArmSimulator()` answers false — which it does
+    # both when a pod already excludes arm64 and when it cannot read the pods'
+    # settings at all. So a workaround written here does not merely duplicate
+    # Flutter's: it *teaches Flutter's probe* to keep excluding arm64, and it
+    # additionally applies the setting to the Runner target, which Flutter does
+    # not.
+    #
+    # ## What this means for anybody reading a green build
+    #
+    # `flutter build ios --simulator` succeeds and produces an **x86_64** app.
+    # iOS 17+ simulators dropped x86_64, so on an Apple Silicon Mac that artifact
+    # installs on nothing — `simctl install` answers "This app needs to be
+    # updated by the developer." The green is structural to the toolchain for any
+    # project with a plugin lacking an arm64-simulator slice; it cannot be turned
+    # into a loud failure from this file.
+    #
+    # **Therefore: a successful simulator build is not evidence of anything for
+    # this app.** iOS QA is physical-device, which is a deliberate product
+    # decision. Check with `lipo -info build/ios/iphonesimulator/Runner.app/Runner`
+    # if you need to see it for yourself.
+    #
+    # The real fix is Google shipping MLImage as an xcframework with an
+    # arm64-simulator slice; `1.0.0-beta8` is the newest and has none.
+
   end
 end

@@ -1,0 +1,13 @@
+# Release signing credentials. Copy to `android/key.properties` and fill in.
+#
+# This file is an example and is committed. `key.properties` itself is not, and
+# must never be: it names a keystore and carries its passwords.
+#
+# A debug build needs none of this. Gradle only asks for these when a release is
+# actually being built (`assembleRelease` / `bundleRelease`), and refuses to
+# produce an unsigned one — see `android/app/build.gradle.kts`.
+
+storeFile=../esas-keystore.jks
+storePassword=
+keyAlias=
+keyPassword=

@@ -39,8 +39,6 @@
 	<string>Aplikasi ini membutuhkan akses lokasi Anda setiap saat untuk memverifikasi lokasi absensi Anda.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Aplikasi ini membutuhkan akses lokasi Anda saat digunakan untuk memverifikasi lokasi absensi Anda.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Aplikasi ini membutuhkan akses ke mikrofon Anda untuk merekam video (jika ada fitur terkait).</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Aplikasi ini membutuhkan akses ke galeri foto Anda untuk mengunggah foto profil.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

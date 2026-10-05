@@ -1,117 +1,194 @@
-import 'package:esas/app/routes/app_pages.dart';
+import 'package:esas/core/theme/app_dimens.dart';
+import 'package:esas/core/theme/app_palette.dart';
+import 'package:esas/core/ui/components/app_card.dart';
+import 'package:esas/core/ui/components/app_empty_state.dart';
+import 'package:esas/core/ui/components/app_skeleton.dart';
+import 'package:esas/features/home/data/models/announcement.dart';
+import 'package:esas/features/home/presentation/routes/home_routes.dart';
+import 'package:esas/core/utils/date_formatter.dart';
+import 'package:esas/core/utils/string_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_html/flutter_html.dart';
 import 'package:get/get.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../controllers/announcement_controller.dart';
 
-class AnnouncementView extends StatelessWidget {
+/// Daftar pengumuman.
+///
+/// Kartu di daftar ini sebelumnya merender isi HTML pengumuman secara penuh
+/// lewat paket `flutter_html` — sebuah pengumuman sepanjang tiga paragraf
+/// menghasilkan kartu setinggi layar, dan menggulir daftarnya berarti membaca
+/// semuanya. Di sini isi dipotong menjadi cuplikan tiga baris; naskah lengkap
+/// dengan tata letak aslinya tetap ada di halaman rincian.
+class AnnouncementView extends GetView<AnnouncementController> {
   const AnnouncementView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(AnnouncementController());
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pengumuman'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
-          onPressed: () => Get.offAllNamed(Routes.HOME),
+          icon: const Icon(Icons.arrow_back_rounded),
+          tooltip: 'Kembali',
+          onPressed: () => Get.offAllNamed(HomeRoutes.home),
         ),
+        title: const Text('Pengumuman'),
+        titleSpacing: 0,
       ),
       body: Obx(() {
         if (controller.isLoading.value && controller.lists.isEmpty) {
-          return const Center(child: CircularProgressIndicator());
+          return const Padding(
+            padding: EdgeInsets.only(top: AppSpacing.lg),
+            child: AppSkeletonList(count: 4),
+          );
         }
 
         if (controller.lists.isEmpty) {
-          return Center(
-            child: Text(
-              'Belum ada pengumuman.',
-              style: theme.textTheme.bodyMedium,
-            ),
+          return const AppEmptyState(
+            icon: Icons.campaign_outlined,
+            title: 'Belum ada pengumuman',
+            message: 'Pengumuman dari perusahaan akan muncul di sini.',
           );
         }
 
         return RefreshIndicator(
           onRefresh: controller.resetAndFetch,
-          child: ListView.builder(
+          child: ListView.separated(
             controller: controller.scrollController,
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.page,
+              AppSpacing.lg,
+              AppSpacing.page,
+              AppSpacing.bottomSafe,
+            ),
             itemCount: controller.lists.length + 1,
-            padding: const EdgeInsets.all(16),
+            separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
             itemBuilder: (context, index) {
               if (index < controller.lists.length) {
-                final announcement = controller.lists[index];
-                return _buildAnnouncementCard(announcement, theme);
-              } else {
-                return Obx(() {
-                  if (controller.isLoadMore.value) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  } else {
-                    return const SizedBox();
-                  }
-                });
+                return _AnnouncementCard(item: controller.lists[index]);
               }
+              return Obx(
+                () => controller.isLoadMore.value
+                    ? const AppSkeletonRow(showLeading: false)
+                    : const SizedBox.shrink(),
+              );
             },
           ),
         );
       }),
     );
   }
+}
 
-  Widget _buildAnnouncementCard(dynamic announcement, ThemeData theme) {
-    return InkWell(
+class _AnnouncementCard extends StatelessWidget {
+  const _AnnouncementCard({required this.item});
+
+  final Announcement item;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
+
+    // Sama seperti di carousel: endpoint daftar tidak mengirim badan
+    // pengumuman, jadi null di sini berarti "tidak diminta". Barisnya dibangun
+    // di sekitar judul, penerbit, dan tanggal — yang memang ada.
+    // `excerpt` HARUS ikut melewati pembersih, bukan hanya `content`.
+    // Ia dikirim server sebagai potongan HTML persis seperti badan
+    // pengumumannya, jadi versi yang memakainya apa adanya mencetak
+    // "&nbsp;BERIKUT LINK UNTUK MENGAKSES FILE TERSEBUT" ke layar — dan karena
+    // `excerpt` lebih didahulukan, jalur yang bersih justru yang tidak pernah
+    // terpakai pada baris daftar.
+    final String? snippet =
+        htmlToPlainText(item.excerpt) ?? htmlToPlainText(item.content);
+    final String? meta = _metaLine(item);
+
+    return AppCard(
       onTap: () =>
-          Get.toNamed(Routes.ANNOUNCEMENT_DETAIL, arguments: announcement.id),
-      child: Card(
-        color: theme.colorScheme.surface,
-        margin: const EdgeInsets.only(bottom: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+          Get.toNamed(HomeRoutes.announcementDetail, arguments: item.id),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                announcement.title ?? '(Tanpa Judul)',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+              const AppIconBox(icon: Icons.campaign_outlined, size: 34),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      // Judul yang datang HURUF KAPITAL SEMUA diturunkan di
+                      // sini juga, dengan helper yang sama yang dipakai kartu
+                      // di Beranda — satu judul tidak boleh dirender dalam dua
+                      // bentuk di dua layar.
+                      sentenceFromShout(item.title) ?? '(Tanpa judul)',
+                      style: theme.textTheme.titleMedium,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (meta != null) ...[
+                      const SizedBox(height: AppSpacing.xxs),
+                      Text(
+                        meta,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: palette.textMuted,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
                 ),
-              ),
-              const SizedBox(height: 8),
-              Html(
-                data: announcement.content ?? '',
-                style: {
-                  "body": Style(
-                    margin: Margins.zero,
-                    fontSize: FontSize.medium,
-                    color: theme.textTheme.bodyMedium?.color,
-                  ),
-                },
-                onLinkTap: (url, attributes, element) {
-                  if (url == null) return;
-                  final uri = Uri.tryParse(url);
-                  if (uri != null) {
-                    launchUrl(
-                      uri,
-                      mode: LaunchMode.externalApplication,
-                    ).catchError((e) {
-                      debugPrint('Gagal membuka URL: $url');
-                      return false;
-                    });
-                  }
-                },
               ),
             ],
           ),
-        ),
+          if (snippet != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              snippet,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              // `Flexible`: pada 320dp dengan skala teks 1,5 kalimat ini lebih
+              // lebar daripada kartunya. Ia membungkus, bukan meluap.
+              Flexible(
+                child: Text(
+                  'Baca selengkapnya',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xxs),
+              Icon(
+                Icons.arrow_forward_rounded,
+                size: AppIconSizes.sm,
+                color: theme.colorScheme.primary,
+              ),
+            ],
+          ),
+        ],
       ),
     );
+  }
+
+  static String? _metaLine(Announcement item) {
+    final parts = <String>[
+      if (item.publishedBy != null) item.publishedBy!,
+      if (item.createdAt != null)
+        DateFormatter.timestamp(item.createdAt, 'd MMM yyyy'),
+    ];
+
+    return parts.isEmpty ? null : parts.join(' • ');
   }
 }

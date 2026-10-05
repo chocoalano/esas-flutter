@@ -1,410 +1,481 @@
-// ignore_for_file: unnecessary_to_list_in_spreads
-
-import 'package:esas/app/routes/app_pages.dart';
-import 'package:esas/utils/api_constants.dart';
+import 'package:esas/core/config/env.dart';
+import 'package:esas/core/theme/app_dimens.dart';
+import 'package:esas/core/theme/app_palette.dart';
+import 'package:esas/core/theme/app_typography.dart';
+import 'package:esas/core/ui/components/app_badge.dart';
+import 'package:esas/core/ui/components/app_card.dart';
+import 'package:esas/core/ui/components/app_empty_state.dart';
+import 'package:esas/core/ui/components/app_section_header.dart';
+import 'package:esas/core/ui/components/app_skeleton.dart';
+import 'package:esas/core/ui/dialogs/app_bottom_sheet.dart';
+import 'package:esas/core/ui/dialogs/app_snackbar.dart';
+import 'package:esas/features/permit/data/models/leave_list.dart';
+import 'package:esas/features/permit/data/models/permit_variant.dart';
+import 'package:esas/features/permit/presentation/routes/permit_routes.dart';
+import 'package:esas/features/permit/presentation/widgets/permit_status.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart'; // Untuk memformat tanggal
-import 'package:url_launcher/url_launcher.dart'; // Untuk membuka URL (misal: file)
-import '../controllers/permit_show_controller.dart'; // Sesuaikan jalur import controller
-import 'package:esas/app/data/Permit/leave_list.m.dart'; // Import model Permit
-import 'package:esas/app/widgets/views/snackbar.dart'; // Pastikan ini diimpor jika digunakan di controller
+import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../controllers/permit_show_controller.dart';
+
+/// Rincian satu pengajuan izin.
+///
+/// Perubahan terbesar ada pada dua hal.
+///
+/// Pertama, alur persetujuan. Sebelumnya ia berupa daftar baris berbunyi
+/// "line: Menunggu Persetujuan", "manager: Disetujui" — rata kiri, tanpa
+/// hubungan visual antar baris, sehingga urutan siapa menyetujui setelah siapa
+/// harus disimpulkan sendiri. Sekarang ia digambar sebagai lini masa dengan
+/// garis penghubung: satu tatapan cukup untuk melihat pengajuan ini berhenti di
+/// mana.
+///
+/// Kedua, tombol Setujui dan Tolak pindah dari ujung bawah halaman yang harus
+/// digulir ke sebuah bilah tetap di kaki layar. Seorang atasan yang membuka
+/// layar ini datang untuk memutuskan; keputusannya tidak seharusnya bersembunyi
+/// di bawah lampiran.
 class PermitShowView extends GetView<PermitShowController> {
   const PermitShowView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Memastikan controller diinisialisasi.
-    // Jika Anda menggunakan GetX bindings di app_pages.dart, baris ini tidak wajib.
-    Get.put(PermitShowController());
-
-    final ThemeData theme = Theme.of(context);
-    final DateFormat formatter = DateFormat(
-      'dd MMMM yyyy',
-    ); // Contoh format tanggal
+    void back() => Get.offAllNamed(
+      PermitRoutes.list,
+      arguments: controller.permitType.value,
+    );
 
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (didPop) {
-          return;
-        }
-        // print(controller.permitType.value);
-        Get.offAllNamed(
-          Routes.PERMIT_LIST,
-          arguments: controller.permitType.value,
-        );
+        if (didPop) return;
+        back();
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Detail Pengajuan'),
-          centerTitle: true,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios),
-            onPressed: () => Get.offAllNamed(
-              Routes.PERMIT_LIST,
-              arguments: controller.permitType,
-            ),
+            icon: const Icon(Icons.arrow_back_rounded),
+            tooltip: 'Kembali',
+            onPressed: back,
           ),
+          title: const Text('Detail pengajuan'),
+          titleSpacing: 0,
         ),
         body: Obx(() {
           if (controller.isLoading.value) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          // Tampilkan pesan error jika permit null setelah loading selesai
-          if (controller.permit.value == null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.sentiment_dissatisfied_rounded,
-                    size: 80,
-                    color: theme.colorScheme.onSurface.withAlpha(29),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Gagal memuat detail perizinan.\nMohon coba lagi.',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withAlpha(29),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: controller.permitId.value != 0
-                        ? controller
-                              .loadPermitDetails // Panggil ulang fetch jika ID valid
-                        : null, // Nonaktifkan tombol jika ID tidak valid
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Coba Lagi'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primary,
-                      foregroundColor: theme.colorScheme.onPrimary,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            return const Padding(
+              padding: EdgeInsets.only(top: AppSpacing.lg),
+              child: AppSkeletonList(count: 3),
             );
           }
 
-          final Permit permit =
-              controller.permit.value!; // Data perizinan yang berhasil dimuat
+          final Permit? permit = controller.permit.value;
+          if (permit == null) {
+            return AppEmptyState(
+              icon: Icons.error_outline_rounded,
+              title: 'Gagal memuat detail',
+              message:
+                  'Rincian pengajuan ini tidak bisa diambil. Periksa koneksi '
+                  'Anda lalu coba lagi.',
+              actionLabel: 'Coba lagi',
+              onAction: controller.permitId.value != 0
+                  ? controller.loadPermitDetails
+                  : null,
+            );
+          }
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(8), // Padding keseluruhan lebih baik
-            child: Card(
-              color: theme.colorScheme.surface,
-              elevation: 0, // Sedikit lebih tinggi
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildDetailRow(
-                      context,
-                      'Nomor:',
-                      permit.permitNumbers,
-                      isTitle: true,
-                    ),
-                    const Divider(height: 24),
-                    _buildDetailRow(
-                      context,
-                      'Tipe Perizinan:',
-                      permit.permitType!.type,
-                    ),
-                    _buildDetailRow(
-                      context,
-                      'Periode:',
-                      '${formatter.format(permit.startDate!)} - ${formatter.format(permit.endDate!)}',
-                    ),
-                    _buildDetailRow(
-                      context,
-                      'Durasi:',
-                      '${permit.durationInDays} hari',
-                    ),
-                    _buildDetailRow(
-                      context,
-                      'Waktu:',
-                      '${permit.startTime} - ${permit.endTime}',
-                    ),
-                    _buildDetailRow(
-                      context,
-                      'Yang mengajukan:',
-                      permit.user!.name,
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Status Persetujuan:',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    // Menampilkan daftar persetujuan
-                    ...permit.approvals
-                        .map(
-                          (approval) => Padding(
-                            padding: const EdgeInsets.only(
-                              left: 8.0,
-                              bottom: 4.0,
-                            ),
-                            child: InkWell(
-                              // Make approval status clickable for notes
-                              onTap: () {
-                                if (approval.userApprove!.toLowerCase() ==
-                                        'n' &&
-                                    approval.notes != null &&
-                                    approval.notes!.isNotEmpty) {
-                                  _showApprovalReasonBottomSheet(
-                                    context,
-                                    approval.userType!,
-                                    approval.notes!,
-                                  );
-                                }
-                              },
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(
-                                    _getApprovalStatusIcon(
-                                      approval.userApprove,
-                                    ),
-                                    size: 18,
-                                    color: _getApprovalStatusColor(
-                                      approval.userApprove,
-                                      theme,
-                                    ), // Warna ikon sesuai status
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      // Menampilkan UserType dan Status
-                                      '${approval.userType}: ${_getApprovalStatusText(approval.userApprove)}',
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                            color: _getApprovalStatusColor(
-                                              approval.userApprove,
-                                              theme,
-                                            ),
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                    ),
-                                  ),
-                                  if (approval.userApprove!.toLowerCase() ==
-                                          'n' &&
-                                      approval.notes != null &&
-                                      approval.notes!.isNotEmpty)
-                                    Icon(
-                                      Icons.info_outline,
-                                      size: 18,
-                                      color: theme.colorScheme.primary,
-                                    ), // Add info icon for rejected reasons
-                                ],
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    const Divider(height: 24),
-                    Text(
-                      'Catatan Pengajuan:', // Perjelas ini catatan dari pengaju
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      permit.notes ?? 'Tidak ada catatan.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface,
-                      ),
-                      softWrap: true,
-                      overflow: TextOverflow.visible,
-                    ),
-                    const SizedBox(height: 16),
-                    // Tampilkan tombol lihat dokumen jika ada file
-                    if ((permit.file ?? '').isNotEmpty)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: ElevatedButton.icon(
-                          onPressed: () => _showDocumentPreviewBottomSheet(
-                            context,
-                            permit.file!,
-                          ),
-                          icon: const Icon(Icons.attach_file),
-                          label: const Text('Lihat Dokumen Terlampir'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: theme.colorScheme.primary,
-                            foregroundColor: theme
-                                .colorScheme
-                                .onPrimary, // Ubah ke onPrimary agar konsisten
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        ),
-                      ),
-                    // --- Bagian Tombol Persetujuan/Penolakan ---
-                    Obx(() {
-                      if (controller.canApprove.value) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 24.0),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  onPressed: () =>
-                                      controller.submitApproval(approve: true),
-                                  icon: const Icon(Icons.check_circle_outline),
-                                  label: const Text('Setujui'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.green.shade600,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () => _showRejectReasonBottomSheet(
-                                    context,
-                                    controller,
-                                  ),
-                                  icon: const Icon(Icons.cancel_outlined),
-                                  label: const Text('Tolak'),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.red.shade600,
-                                    side: BorderSide(
-                                      color: Colors.red.shade600,
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      } else {
-                        // Jika tidak bisa approve, tampilkan status approval user ini jika sudah ada
-                        if (controller.myApproval.value != null &&
-                            controller.myApproval.value!.userApprove!
-                                    .toLowerCase() !=
-                                'w') {
-                          final approvalStatusText = _getApprovalStatusText(
-                            controller.myApproval.value!.userApprove,
-                          );
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 24.0),
-                            child: Center(
-                              child: Chip(
-                                label: Text(
-                                  'Anda Telah: $approvalStatusText',
-                                  style: TextStyle(
-                                    color: _getApprovalStatusColor(
-                                      controller.myApproval.value!.userApprove,
-                                      theme,
-                                    ),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                backgroundColor: _getApprovalStatusColor(
-                                  controller.myApproval.value!.userApprove,
-                                  theme,
-                                ).withAlpha(29),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                  side: BorderSide(
-                                    color: _getApprovalStatusColor(
-                                      controller.myApproval.value!.userApprove,
-                                      theme,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }
-                        return const SizedBox.shrink(); // Sembunyikan jika tidak ada tombol dan tidak ada status
-                      }
-                    }),
-                  ],
-                ),
-              ),
-            ),
-          );
+          return _PermitDetail(permit: permit);
+        }),
+        bottomNavigationBar: Obx(() {
+          if (controller.permit.value == null) return const SizedBox.shrink();
+
+          if (controller.canApprove.value) {
+            return _ApprovalBar(controller: controller);
+          }
+
+          final Approval? mine = controller.myApproval.value;
+          final String state = (mine?.userApprove ?? '').toLowerCase();
+          if (mine == null || state.isEmpty || state == 'w') {
+            return const SizedBox.shrink();
+          }
+          return _MyDecisionBar(state: state);
         }),
       ),
     );
   }
+}
 
-  /// Helper widget untuk membuat baris detail.
-  Widget _buildDetailRow(
-    BuildContext context,
-    String label,
-    String value, {
-    bool isTitle = false,
-  }) {
-    final ThemeData theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+class _PermitDetail extends StatelessWidget {
+  const _PermitDetail({required this.permit});
+
+  final Permit permit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
+    final PermitStatus status = resolvePermitStatus(permit);
+    final DateFormat dateFormat = DateFormat('d MMMM yyyy', 'id');
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.page,
+        AppSpacing.lg,
+        AppSpacing.page,
+        AppSpacing.bottomSafe,
+      ),
+      children: [
+        // Ringkasan
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      permit.permitType?.type ?? 'Perizinan',
+                      style: theme.textTheme.titleLarge,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  AppBadge(
+                    label: status.label,
+                    tone: status.tone,
+                    icon: status.icon,
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                permit.permitNumbers,
+                style: AppTypography.dataSmall(color: palette.textMuted),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: AppSpacing.xxl),
+        const AppSectionHeader(title: 'Rincian'),
+        AppDetailPanel(
+          children: [
+            AppDetailRow(label: 'Periode', value: _period(permit, dateFormat)),
+            AppDetailRow(
+              label: 'Durasi',
+              value: '${permit.durationInDays} hari',
+            ),
+            if ((permit.startTime ?? '').isNotEmpty ||
+                (permit.endTime ?? '').isNotEmpty)
+              AppDetailRow(
+                label: 'Jam',
+                value:
+                    '${permit.startTime ?? '--:--'} – '
+                    '${permit.endTime ?? '--:--'}',
+              ),
+            AppDetailRow(
+              label: 'Pengaju',
+              value: permit.user?.name ?? '—',
+              trailing: permit.user == null
+                  ? null
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          permit.user!.name,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurface,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'NIP ${permit.user!.nip}',
+                          style: AppTypography.dataSmall(
+                            color: palette.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+
+        ..._adjustment(permit),
+
+        const SizedBox(height: AppSpacing.xxl),
+        const AppSectionHeader(title: 'Alur persetujuan'),
+        if (permit.approvals.isEmpty)
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: const AppEmptyState(
+              icon: Icons.how_to_reg_outlined,
+              title: 'Belum masuk antrean persetujuan',
+              compact: true,
+            ),
+          )
+        else
+          AppCard(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.lg,
+            ),
+            child: Builder(
+              builder: (context) {
+                // Sampai di mana rel ini sudah benar-benar dilewati. Konektor
+                // di bawah langkah yang sudah diputuskan ikut bernada; sisanya
+                // kembali menjadi hairline netral, jadi bentuk relnya sendiri
+                // sudah menjawab "berhenti di mana".
+                final int decidedUpTo = lastDecidedApprovalIndex(permit);
+
+                return Column(
+                  children: [
+                    for (var i = 0; i < permit.approvals.length; i++)
+                      _ApprovalStep(
+                        approval: permit.approvals[i],
+                        isLast: i == permit.approvals.length - 1,
+                        traversed: i <= decidedUpTo,
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+
+        const SizedBox(height: AppSpacing.xxl),
+        const AppSectionHeader(title: 'Catatan pengajuan'),
+        AppCard(
+          child: Text(
+            (permit.notes ?? '').trim().isEmpty
+                ? 'Tidak ada catatan.'
+                : permit.notes!,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: (permit.notes ?? '').trim().isEmpty
+                  ? palette.textMuted
+                  : theme.colorScheme.onSurface,
+            ),
+          ),
+        ),
+
+        if ((permit.file ?? '').isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.xxl),
+          const AppSectionHeader(title: 'Lampiran'),
+          _AttachmentCard(file: permit.file!),
+        ],
+      ],
+    );
+  }
+
+  /// Apa yang sebenarnya diminta, pada dua jenis izin yang meminta lebih dari
+  /// sekadar tanggal.
+  ///
+  /// Layar ini dulu menampilkan periode, durasi, jam dan catatan untuk semua
+  /// jenis izin tanpa kecuali — jadi seorang atasan yang membuka permintaan
+  /// tukar shift menyetujui sesuatu yang tidak pernah ditampilkan kepadanya.
+  /// Keempat kolomnya ada di dalam jawaban server sejak dulu.
+  ///
+  /// Ditampilkan bila variannya mengatakan begitu **atau** bila datanya
+  /// memang ada: pengajuan lama dibuat sebelum jenis izin punya kode, dan
+  /// menyembunyikan isinya karena alasan itu sama saja dengan kehilangannya.
+  static List<Widget> _adjustment(Permit permit) {
+    final PermitVariant variant =
+        permit.permitType?.variant ?? PermitVariant.general;
+
+    final String? timeIn = _hourMinute(permit.timeinAdjust);
+    final String? timeOut = _hourMinute(permit.timeoutAdjust);
+    final PermitShift? from = permit.shiftFrom;
+    final PermitShift? to = permit.shiftTo;
+
+    final bool showTime =
+        variant.isTimeAdjustment || timeIn != null || timeOut != null;
+    final bool showShift =
+        variant.isShiftAdjustment || from != null || to != null;
+
+    return [
+      if (showTime) ...[
+        const SizedBox(height: AppSpacing.xxl),
+        const AppSectionHeader(title: 'Penyesuaian jam'),
+        AppDetailPanel(
+          children: [
+            // Hanya jam yang diminta. Jam absensi yang berlaku sekarang tidak
+            // ada di dalam jawaban endpoint ini, dan menampilkan tebakan
+            // sebagai "jam semula" akan membuat penyetuju membandingkan
+            // permintaan dengan angka yang tidak pernah dicatat.
+            AppDetailRow(label: 'Jam masuk diminta', value: timeIn ?? '—'),
+            AppDetailRow(label: 'Jam pulang diminta', value: timeOut ?? '—'),
+          ],
+        ),
+      ],
+      if (showShift) ...[
+        const SizedBox(height: AppSpacing.xxl),
+        const AppSectionHeader(title: 'Penyesuaian shift'),
+        _ShiftChange(from: from, to: to),
+      ],
+    ];
+  }
+
+  /// `08:00:00` menjadi `08:00`; kolom jam membawa detik yang tidak pernah
+  /// berarti apa pun di layar.
+  static String? _hourMinute(String? raw) {
+    final value = raw?.trim();
+
+    if (value == null || value.isEmpty) return null;
+
+    final match = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(value);
+
+    if (match == null) return value;
+
+    return '${match.group(1)!.padLeft(2, '0')}:${match.group(2)}';
+  }
+
+  static String _period(Permit permit, DateFormat format) {
+    final start = permit.startDate;
+    final end = permit.endDate;
+    if (start == null && end == null) return 'Belum ditentukan';
+    if (start != null && end != null) {
+      return start == end
+          ? format.format(start)
+          : '${format.format(start)} – ${format.format(end)}';
+    }
+    return format.format((start ?? end)!);
+  }
+}
+
+/// Satu langkah pada lini masa persetujuan.
+///
+/// Label dan nadanya datang dari `permit_status.dart`, kamus yang sama yang
+/// dipakai lencana di kepala layar ini dan setiap baris di daftar riwayat.
+/// Sebelumnya file ini memelihara pemetaannya sendiri, dan pemetaan itu tidak
+/// sepakat dengan yang di sebelahnya.
+class _ApprovalStep extends StatelessWidget {
+  const _ApprovalStep({
+    required this.approval,
+    required this.isLast,
+    required this.traversed,
+  });
+
+  final Approval approval;
+  final bool isLast;
+
+  /// Apakah rel sudah lewat titik ini — yakni langkah ini berada pada atau
+  /// sebelum keputusan terakhir yang sudah diambil.
+  final bool traversed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
+    final PermitStatus status = resolveApprovalStatus(approval);
+    final AppTone tone = status.colors(palette);
+    final bool hasReason =
+        status == PermitStatus.rejected &&
+        (approval.notes ?? '').trim().isNotEmpty;
+    // Stempel waktu hanya untuk langkah yang sudah diputuskan. Pada langkah
+    // yang masih menunggu, `updated_at` adalah waktu baris itu dibuat — angka
+    // yang akan dibaca sebagai waktu keputusan yang belum pernah terjadi.
+    final String? stamp = traversed ? _stamp(approval.updatedAt) : null;
+
+    return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 130, // Lebar tetap untuk label agar sejajar
-            child: Text(
-              label,
-              style: isTitle
-                  ? theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
-                    )
-                  : theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
+          // Rel lini masa: bulatan status, lalu garis menuju langkah berikutnya.
+          Column(
+            children: [
+              Container(
+                width: 22,
+                height: 22,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: tone.background,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: tone.border),
+                ),
+                child: Icon(
+                  status.icon,
+                  size: AppIconSizes.xs,
+                  color: tone.foreground,
+                ),
+              ),
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    width: 1.5,
+                    margin: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.xxs,
                     ),
-            ),
+                    color: traversed ? tone.border : palette.borderSubtle,
+                  ),
+                ),
+            ],
           ),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
-            child: Text(
-              value,
-              style: isTitle
-                  ? theme.textTheme.titleLarge?.copyWith(
-                      color: theme.colorScheme.onSurface,
-                    )
-                  : theme.textTheme.bodyLarge?.copyWith(
-                      color: theme.colorScheme.onSurface,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _roleLabel(approval.userType),
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: AppSpacing.xxs),
+                  // Kata statusnya tetap ditulis — titik bernada saja adalah
+                  // warna sebagai pembawa makna tunggal — tetapi bukan lagi
+                  // sebagai lencana berbingkai: satu rel dengan tiga lencana
+                  // membaca lebih ramai daripada keadaan yang diwakilinya.
+                  Row(
+                    children: [
+                      Text(
+                        status.label,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: tone.foreground,
+                        ),
+                      ),
+                      if (stamp != null) ...[
+                        Text(
+                          '  ·  ',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: palette.borderStrong,
+                          ),
+                        ),
+                        Flexible(
+                          child: Text(
+                            stamp,
+                            style: AppTypography.dataSmall(
+                              color: palette.textMuted,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (hasReason) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    // Alasan penolakan ditampilkan langsung, bukan disembunyikan
+                    // di balik ikon info yang harus ditekan. Ini justru
+                    // informasi yang paling dicari orang saat pengajuannya
+                    // ditolak.
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: palette.danger.background,
+                        borderRadius: AppRadii.mdAll,
+                        border: Border.all(color: palette.danger.border),
+                      ),
+                      child: Text(
+                        approval.notes!.trim(),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: palette.danger.foreground,
+                        ),
+                      ),
                     ),
+                  ],
+                ],
+              ),
             ),
           ),
         ],
@@ -412,358 +483,369 @@ class PermitShowView extends GetView<PermitShowController> {
     );
   }
 
-  /// Membantu menentukan warna teks status persetujuan.
-  Color _getApprovalStatusColor(String? userApproveStatus, ThemeData theme) {
-    switch (userApproveStatus?.toLowerCase()) {
-      case 'w': // Waiting / Pending
-        return Colors.orange.shade700;
-      case 'y': // Yes / Approved
-        return Colors.green;
-      case 'n': // No / Rejected
-        return Colors.red.shade700;
+  /// `userType` datang sebagai slug bahasa Inggris (`line`, `manager`, `hr`).
+  static String _roleLabel(String? type) {
+    switch ((type ?? '').toLowerCase()) {
+      case 'line':
+        return 'Atasan langsung';
+      case 'manager':
+        return 'Manajer';
+      case 'hr':
+        return 'HR';
       default:
-        return theme.colorScheme.onSurface;
+        return (type ?? 'Penyetuju').toUpperCase();
     }
   }
 
-  /// Membantu menentukan ikon berdasarkan status persetujuan.
-  IconData _getApprovalStatusIcon(String? userApproveStatus) {
-    switch (userApproveStatus?.toLowerCase()) {
-      case 'w': // Waiting / Pending
-        return Icons.hourglass_empty;
-      case 'y': // Yes / Approved
-        return Icons.check_circle;
-      case 'n': // No / Rejected
-        return Icons.cancel;
-      default:
-        return Icons.info_outline;
-    }
+  /// Kapan keputusan itu diambil. Kolom ini sudah diurai model sejak dulu dan
+  /// tidak pernah sekali pun digambar, sehingga "sudah berapa lama pengajuan
+  /// ini mengendap" adalah pertanyaan yang layar rincian tidak bisa jawab.
+  static String? _stamp(DateTime? at) {
+    if (at == null) return null;
+    return DateFormat('d MMM yyyy · HH:mm', 'id').format(at);
   }
+}
 
-  /// Membantu menentukan teks status persetujuan.
-  String _getApprovalStatusText(String? userApproveStatus) {
-    switch (userApproveStatus?.toLowerCase()) {
-      case 'w':
-        return 'Menunggu Persetujuan';
-      case 'y':
-        return 'Disetujui';
-      case 'n':
-        return 'Ditolak';
-      default:
-        return 'Tidak Diketahui';
-    }
-  }
+/// Kartu lampiran: nama berkas dan satu tindakan.
+class _AttachmentCard extends StatelessWidget {
+  const _AttachmentCard({required this.file});
 
-  /// --- BOTTOM SHEET UNTUK PREVIEW DOKUMEN ---
-  void _showDocumentPreviewBottomSheet(BuildContext context, String fileUrl) {
-    Get.bottomSheet(
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Align(
-              alignment: Alignment.center,
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurface.withAlpha(29),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Lihat Dokumen',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Anda dapat melihat atau mengunduh dokumen terlampir:',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: Icon(
-                Icons.file_present,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              title: Text(
-                'File: ${fileUrl.split('/').last}', // Ambil nama file dari URL
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-              trailing: Icon(
-                Icons.open_in_new,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              onTap: () async {
-                final Uri uri = Uri.parse("$baseImageUrl/$fileUrl");
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri);
-                } else {
-                  showErrorSnackbar(
-                    'Tidak dapat membuka dokumen. URL tidak valid atau aplikasi tidak ditemukan.',
-                  );
-                }
-                Get.back(); // Tutup bottom sheet
-              },
-            ),
-            const SizedBox(height: 16),
-            Center(
-              child: ElevatedButton(
-                onPressed: () => Get.back(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Theme.of(context)
-                      .colorScheme
-                      .onPrimary, // Changed to onPrimary for better contrast with primary background
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical:
-                        16, // Increased vertical padding for a more substantial button
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  minimumSize: const Size(
-                    double.infinity,
-                    0,
-                  ), // Makes the button take full width
-                ),
-                child: const Text('Tutup'),
-              ),
-            ),
-          ],
-        ),
-      ),
-      isScrollControlled:
-          true, // Izinkan bottom sheet mengambil tinggi yang dibutuhkan
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      backgroundColor: Colors.transparent, // Untuk sudut melengkung
-    );
-  }
+  final String file;
 
-  /// --- BOTTOM SHEET UNTUK REJECT REASON ---
-  void _showRejectReasonBottomSheet(
-    BuildContext context,
-    PermitShowController controller,
-  ) {
-    final TextEditingController notesController = TextEditingController();
-    final RxBool isNotesValid =
-        false.obs; // Menggunakan RxBool untuk validasi reaktif
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
 
-    Get.bottomSheet(
-      Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        child: Column(
-          mainAxisSize:
-              MainAxisSize.min, // Penting agar tidak memenuhi seluruh layar
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Align(
-              alignment: Alignment.center,
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurface.withAlpha(29),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Tolak Perizinan',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Mohon berikan alasan penolakan:',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Obx(
-              () => TextField(
-                controller: notesController,
-                maxLines: 4,
-                keyboardType: TextInputType.multiline,
-                decoration: InputDecoration(
-                  hintText: 'Masukkan catatan penolakan...',
-                  alignLabelWithHint: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(
-                      color: isNotesValid.value
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.outline,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(
-                      color: Theme.of(context).colorScheme.primary,
-                      width: 2,
-                    ),
-                  ),
-                  errorText: notesController.text.isEmpty && !isNotesValid.value
-                      ? 'Catatan tidak boleh kosong.'
-                      : null,
-                ),
-                onChanged: (text) {
-                  isNotesValid.value = text.trim().isNotEmpty;
-                },
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
+    return AppCard(
+      onTap: () => _open(),
+      child: Row(
+        children: [
+          const AppIconBox(icon: Icons.description_outlined, size: 36),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Get.back(), // Tutup bottom sheet
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Theme.of(context).colorScheme.error,
-                      side: BorderSide(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('Batal'),
-                  ),
+                Text(
+                  file.split('/').last,
+                  style: theme.textTheme.titleSmall,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Obx(
-                    () => ElevatedButton(
-                      onPressed: isNotesValid.value
-                          ? () {
-                              Get.back(); // Tutup bottom sheet sebelum submit
-                              controller.submitApproval(
-                                approve: false,
-                                notes: notesController.text.trim(),
-                              );
-                            }
-                          : null, // Tombol nonaktif jika catatan tidak valid
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade600,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text('Tolak'),
-                    ),
+                const SizedBox(height: 2),
+                Text(
+                  'Ketuk untuk membuka di aplikasi lain',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: palette.textMuted,
                   ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          Icon(
+            Icons.open_in_new_rounded,
+            size: AppIconSizes.md,
+            color: palette.textMuted,
+          ),
+        ],
       ),
-      isScrollControlled: true, // Penting agar keyboard tidak menutupi input
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      backgroundColor: Colors.transparent, // Untuk efek sudut melengkung
     );
   }
 
-  /// --- BOTTOM SHEET UNTUK MENAMPILKAN ALASAN PENOLAKAN YANG SUDAH ADA ---
-  void _showApprovalReasonBottomSheet(
-    BuildContext context,
-    String approverType,
-    String reason,
-  ) {
-    Get.bottomSheet(
-      Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+  Future<void> _open() async {
+    final Uri uri = Uri.parse('${Env.assetBaseUrl}/$file');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      showErrorSnackbar(
+        'Tidak dapat membuka dokumen. Tautan tidak valid atau tidak ada '
+        'aplikasi yang bisa membukanya.',
+      );
+    }
+  }
+}
+
+/// Bilah keputusan di kaki layar, untuk penyetuju.
+class _ApprovalBar extends StatelessWidget {
+  const _ApprovalBar({required this.controller});
+
+  final PermitShowController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(top: BorderSide(color: palette.borderSubtle)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 46,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _askReason(context),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      size: AppIconSizes.lg,
+                    ),
+                    label: const Text('Tolak'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: palette.danger.foreground,
+                      side: BorderSide(color: palette.danger.border),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                flex: 2,
+                child: SizedBox(
+                  height: 46,
+                  child: FilledButton.icon(
+                    onPressed: () => controller.submitApproval(approve: true),
+                    icon: const Icon(
+                      Icons.check_rounded,
+                      size: AppIconSizes.lg,
+                    ),
+                    label: const Text('Setujui'),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+    );
+  }
+
+  void _askReason(BuildContext context) {
+    showAppBottomSheet<void>(
+      context,
+      title: 'Tolak pengajuan',
+      description:
+          'Alasan ini akan dibaca oleh karyawan yang mengajukan, jadi tulis '
+          'sejelas mungkin.',
+      child: _RejectForm(
+        onSubmit: (notes) =>
+            controller.submitApproval(approve: false, notes: notes),
+      ),
+    );
+  }
+}
+
+/// Formulir alasan penolakan.
+///
+/// Sebuah [StatefulWidget] agar [TextEditingController]-nya punya pemilik yang
+/// membuangnya. Versi sebelumnya membuat controller di dalam sebuah fungsi dan
+/// tidak pernah memanggil `dispose()`, jadi setiap kali sheet dibuka satu
+/// controller tertinggal.
+class _RejectForm extends StatefulWidget {
+  const _RejectForm({required this.onSubmit});
+
+  final void Function(String notes) onSubmit;
+
+  @override
+  State<_RejectForm> createState() => _RejectFormState();
+}
+
+class _RejectFormState extends State<_RejectForm> {
+  final TextEditingController _notes = TextEditingController();
+  bool _valid = false;
+
+  @override
+  void dispose() {
+    _notes.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _notes,
+          maxLines: 4,
+          autofocus: true,
+          keyboardType: TextInputType.multiline,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            hintText: 'Contoh: kuota cuti tahun ini sudah habis.',
+            alignLabelWithHint: true,
+          ),
+          // Galat baru muncul setelah pengguna sempat mengetik. Versi lama
+          // menandai kolom sebagai salah sejak sheet terbuka, sebelum ada
+          // kesempatan mengisinya.
+          onChanged: (text) => setState(() => _valid = text.trim().isNotEmpty),
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        Row(
           children: [
-            Align(
-              alignment: Alignment.center,
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurface.withAlpha(29),
-                  borderRadius: BorderRadius.circular(2),
+            Expanded(
+              child: SizedBox(
+                height: 46,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Batal'),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Alasan Penolakan dari $approverType',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              reason,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Center(
-              child: ElevatedButton(
-                onPressed: () => Get.back(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: SizedBox(
+                height: 46,
+                child: FilledButton(
+                  onPressed: _valid
+                      ? () {
+                          Navigator.of(context).pop();
+                          widget.onSubmit(_notes.text.trim());
+                        }
+                      : null,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: theme.colorScheme.error,
+                    foregroundColor: theme.colorScheme.onError,
+                    disabledBackgroundColor: palette.surfaceRaised,
+                    disabledForegroundColor: palette.textMuted,
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  child: const Text('Tolak'),
                 ),
-                child: const Text('Tutup'),
               ),
             ),
           ],
         ),
+      ],
+    );
+  }
+}
+
+/// Bilah yang menyebutkan keputusan yang sudah pernah diambil pengguna ini.
+class _MyDecisionBar extends StatelessWidget {
+  const _MyDecisionBar({required this.state});
+
+  final String state;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
+    final bool approved = state == 'y' || state == 'approved';
+    final AppTone tone = approved ? palette.success : palette.danger;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(top: BorderSide(color: palette.borderSubtle)),
       ),
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                approved ? Icons.check_circle_outline : Icons.cancel_outlined,
+                size: AppIconSizes.md,
+                color: tone.foreground,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                approved
+                    ? 'Anda sudah menyetujui pengajuan ini'
+                    : 'Anda sudah menolak pengajuan ini',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: tone.foreground,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      backgroundColor: Colors.transparent,
+    );
+  }
+}
+
+/// Perpindahan shift, dibaca dalam satu tarikan: dari apa, menjadi apa.
+///
+/// Bukan "current_shift_id 12 → adjust_shift_id 15". Sebuah id bukan kalimat
+/// yang bisa disetujui siapa pun, dan `Pagi (07:00–15:00) → Malam
+/// (23:00–07:00)` adalah keputusan yang berbeda dari `Pagi → Siang` meskipun
+/// keduanya sama-sama "tukar shift".
+class _ShiftChange extends StatelessWidget {
+  const _ShiftChange({required this.from, required this.to});
+
+  final PermitShift? from;
+  final PermitShift? to;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
+
+    return AppCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(child: _side(theme, palette, 'Shift saat ini', from)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: Icon(
+              Icons.arrow_forward_rounded,
+              size: AppIconSizes.lg,
+              color: palette.textMuted,
+            ),
+          ),
+          Expanded(child: _side(theme, palette, 'Diminta', to)),
+        ],
+      ),
+    );
+  }
+
+  Widget _side(
+    ThemeData theme,
+    AppPalette palette,
+    String label,
+    PermitShift? shift,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(color: palette.textMuted),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          shift?.name ?? 'Tidak disebutkan',
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: shift == null
+                ? palette.textMuted
+                : theme.colorScheme.onSurface,
+          ),
+        ),
+        if (shift?.start != null && shift?.end != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            '${shift!.start} – ${shift.end}',
+            style: AppTypography.dataSmall(color: palette.textMuted),
+          ),
+        ],
+      ],
     );
   }
 }

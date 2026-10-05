@@ -1,5 +1,7 @@
-import 'approval.m.dart';
-import 'departement.m.dart';
+import '../../../../core/utils/json_parsers.dart';
+
+import 'approval.dart';
+import 'departement.dart';
 
 class Employee {
   int? id;
@@ -56,38 +58,35 @@ class Employee {
     jobLevelId: json["job_level_id"],
     approvalLineId: json["approval_line_id"],
     approvalManagerId: json["approval_manager_id"],
-    joinDate: json["join_date"] == null
-        ? null
-        : DateTime.parse(json["join_date"]),
-    signDate: json["sign_date"] == null
-        ? null
-        : DateTime.parse(json["sign_date"]),
+    joinDate: asDate(json["join_date"]),
+    signDate: asDate(json["sign_date"]),
     resignDate: json["resign_date"],
     bankName: json["bank_name"],
     bankNumber: json["bank_number"],
     bankHolder: json["bank_holder"],
     saldoCuti: json["saldo_cuti"],
-    createdAt: json["created_at"] == null
-        ? null
-        : DateTime.parse(json["created_at"]),
-    updatedAt: json["updated_at"] == null
-        ? null
-        : DateTime.parse(json["updated_at"]),
-    approvalLine: json["approval_line"] == null
-        ? null
-        : Approval.fromJson(json["approval_line"]),
-    approvalManager: json["approval_manager"] == null
-        ? null
-        : Approval.fromJson(json["approval_manager"]),
-    departement: json["departement"] == null
-        ? null
-        : Departement.fromJson(json["departement"]),
-    jobPosition: json["job_position"] == null
-        ? null
-        : Departement.fromJson(json["job_position"]),
-    jobLevel: json["job_level"] == null
-        ? null
-        : Departement.fromJson(json["job_level"]),
+    createdAt: asDate(json["created_at"]),
+    updatedAt: asDate(json["updated_at"]),
+    // `is Map` rather than `!= null`. The contract sends the department, the
+    // position and the level as **names** - Lampiran B.3 - and
+    // `ProfileRepository` wraps each one back into the object shape this model
+    // declares. A payload that skipped that step used to reach
+    // `Departement.fromJson("Produksi")` and throw.
+    approvalLine: json["approval_line"] is Map
+        ? Approval.fromJson(asObject(json["approval_line"]))
+        : null,
+    approvalManager: json["approval_manager"] is Map
+        ? Approval.fromJson(asObject(json["approval_manager"]))
+        : null,
+    departement: json["departement"] is Map
+        ? Departement.fromJson(asObject(json["departement"]))
+        : null,
+    jobPosition: json["job_position"] is Map
+        ? Departement.fromJson(asObject(json["job_position"]))
+        : null,
+    jobLevel: json["job_level"] is Map
+        ? Departement.fromJson(asObject(json["job_level"]))
+        : null,
   );
 
   Map<String, dynamic> toJson() => {

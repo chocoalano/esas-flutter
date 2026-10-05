@@ -1,102 +1,159 @@
-import 'package:intl/intl.dart'; // Import ini untuk DateFormat
-import 'package:flutter/foundation.dart'; // Untuk kDebugMode, jika diperlukan di model
+import 'package:intl/intl.dart';
 
+import '../../../../core/utils/json_parsers.dart';
+
+/// Satu baris jadwal kerja karyawan — pilihan pertama pada formulir pengajuan.
+///
+/// ## Kontraknya, bukan tebakan atas kontraknya
+///
+/// `GET /permits/form` mengirim baris seperti ini:
+///
+/// ```json
+/// {"id": 8, "work_day": "2026-09-02", "shift_id": 3, "shift": "Pagi",
+///  "in": "08:00:00", "out": "17:00:00", "attended": false}
+/// ```
+///
+/// Model ini dulu menuntut `user_id` dan `time_work_id` dengan `as int`, dan
+/// tidak satu pun dari keduanya ada di sana. `asModelList` menangkap
+/// kegagalannya per baris, jadi tidak ada layar merah — hanya dropdown jadwal
+/// kerja yang kosong pada setiap pengajuan, dengan pesan "Jadwal kerja wajib
+/// diisi" di bawah daftar yang tidak mungkin diisi.
+///
+/// ## `user_id` tidak hilang; ia memang bukan urusan baris ini
+///
+/// Endpointnya hanya memulangkan jadwal milik pemegang token. Kepemilikan sudah
+/// dipastikan oleh server sebelum barisnya dikirim, jadi sebuah kolom pemilik
+/// di sini tidak menambah apa pun yang bisa diperiksa — dan sebuah formulir
+/// yang menanyakan jadwal siapa adalah formulir yang bisa ditanyakan untuk
+/// orang lain.
 class Schedule {
-  final int id;
-  final int userId;
-  final int timeWorkId;
-  final DateTime workDay; // Tetap sebagai DateTime
-
-  Schedule({
+  const Schedule({
     required this.id,
-    required this.userId,
-    required this.timeWorkId,
     required this.workDay,
+    this.shiftId,
+    this.shiftName,
+    this.shiftIn,
+    this.shiftOut,
+    this.attended = false,
   });
 
-  /// Factory constructor to create a Schedule from a JSON map.
+  final int id;
+  final DateTime workDay;
+
+  /// Shift yang dijadwalkan pada hari itu, bila server menyebutkannya.
+  final int? shiftId;
+  final String? shiftName;
+  final String? shiftIn;
+  final String? shiftOut;
+
+  /// Hari itu sudah punya catatan absensi.
+  ///
+  /// Dikirim server justru untuk ditampilkan: "Pengajuan atas hari yang sudah
+  /// dijalani biasanya keliru, dan aplikasi bisa mengatakannya sebelum dikirim,
+  /// bukan sesudah."
+  final bool attended;
+
   factory Schedule.fromJson(Map<String, dynamic> json) {
-    // Helper function to safely parse various date formats
-    // This logic is adapted from the previous robust parsing attempts.
-    DateTime parseRobustDateTime(String? dateString, String fieldName) {
-      if (dateString == null || dateString.isEmpty) {
-        if (kDebugMode) {
-          print('Warning: $fieldName date string is null or empty.');
-        }
-        // Return a default/invalid DateTime or throw an error based on your app's needs
-        return DateTime(0); // Example: Return epoch if null/empty
-      }
+    final id = asInt(json['id']);
 
-      // Try ISO 8601 first (default for DateTime.parse)
-      try {
-        return DateTime.parse(dateString);
-      } on FormatException catch (_) {
-        // If default parse fails, try custom formatters
-        final List<DateFormat> formatters = [
-          // Format: "28 June 25 13:56:36" (full month name)
-          DateFormat("dd MMMM yy HH:mm:ss", 'id'), // 'id' for Indonesian locale
-          // Format: "28 Jun 25 13:56:36" (abbreviated month name)
-          DateFormat("dd MMM yy HH:mm:ss", 'id'), // 'id' for Indonesian locale
-          // Add any other specific formats your API might return, e.g.:
-          // DateFormat("yyyy-MM-dd HH:mm:ss"),
-          // DateFormat("dd-MM-yyyy"),
-        ];
-
-        for (var formatter in formatters) {
-          try {
-            return formatter.parse(dateString);
-          } on FormatException catch (_) {
-            // Continue to next formatter if this one fails
-          }
-        }
-      }
-
-      // If all attempts fail, log and throw an error
-      if (kDebugMode) {
-        print(
-          'Error: Could not parse "$dateString" for field "$fieldName" with any known format.',
-        );
-      }
-      throw FormatException(
-        'Invalid date format for $fieldName: "$dateString"',
-      );
+    if (id == null) {
+      throw const FormatException('Baris jadwal kerja tanpa id');
     }
 
     return Schedule(
-      id: json['id'] as int,
-      userId: json['user_id'] as int,
-      timeWorkId: json['time_work_id'] as int,
-      // Gunakan helper function untuk parsing workDay
-      workDay: parseRobustDateTime(json['work_day'] as String?, 'work_day'),
+      id: id,
+      workDay: _parseWorkDay(json['work_day']),
+      // `shift_id` pada kontrak sekarang, `time_work_id` pada yang lama.
+      shiftId: asInt(json['shift_id']) ?? asInt(json['time_work_id']),
+      shiftName: asString(json['shift']),
+      shiftIn: _hourMinute(asString(json['in'])),
+      shiftOut: _hourMinute(asString(json['out'])),
+      attended: asBool(json['attended']) ?? false,
     );
   }
 
-  /// Getter untuk mengembalikan workDay dalam format tanggal Indonesia.
-  /// Contoh: "Kamis, 10 Juli 2025"
-  String get formattedWorkDay {
-    // 'EEEE' untuk nama hari penuh (e.g., "Kamis")
-    // 'dd' untuk tanggal (e.g., "10")
-    // 'MMMM' untuk nama bulan penuh (e.g., "Juli")
-    // 'yyyy' untuk tahun penuh (e.g., "2025")
-    final DateFormat formatter = DateFormat('EEEE, dd MMMM yyyy', 'id_ID');
-    return formatter.format(workDay);
+  /// Tanggal kerja, atau lemparan bila tidak ada bentuk yang dikenali.
+  ///
+  /// Melempar dengan sengaja. Nilai pengganti yang dulu dipakai — `DateTime(0)`
+  /// untuk tanggal yang kosong — memasang baris "Minggu, 01 Januari 0000" di
+  /// dalam dropdown: sebuah pilihan yang bisa dipilih orang dan mengisi tanggal
+  /// pengajuan dengan tahun nol. `asModelList` menangkap lemparan ini, mencatat
+  /// barisnya, dan meneruskan sisanya.
+  static DateTime _parseWorkDay(Object? raw) {
+    final value = asString(raw);
+
+    if (value == null) {
+      throw const FormatException('Baris jadwal kerja tanpa tanggal kerja');
+    }
+
+    final iso = DateTime.tryParse(value);
+
+    if (iso != null) {
+      return iso;
+    }
+
+    // Bentuk yang pernah dikirim backend lama: "28 June 25 13:56:36" dan
+    // "28 Jun 25 13:56:36".
+    for (final formatter in [
+      DateFormat('dd MMMM yy HH:mm:ss', 'id'),
+      DateFormat('dd MMM yy HH:mm:ss', 'id'),
+    ]) {
+      try {
+        return formatter.parse(value);
+      } on FormatException {
+        continue;
+      }
+    }
+
+    throw FormatException('Tanggal kerja tidak dikenali', value);
   }
 
-  /// Convert a Schedule object to a JSON map.
-  /// Biasanya, saat mengirim tanggal kembali ke API, format ISO 8601 lebih disukai.
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'user_id': userId,
-      'time_work_id': timeWorkId,
-      'work_day': workDay
-          .toIso8601String(), // Tetap kirim sebagai ISO 8601 ke API
-    };
+  /// `08:00:00` menjadi `08:00`. Kolom jam pada basis data membawa detik yang
+  /// tidak pernah berarti apa pun di layar.
+  static String? _hourMinute(String? raw) {
+    if (raw == null) return null;
+
+    final match = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(raw);
+
+    if (match == null) return raw;
+
+    return '${match.group(1)!.padLeft(2, '0')}:${match.group(2)}';
   }
+
+  /// Contoh: "Kamis, 10 Juli 2025".
+  String get formattedWorkDay =>
+      DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(workDay);
+
+  /// Baris sebagaimana dibaca di dropdown: tanggal, shift, dan penanda bila
+  /// hari itu sudah terlanjur diabsen.
+  String get optionLabel {
+    final buffer = StringBuffer(formattedWorkDay);
+
+    if (shiftName != null) {
+      buffer.write(' · $shiftName');
+
+      if (shiftIn != null && shiftOut != null) {
+        buffer.write(' $shiftIn–$shiftOut');
+      }
+    }
+
+    if (attended) {
+      buffer.write(' · sudah absen');
+    }
+
+    return buffer.toString();
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'work_day': workDay.toIso8601String(),
+    'shift_id': shiftId,
+    'shift': shiftName,
+    'in': shiftIn,
+    'out': shiftOut,
+    'attended': attended,
+  };
 
   @override
-  String toString() {
-    // Menggunakan formattedWorkDay untuk representasi string yang lebih mudah dibaca
-    return 'Schedule(id: $id, userId: $userId, timeWorkId: $timeWorkId, workDay: $formattedWorkDay)';
-  }
+  String toString() => 'Schedule(id: $id, workDay: $formattedWorkDay)';
 }

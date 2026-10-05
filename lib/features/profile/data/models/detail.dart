@@ -1,3 +1,5 @@
+import '../../../../core/utils/json_parsers.dart';
+
 class Details {
   int? id;
   int? userId;
@@ -26,17 +28,15 @@ class Details {
   });
 
   factory Details.fromJson(Map<String, dynamic> json) => Details(
-    id: json["id"],
-    userId: json["user_id"],
-    phone: json["phone"],
-    placebirth: json["placebirth"],
-    datebirth: json["datebirth"] == null
-        ? null
-        : DateTime.parse(json["datebirth"]),
-    gender: json["gender"],
-    blood: json["blood"],
-    maritalStatus: json["marital_status"],
-    religion: json["religion"],
+    id: asInt(json["id"]),
+    userId: asInt(json["user_id"]),
+    phone: asString(json["phone"]),
+    placebirth: asString(json["placebirth"]),
+    datebirth: asDate(json["datebirth"]),
+    gender: asString(json["gender"]),
+    blood: asString(json["blood"]),
+    maritalStatus: asString(json["marital_status"]),
+    religion: asString(json["religion"]),
     createdAt: json["created_at"],
     updatedAt: json["updated_at"],
   );

@@ -1,3 +1,5 @@
+import '../../../../core/utils/json_parsers.dart';
+
 class Salaries {
   int? id;
   int? userId;
@@ -16,10 +18,13 @@ class Salaries {
   });
 
   factory Salaries.fromJson(Map<String, dynamic> json) => Salaries(
-    id: json["id"],
-    userId: json["user_id"],
-    basicSalary: json["basic_salary"],
-    paymentType: json["payment_type"],
+    // `basic_salary` is a decimal, and the field it lands in is an int. An
+    // unguarded assignment threw the moment a workspace had a wage with
+    // anything after the decimal point.
+    id: asInt(json["id"]),
+    userId: asInt(json["user_id"]),
+    basicSalary: asInt(json["basic_salary"]),
+    paymentType: asString(json["payment_type"]),
     createdAt: json["created_at"],
     updatedAt: json["updated_at"],
   );

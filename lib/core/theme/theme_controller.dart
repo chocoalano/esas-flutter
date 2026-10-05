@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart'; // Import GetStorage
 
+import 'system_ui_style.dart';
+
 class ThemeController extends GetxController {
   // Kunci untuk menyimpan preferensi tema di GetStorage
   static const String _themeKey = 'isDarkMode';
@@ -26,6 +28,7 @@ class ThemeController extends GetxController {
     _isDarkMode = (_box.read<bool>(_themeKey) ?? false).obs;
     // Terapkan tema saat aplikasi dimulai berdasarkan nilai yang disimpan
     Get.changeThemeMode(_isDarkMode.value ? ThemeMode.dark : ThemeMode.light);
+    applySystemUiOverlayStyle(isDarkMode: _isDarkMode.value);
   }
 
   /// Fungsi untuk mengubah tema (light/dark)
@@ -39,16 +42,16 @@ class ThemeController extends GetxController {
     // Ubah tema aplikasi secara langsung
     Get.changeThemeMode(_isDarkMode.value ? ThemeMode.dark : ThemeMode.light);
 
-    // Opsional: Tampilkan snackbar untuk konfirmasi perubahan tema
-    Get.snackbar(
-      'Tema Berubah',
-      _isDarkMode.value ? 'Mode Gelap Aktif' : 'Mode Terang Aktif',
-      snackPosition: SnackPosition.BOTTOM,
-      duration: const Duration(seconds: 2),
-      backgroundColor: Get.isDarkMode
-          ? Colors.grey.shade800
-          : Colors.grey.shade200,
-      colorText: Get.isDarkMode ? Colors.white : Colors.black,
-    );
+    // Bilah status dan bilah navigasi sistem ikut berganti. Sebelumnya
+    // keduanya hanya diwarnai sekali saat aplikasi dijalankan, jadi setelah
+    // pengguna berpindah ke mode gelap, dasar bilah navigasi tetap putih
+    // sampai aplikasi ditutup dan dibuka lagi.
+    applySystemUiOverlayStyle(isDarkMode: _isDarkMode.value);
+
+    // Tidak ada snackbar di sini. Sebelumnya setiap pergantian tema memunculkan
+    // notifikasi "Mode Gelap Aktif" berwarna abu-abu yang ditulis di luar tema,
+    // sehingga satu-satunya elemen di layar yang tidak ikut berganti warna
+    // justru adalah pemberitahuan tentang pergantian warna. Seluruh layar sudah
+    // berubah — itu umpan balik yang paling jelas yang bisa diberikan.
   }
 }

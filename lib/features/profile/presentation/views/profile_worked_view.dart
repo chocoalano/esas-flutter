@@ -1,276 +1,191 @@
+import 'package:esas/core/theme/app_dimens.dart';
+import 'package:esas/core/theme/app_palette.dart';
+import 'package:esas/core/ui/components/app_card.dart';
+import 'package:esas/core/ui/components/app_error_state.dart';
+import 'package:esas/core/ui/components/app_record_field.dart';
+import 'package:esas/core/ui/components/app_section_header.dart';
+import 'package:esas/core/ui/components/app_skeleton.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:esas/app/modules/profile/profile_pages.dart'; // Pastikan ini mengarah ke ProfileRoutes
-import '../controllers/profile_worked_controller.dart';
 
+import '../controllers/profile_tab_controllers.dart';
+
+/// Catatan kepegawaian: perusahaan, kontrak, rekening, dan jalur persetujuan.
+///
+/// Empat kartu, satu ritme. Nilai yang berupa angka atau tanggal — tanggal
+/// bergabung, nomor rekening, gaji pokok — dirender tabular dan bisa disalin,
+/// karena inilah layar yang dibuka orang saat HR menanyakannya lewat telepon.
 class ProfileWorkedView extends GetView<ProfileWorkedController> {
   const ProfileWorkedView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (didPop) {
-          return;
-        }
-        Get.offAllNamed(ProfileRoutes.PROFILE);
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Info Pekerjaan'),
-          centerTitle: true,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios),
-            onPressed: () => Get.offAllNamed(ProfileRoutes.PROFILE),
-          ),
-        ),
-        body: Obx(() {
-          if (controller.isLoading.value) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (controller.errorMessage.isNotEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 48,
-                      color: colorScheme.error,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      controller.errorMessage.value,
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: colorScheme.error,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () => controller.setupProfile(),
-                      child: const Text('Coba Lagi'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          // Using SingleChildScrollView and mainAxisSize.min to prevent RenderFlex issues
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min, // Crucial for scrollable columns
-              children: [
-                // --- Bagian Informasi Umum Perusahaan ---
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Informasi Perusahaan',
-                          style: textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _InfoTile(
-                          title: 'Nama Perusahaan',
-                          value: controller.companyName,
-                        ),
-                        const SizedBox(height: 12),
-                        _InfoTile(
-                          title: 'Departemen',
-                          value: controller.departmentName,
-                        ),
-                        const SizedBox(height: 12),
-                        _InfoTile(
-                          title: 'Posisi Pekerjaan',
-                          value: controller.jobPosition,
-                        ),
-                        const SizedBox(height: 12),
-                        _InfoTile(
-                          title: 'Level Pekerjaan',
-                          value: controller.jobLevel,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // --- Bagian Detail Pekerjaan ---
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Detail Pekerjaan',
-                          style: textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _InfoTile(
-                          title: 'Tanggal Bergabung',
-                          value: controller.joinDate,
-                        ),
-                        const SizedBox(height: 12),
-                        _InfoTile(
-                          title: 'Tanggal Tanda Tangan',
-                          value: controller.signDate,
-                        ),
-                        const SizedBox(height: 12),
-                        _InfoTile(
-                          title: 'Tanggal Resign',
-                          value: controller.resignDate,
-                        ),
-                        const SizedBox(height: 12),
-                        _InfoTile(
-                          title: 'Saldo Cuti',
-                          value: controller.saldoCuti,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // --- Bagian Informasi Bank & Gaji ---
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Informasi Bank & Gaji',
-                          style: textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _InfoTile(
-                          title: 'Nama Bank',
-                          value: controller.bankName,
-                        ),
-                        const SizedBox(height: 12),
-                        _InfoTile(
-                          title: 'Nomor Rekening',
-                          value: controller.bankNumber,
-                        ),
-                        const SizedBox(height: 12),
-                        _InfoTile(
-                          title: 'Pemegang Rekening',
-                          value: controller.bankHolder,
-                        ),
-                        const SizedBox(height: 12),
-                        _InfoTile(
-                          title: 'Gaji Pokok',
-                          value: controller.basicSalary,
-                        ),
-                        const SizedBox(height: 12),
-                        _InfoTile(
-                          title: 'Tipe Pembayaran',
-                          value: controller.paymentType,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // --- Bagian Informasi Approval ---
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Informasi Persetujuan',
-                          style: textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _InfoTile(
-                          title: 'Persetujuan Line',
-                          value: controller.approvalLine,
-                        ),
-                        const SizedBox(height: 12),
-                        _InfoTile(
-                          title: 'Persetujuan Manajer',
-                          value: controller.approvalManager,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+    return Scaffold(
+      appBar: AppBar(title: const Text('Info Pekerjaan'), centerTitle: true),
+      body: Obx(() {
+        if (controller.isLoading.value) {
+          return const AppSkeletonList(
+            count: 4,
+            padding: EdgeInsets.all(AppSpacing.page),
           );
-        }),
-      ),
+        }
+
+        if (controller.errorMessage.isNotEmpty) {
+          return AppErrorState(
+            message: controller.errorMessage.value,
+            onRetry: controller.setupProfile,
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: controller.setupProfile,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.page,
+              AppSpacing.lg,
+              AppSpacing.page,
+              AppSpacing.bottomSafe,
+            ),
+            children: [
+              const AppSectionHeader(
+                title: 'Informasi perusahaan',
+                dense: true,
+              ),
+              _RecordCard(
+                fields: [
+                  AppRecordField(
+                    label: 'Nama perusahaan',
+                    value: controller.companyName,
+                  ),
+                  AppRecordField(
+                    label: 'Departemen',
+                    value: controller.departmentName,
+                  ),
+                  AppRecordField(
+                    label: 'Posisi pekerjaan',
+                    value: controller.jobPosition,
+                  ),
+                  AppRecordField(
+                    label: 'Level pekerjaan',
+                    value: controller.jobLevel,
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xl),
+
+              const AppSectionHeader(title: 'Detail pekerjaan', dense: true),
+              _RecordCard(
+                fields: [
+                  AppRecordField(
+                    label: 'Tanggal bergabung',
+                    value: controller.joinDate,
+                    mono: true,
+                  ),
+                  AppRecordField(
+                    label: 'Tanggal tanda tangan',
+                    value: controller.signDate,
+                    mono: true,
+                  ),
+                  AppRecordField(
+                    label: 'Tanggal resign',
+                    value: controller.resignDate,
+                    mono: true,
+                  ),
+                  AppRecordField(
+                    label: 'Saldo cuti',
+                    value: controller.saldoCutiLabel,
+                    mono: true,
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xl),
+
+              const AppSectionHeader(
+                title: 'Informasi bank & gaji',
+                dense: true,
+              ),
+              _RecordCard(
+                fields: [
+                  AppRecordField(
+                    label: 'Nama bank',
+                    value: controller.bankName,
+                  ),
+                  AppRecordField(
+                    label: 'Nomor rekening',
+                    value: controller.bankNumber,
+                    mono: true,
+                    selectable: true,
+                  ),
+                  AppRecordField(
+                    label: 'Pemegang rekening',
+                    value: controller.bankHolder,
+                    selectable: true,
+                  ),
+                  AppRecordField(
+                    label: 'Gaji pokok',
+                    value: controller.basicSalary,
+                    mono: true,
+                    selectable: true,
+                  ),
+                  AppRecordField(
+                    label: 'Tipe pembayaran',
+                    value: controller.paymentType,
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xl),
+
+              const AppSectionHeader(
+                title: 'Informasi persetujuan',
+                dense: true,
+              ),
+              _RecordCard(
+                fields: [
+                  AppRecordField(
+                    label: 'Persetujuan line',
+                    value: controller.approvalLine,
+                  ),
+                  AppRecordField(
+                    label: 'Persetujuan manajer',
+                    value: controller.approvalManager,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      }),
     );
   }
 }
 
-// Reusable widget for displaying an info tile
-class _InfoTile extends StatelessWidget {
-  final String title;
-  final String value;
+/// Sekumpulan bidang catatan di dalam satu kartu, dipisah garis 1px.
+///
+/// Garis pemisahnya yang membuat kartu ini terbaca sebagai tabel dan bukan
+/// sebagai paragraf: mata menyusuri satu kolom label, bukan delapan blok teks.
+class _RecordCard extends StatelessWidget {
+  const _RecordCard({required this.fields});
 
-  const _InfoTile({required this.title, required this.value});
+  final List<AppRecordField> fields;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final palette = Theme.of(context).palette;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: textTheme.bodySmall?.copyWith(color: Colors.grey)),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-          maxLines: 2, // Allow value to wrap if long
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < fields.length; i++) ...[
+            if (i > 0) ...[
+              const SizedBox(height: AppSpacing.md),
+              Divider(height: 1, color: palette.borderSubtle),
+              const SizedBox(height: AppSpacing.md),
+            ],
+            fields[i],
+          ],
+        ],
+      ),
     );
   }
 }

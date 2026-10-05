@@ -1,3 +1,5 @@
+import '../../../../core/utils/json_parsers.dart';
+
 class Company {
   int? id;
   String? name;
@@ -21,19 +23,20 @@ class Company {
     this.deletedAt,
   });
 
+  /// The coordinates come back as decimal *strings* from the HRIS, so
+  /// `json["latitude"]?.toDouble()` — which assumes a num — was a crash on real
+  /// data. These are for the profile screen; attendance reads its geofence from
+  /// `attendance/context`, fresh, because a coordinate cached from an old
+  /// session is the wrong geofence the day the office moves.
   factory Company.fromJson(Map<String, dynamic> json) => Company(
-    id: json["id"],
-    name: json["name"],
-    latitude: json["latitude"]?.toDouble(),
-    longitude: json["longitude"]?.toDouble(),
-    radius: json["radius"],
-    fullAddress: json["full_address"],
-    createdAt: json["created_at"] == null
-        ? null
-        : DateTime.parse(json["created_at"]),
-    updatedAt: json["updated_at"] == null
-        ? null
-        : DateTime.parse(json["updated_at"]),
+    id: asInt(json["id"]),
+    name: asString(json["name"]),
+    latitude: asDouble(json["latitude"]),
+    longitude: asDouble(json["longitude"]),
+    radius: asInt(json["radius"]),
+    fullAddress: asString(json["full_address"]),
+    createdAt: asDate(json["created_at"]),
+    updatedAt: asDate(json["updated_at"]),
     deletedAt: json["deleted_at"],
   );
 

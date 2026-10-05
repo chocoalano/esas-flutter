@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
-import 'leave_type.m.dart'; // pastikan benar
+import 'leave_type.dart'; // pastikan benar
 
 // -------------------- Helpers null-safe --------------------
 int _asInt(Map<String, dynamic> j, String k, {int? def}) {
@@ -61,6 +61,15 @@ class Permit {
   final String? notes;
   final String? file;
 
+  /// Shift asal dan shift yang diminta, pada pengajuan penyesuaian shift.
+  ///
+  /// Dua id `current_shift_id`/`adjust_shift_id` sudah lama ada di sini dan
+  /// tidak pernah bisa ditampilkan: "12 → 15" bukan kalimat yang bisa
+  /// disetujui siapa pun. Server mengirim keduanya bernama dan berjam pada
+  /// `shift_from`/`shift_to`.
+  final PermitShift? shiftFrom;
+  final PermitShift? shiftTo;
+
   final String? createdAt; // biarkan String? jika API kirim string
   final String? updatedAt;
   final String? deletedAt;
@@ -86,6 +95,8 @@ class Permit {
     this.endTime,
     this.notes,
     this.file,
+    this.shiftFrom,
+    this.shiftTo,
     this.createdAt,
     this.updatedAt,
     this.deletedAt,
@@ -120,6 +131,20 @@ class Permit {
       endTime: _asStringN(json, 'end_time'),
       notes: _asStringN(json, 'notes'),
       file: _asStringN(json, 'file'),
+      shiftFrom: PermitShift.fromJson(
+        _asMapN(json, 'shift_from'),
+        fallbackName: _asStringN(json, 'current_shift'),
+        fallbackId: json['current_shift_id'] == null
+            ? null
+            : _asInt(json, 'current_shift_id'),
+      ),
+      shiftTo: PermitShift.fromJson(
+        _asMapN(json, 'shift_to'),
+        fallbackName: _asStringN(json, 'adjust_shift'),
+        fallbackId: json['adjust_shift_id'] == null
+            ? null
+            : _asInt(json, 'adjust_shift_id'),
+      ),
       createdAt: _asStringN(json, 'created_at'),
       updatedAt: _asStringN(json, 'updated_at'),
       deletedAt: _asStringN(json, 'deleted_at'),
@@ -155,6 +180,8 @@ class Permit {
     if (endTime != null) 'end_time': endTime,
     if (notes != null) 'notes': notes,
     if (file != null) 'file': file,
+    if (shiftFrom != null) 'shift_from': shiftFrom!.toJson(),
+    if (shiftTo != null) 'shift_to': shiftTo!.toJson(),
     if (createdAt != null) 'created_at': createdAt,
     if (updatedAt != null) 'updated_at': updatedAt,
     if (deletedAt != null) 'deleted_at': deletedAt,
@@ -336,5 +363,64 @@ class UserTimeworkSchedule {
       'work_day': workDay!.toIso8601String().split('T').first,
     if (createdAt != null) 'created_at': createdAt,
     if (updatedAt != null) 'updated_at': updatedAt,
+  };
+}
+
+/// Satu shift sebagaimana dibaca penyetuju: bernama, dan dengan jamnya.
+class PermitShift {
+  const PermitShift({this.id, required this.name, this.start, this.end});
+
+  final int? id;
+  final String name;
+  final String? start;
+  final String? end;
+
+  /// Dari `shift_from`/`shift_to`, atau dari nama telanjang yang dikirim
+  /// kontrak sebelumnya.
+  ///
+  /// Nama itulah syaratnya. Sebuah shift yang hanya punya id tidak
+  /// dikembalikan sama sekali: menampilkan "Shift 12" kepada seorang manajer
+  /// sama tidak berartinya dengan tidak menampilkan apa pun, dan yang kedua
+  /// setidaknya jujur.
+  static PermitShift? fromJson(
+    Map<String, dynamic>? json, {
+    String? fallbackName,
+    int? fallbackId,
+  }) {
+    final name = _asStringN(json ?? const {}, 'name') ?? fallbackName;
+
+    if (name == null || name.trim().isEmpty) return null;
+
+    return PermitShift(
+      id: json == null || json['id'] == null ? fallbackId : _asInt(json, 'id'),
+      name: name.trim(),
+      start: _hourMinute(_asStringN(json ?? const {}, 'in')),
+      end: _hourMinute(_asStringN(json ?? const {}, 'out')),
+    );
+  }
+
+  /// `08:00:00` menjadi `08:00`.
+  static String? _hourMinute(String? raw) {
+    if (raw == null) return null;
+
+    final match = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(raw);
+
+    if (match == null) return raw;
+
+    return '${match.group(1)!.padLeft(2, '0')}:${match.group(2)}';
+  }
+
+  /// "Pagi (07:00–15:00)", atau hanya "Pagi" bila jamnya tidak dikirim.
+  String get label {
+    if (start == null || end == null) return name;
+
+    return '$name ($start–$end)';
+  }
+
+  Map<String, dynamic> toJson() => {
+    if (id != null) 'id': id,
+    'name': name,
+    if (start != null) 'in': start,
+    if (end != null) 'out': end,
   };
 }

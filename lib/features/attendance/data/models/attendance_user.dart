@@ -1,3 +1,5 @@
+import 'package:esas/core/utils/json_parsers.dart';
+
 class User {
   int? id;
   int? companyId;
@@ -28,23 +30,17 @@ class User {
   });
 
   factory User.fromJson(Map<String, dynamic> json) => User(
-    id: json["id"],
-    companyId: json["company_id"],
-    name: json["name"],
-    nip: json["nip"],
-    email: json["email"],
-    emailVerifiedAt: json["email_verified_at"] == null
-        ? null
-        : DateTime.parse(json["email_verified_at"]),
-    avatar: json["avatar"],
-    status: json["status"], // Added null check
-    deviceId: json["device_id"],
-    createdAt: json["created_at"] == null
-        ? null
-        : DateTime.parse(json["created_at"]),
-    updatedAt: json["updated_at"] == null
-        ? null
-        : DateTime.parse(json["updated_at"]),
+    id: asInt(json["id"]),
+    companyId: asInt(json["company_id"]),
+    name: asString(json["name"]),
+    nip: asString(json["nip"]),
+    email: asString(json["email"]),
+    emailVerifiedAt: asDate(json["email_verified_at"]),
+    avatar: asString(json["avatar"]),
+    status: asString(json["status"]),
+    deviceId: asString(json["device_id"]),
+    createdAt: asDate(json["created_at"]),
+    updatedAt: asDate(json["updated_at"]),
     deletedAt: json["deleted_at"],
   );
 

@@ -43,3 +43,34 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# ─── Secrets & signing material ───────────────────────────────────────────
+# NOTE: adding a path here does NOT untrack a file already committed.
+# `esas-keystore.jks` remains tracked and remains in Git history.
+# See docs/refactoring/04-risk-register.md R-01 for the required remediation.
+
+# Android signing
+*.jks
+*.keystore
+key.properties
+android/key.properties
+android/local.properties
+
+# Environment configuration
+.env
+.env.*
+!.env.example
+
+# Certificates & provisioning
+*.p12
+*.pem
+*.cer
+*.certSigningRequest
+*.mobileprovision
+
+# iOS
+ios/Flutter/flutter_export_environment.sh
+ios/Podfile.lock.backup
+
+# Coverage
+coverage/

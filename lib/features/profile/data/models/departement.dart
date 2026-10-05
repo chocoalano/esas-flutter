@@ -1,3 +1,5 @@
+import '../../../../core/utils/json_parsers.dart';
+
 class Departement {
   int? id;
   int? companyId;
@@ -18,17 +20,13 @@ class Departement {
   });
 
   factory Departement.fromJson(Map<String, dynamic> json) => Departement(
-    id: json["id"],
-    companyId: json["company_id"],
-    name: json["name"],
-    createdAt: json["created_at"] == null
-        ? null
-        : DateTime.parse(json["created_at"]),
-    updatedAt: json["updated_at"] == null
-        ? null
-        : DateTime.parse(json["updated_at"]),
+    id: asInt(json["id"]),
+    companyId: asInt(json["company_id"]),
+    name: asString(json["name"]),
+    createdAt: asDate(json["created_at"]),
+    updatedAt: asDate(json["updated_at"]),
     deletedAt: json["deleted_at"],
-    departementId: json["departement_id"],
+    departementId: asInt(json["departement_id"]),
   );
 
   Map<String, dynamic> toJson() => {

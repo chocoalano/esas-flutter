@@ -35,7 +35,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   get: ^4.7.2
-  introduction_screen: ^3.1.17
+  introduction_screen: ^4.0.0
   get_storage: ^2.1.1
   flutter_svg: ^2.2.0
   device_info_plus: ^11.5.0
@@ -52,11 +52,23 @@ dependencies:
   firebase_messaging: ^15.2.9
   flutter_local_notifications: ^19.3.1
   flutter_html: ^3.0.0
-  flutter_launcher_icons: ^0.14.4
+  # Credentials and the tenancy configuration: Keychain on iOS,
+  # EncryptedSharedPreferences on Android. GetStorage writes plain JSON to the
+  # documents directory, which is the wrong place for a bearer token. Matches
+  # the sibling app esas_attendance. See ADR-0005 and audit TEN-04 / MED-06.
+  flutter_secure_storage: ^9.2.4
+  camera: ^0.12.0+1
+  google_mlkit_face_detection: ^0.14.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # Test doubles. Lets a test fake a concrete class without inventing an
+  # interface in production code purely so a test can substitute it.
+  mocktail: ^1.0.4
+  # Generates launcher icons at build time. It has no `package:` import anywhere
+  # in lib/, so it is a tool, not a runtime dependency (audit LOW-10).
+  flutter_launcher_icons: ^0.14.4
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

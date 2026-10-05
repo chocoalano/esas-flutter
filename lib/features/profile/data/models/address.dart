@@ -1,3 +1,5 @@
+import '../../../../core/utils/json_parsers.dart';
+
 class Address {
   int? id;
   int? userId;
@@ -24,20 +26,16 @@ class Address {
   });
 
   factory Address.fromJson(Map<String, dynamic> json) => Address(
-    id: json["id"],
-    userId: json["user_id"],
-    identityType: json["identity_type"],
-    identityNumbers: json["identity_numbers"],
-    province: json["province"],
-    city: json["city"],
-    citizenAddress: json["citizen_address"],
-    residentialAddress: json["residential_address"],
-    createdAt: json["created_at"] == null
-        ? null
-        : DateTime.parse(json["created_at"]),
-    updatedAt: json["updated_at"] == null
-        ? null
-        : DateTime.parse(json["updated_at"]),
+    id: asInt(json["id"]),
+    userId: asInt(json["user_id"]),
+    identityType: asString(json["identity_type"]),
+    identityNumbers: asString(json["identity_numbers"]),
+    province: asString(json["province"]),
+    city: asString(json["city"]),
+    citizenAddress: asString(json["citizen_address"]),
+    residentialAddress: asString(json["residential_address"]),
+    createdAt: asDate(json["created_at"]),
+    updatedAt: asDate(json["updated_at"]),
   );
 
   Map<String, dynamic> toJson() => {

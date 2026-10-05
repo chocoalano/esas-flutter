@@ -1,14 +1,16 @@
+import '../../../../core/utils/json_parsers.dart';
+
 import 'dart:convert';
 
-import 'address.m.dart';
-import 'company.m.dart';
-import 'detail.m.dart';
-import 'employe.m.dart';
-import 'family.m.dart';
-import 'foeducation.m.dart'; // Make sure this defines FormalEducation
-import 'ineducation.m.dart'; // Make sure this defines InformalEducationModel
-import 'salary.m.dart';
-import 'workexp.m.dart'; // Make sure this defines WorkExperienceModel
+import 'address.dart';
+import 'company.dart';
+import 'detail.dart';
+import 'employe.dart';
+import 'family.dart';
+import 'foeducation.dart'; // Make sure this defines FormalEducation
+import 'ineducation.dart'; // Make sure this defines InformalEducationModel
+import 'salary.dart';
+import 'workexp.dart'; // Make sure this defines WorkExperienceModel
 
 User userFromJson(String str) => User.fromJson(json.decode(str));
 
@@ -61,58 +63,59 @@ class User {
     this.employee,
   });
 
+  /// Built from the `/profile` payload, reshaped by `ProfileRepository`.
+  ///
+  /// Every read is null-safe. It used to be a wall of `json["x"]` assignments
+  /// and `DateTime.parse` calls that threw on an absent or retyped field, and
+  /// `Company.fromJson(json["company"])` was the one that actually fired: the
+  /// session endpoint flattens `company` to its *name*, so feeding this model a
+  /// `/auth/me` body raised a "String is not a subtype of Map" type error
+  /// before the profile screen drew a pixel.
+  ///
+  /// The nested objects are read through [asObject] for the same reason: a
+  /// string where an object was expected now yields an empty record rather than
+  /// a crash.
   factory User.fromJson(Map<String, dynamic> json) => User(
-    id: json["id"],
-    companyId: json["company_id"],
-    name: json["name"],
-    nip: json["nip"],
-    email: json["email"],
-    emailVerifiedAt: json["email_verified_at"] == null
-        ? null
-        : DateTime.parse(json["email_verified_at"]),
-    avatar: json["avatar"],
-    status: json["status"],
-    deviceId: json["device_id"],
-    createdAt: json["created_at"] == null
-        ? null
-        : DateTime.parse(json["created_at"]),
-    updatedAt: json["updated_at"] == null
-        ? null
-        : DateTime.parse(json["updated_at"]),
+    id: asInt(json["id"]),
+    companyId: asInt(json["company_id"]),
+    name: asString(json["name"]),
+    nip: asString(json["nip"]),
+    email: asString(json["email"]),
+    emailVerifiedAt: asDate(json["email_verified_at"]),
+    avatar: asString(json["avatar"]),
+    status: asString(json["status"]),
+    deviceId: asString(json["device_id"]),
+    createdAt: asDate(json["created_at"]),
+    updatedAt: asDate(json["updated_at"]),
     deletedAt: json["deleted_at"],
-    company: json["company"] == null ? null : Company.fromJson(json["company"]),
-    details: json["details"] == null ? null : Details.fromJson(json["details"]),
-    address: json["address"] == null ? null : Address.fromJson(json["address"]),
-    salaries: json["salaries"] == null
-        ? null
-        : Salaries.fromJson(json["salaries"]),
-    families: json["families"] == null
-        ? []
-        : List<Family>.from(json["families"]!.map((x) => Family.fromJson(x))),
-    // --- FIXES ARE HERE ---
-    formalEducations: json["formal_educations"] == null
-        ? []
-        : List<FormalEducation>.from(
-            json["formal_educations"]!.map((x) => FormalEducation.fromJson(x)),
-          ),
-    informalEducations: json["informal_educations"] == null
-        ? []
-        : List<InformalEducationModel>.from(
-            json["informal_educations"]!.map(
-              (x) => InformalEducationModel.fromJson(x),
-            ),
-          ),
-    workExperiences: json["work_experiences"] == null
-        ? []
-        : List<WorkExperienceModel>.from(
-            json["work_experiences"]!.map(
-              (x) => WorkExperienceModel.fromJson(x),
-            ),
-          ),
-    // --- END FIXES ---
-    employee: json["employee"] == null
-        ? null
-        : Employee.fromJson(json["employee"]),
+    company: json["company"] is Map
+        ? Company.fromJson(asObject(json["company"]))
+        : null,
+    details: json["details"] is Map
+        ? Details.fromJson(asObject(json["details"]))
+        : null,
+    address: json["address"] is Map
+        ? Address.fromJson(asObject(json["address"]))
+        : null,
+    salaries: json["salaries"] is Map
+        ? Salaries.fromJson(asObject(json["salaries"]))
+        : null,
+    families: asModelList(json["families"], Family.fromJson),
+    formalEducations: asModelList(
+      json["formal_educations"],
+      FormalEducation.fromJson,
+    ),
+    informalEducations: asModelList(
+      json["informal_educations"],
+      InformalEducationModel.fromJson,
+    ),
+    workExperiences: asModelList(
+      json["work_experiences"],
+      WorkExperienceModel.fromJson,
+    ),
+    employee: json["employee"] is Map
+        ? Employee.fromJson(asObject(json["employee"]))
+        : null,
   );
 
   Map<String, dynamic> toJson() => {

@@ -1,193 +1,190 @@
-// lib/app/modules/login/views/login_view.dart
+// lib/features/auth/presentation/views/login_view.dart
+import 'package:esas/core/theme/app_dimens.dart';
+import 'package:esas/core/theme/app_palette.dart';
+import 'package:esas/core/ui/components/app_button.dart';
+import 'package:esas/core/ui/components/app_input_decoration.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+
 import '../controllers/login_controller.dart';
 
+/// Layar masuk.
+///
+/// Satu kolom, rata kiri, dengan lebar maksimum 420px supaya di tablet baris
+/// tidak melebar sampai sulit dibaca. Tidak ada ilustrasi dan tidak ada kartu
+/// mengambang: layar ini punya satu tugas, dan setiap elemen yang tidak
+/// membantu menyelesaikannya hanya menunda orang yang sedang terburu-buru absen
+/// pagi.
+///
+/// Yang menggantikan hiasan adalah ritme: tanda brand, judul, satu garis 1px
+/// yang memisahkan penjelasan dari formulir, lalu dua field dengan jarak yang
+/// sama persis. Garis itu bukan dekorasi — ia penanda tempat layar berhenti
+/// menjelaskan dan mulai meminta.
 class LoginView extends GetView<LoginController> {
   const LoginView({super.key});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // final size = MediaQuery.of(context).size; // 'size' is not used, can remove
+    final palette = theme.palette;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Form(
-            // ⭐ Wrap your form fields with a Form widget ⭐
-            key: controller
-                .loginFormKey, // ⭐ Assign the GlobalKey from the controller ⭐
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const SizedBox(height: 50),
-
-                // Judul halaman
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Masuk ke Akun Anda",
-                        style: theme.textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xxl,
+              vertical: AppSpacing.xxxl,
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Form(
+                key: controller.loginFormKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Tanda brand, bukan hiasan: memberi tahu aplikasi mana
+                    // yang sedang meminta kata sandi.
+                    Container(
+                      width: 52,
+                      height: 52,
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        borderRadius: AppRadii.xlAll,
+                        border: Border.all(color: palette.borderSubtle),
+                      ),
+                      child: Image.asset(
+                        'assets/images/logo-removebg.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) => Icon(
+                          Icons.badge_outlined,
+                          color: theme.colorScheme.primary,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Pastikan NIP dan kata sandi kamu benar ya!",
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 50),
-
-                // Form NIP
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    "NIP",
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w500,
                     ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                TextFormField(
-                  controller: controller.nipController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    hintText: "1234567890",
-                    prefixIcon: Icon(Icons.badge),
-                  ),
-                  validator: (value) {
-                    // ⭐ Add validator ⭐
-                    if (value == null || value.isEmpty) {
-                      return 'NIP tidak boleh kosong';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
+                    const SizedBox(height: AppSpacing.xxl),
 
-                // Form Kata Sandi
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    "Kata Sandi",
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w500,
+                    Text(
+                      'Masuk ke ESAS',
+                      style: theme.textTheme.headlineMedium,
                     ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Obx(
-                  () => TextFormField(
-                    controller: controller.passwordController,
-                    obscureText: controller.isPasswordHidden.value,
-                    decoration: InputDecoration(
-                      hintText: "********",
-                      prefixIcon: const Icon(Icons.lock),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          controller.isPasswordHidden.value
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                        ),
-                        onPressed: controller.togglePasswordVisibility,
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      'Gunakan NIP dan kata sandi yang diberikan oleh HR.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: palette.textMuted,
                       ),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Kata sandi tidak boleh kosong';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(height: 30),
 
-                // Tombol Login
-                Obx(
-                  () => SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      // Validate the form before calling loginUser
-                      onPressed: controller.isLoading.value
-                          ? null
-                          : () {
-                              if (controller.loginFormKey.currentState!
-                                  .validate()) {
-                                controller.loginUser();
-                              }
-                            },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
+                    const SizedBox(height: AppSpacing.xxl),
+                    Divider(height: 1, color: palette.borderSubtle),
+                    const SizedBox(height: AppSpacing.xxl),
+
+                    const AppFieldLabel('NIP', required: true),
+                    TextFormField(
+                      controller: controller.nipController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.username],
+                      decoration: const InputDecoration(
+                        hintText: '1234567890',
+                        prefixIcon: Icon(
+                          Icons.badge_outlined,
+                          size: AppIconSizes.lg,
                         ),
-                        backgroundColor: theme.colorScheme.primary,
-                        foregroundColor: Colors.white,
                       ),
-                      child: controller.isLoading.value
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text("Masuk"),
+                      validator: (value) =>
+                          (value == null || value.trim().isEmpty)
+                          ? 'NIP tidak boleh kosong'
+                          : null,
                     ),
-                  ),
+                    const SizedBox(height: AppSpacing.xl),
+
+                    const AppFieldLabel('Kata sandi', required: true),
+                    Obx(
+                      () => TextFormField(
+                        controller: controller.passwordController,
+                        obscureText: controller.isPasswordHidden.value,
+                        textInputAction: TextInputAction.done,
+                        autofillHints: const [AutofillHints.password],
+                        // Menekan "selesai" di papan ketik langsung mengirim,
+                        // jadi tangan tidak perlu berpindah ke tombol.
+                        onFieldSubmitted: (_) => _submit(),
+                        decoration: InputDecoration(
+                          hintText: 'Masukkan kata sandi',
+                          prefixIcon: const Icon(
+                            Icons.lock_outline,
+                            size: AppIconSizes.lg,
+                          ),
+                          suffixIcon: IconButton(
+                            tooltip: controller.isPasswordHidden.value
+                                ? 'Tampilkan kata sandi'
+                                : 'Sembunyikan kata sandi',
+                            icon: Icon(
+                              controller.isPasswordHidden.value
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                              size: AppIconSizes.lg,
+                            ),
+                            onPressed: controller.togglePasswordVisibility,
+                          ),
+                        ),
+                        validator: (value) => (value == null || value.isEmpty)
+                            ? 'Kata sandi tidak boleh kosong'
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xxl),
+
+                    // Label tetap dirender sebagai teks selama pengiriman:
+                    // detik ketika seseorang paling ingin tahu tombol mana yang
+                    // barusan ia tekan adalah detik yang paling buruk untuk
+                    // menghilangkan namanya.
+                    Obx(
+                      () => AppButton(
+                        label: 'Masuk',
+                        busy: controller.isLoading.value,
+                        onPressed: _submit,
+                      ),
+                    ),
+
+                    const SizedBox(height: AppSpacing.xxl),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.lock_outline_rounded,
+                          size: AppIconSizes.xs,
+                          color: palette.textMuted,
+                        ),
+                        const SizedBox(width: AppSpacing.tight),
+                        Flexible(
+                          child: Text(
+                            'Kredensial disimpan terenkripsi di perangkat ini.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: palette.textMuted,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-
-                // Tautan Lupa Password
-                // Align(
-                //   alignment: Alignment.centerRight,
-                //   child: TextButton(
-                //     onPressed: () => Get.toNamed('/forgot-password'),
-                //     child: Text(
-                //       "Lupa kata sandi?",
-                //       style: TextStyle(color: theme.colorScheme.primary),
-                //     ),
-                //   ),
-                // ),
-
-                // Navigasi ke halaman pendaftaran
-                // Row(
-                //   mainAxisAlignment: MainAxisAlignment.center,
-                //   children: [
-                //     Text(
-                //       "Belum punya akun?",
-                //       style: theme.textTheme.bodyMedium,
-                //     ),
-                //     TextButton(
-                //       onPressed: () {},
-                //       child: Text(
-                //         "Daftar sekarang",
-                //         style: TextStyle(
-                //           color: theme.colorScheme.primary,
-                //           fontWeight: FontWeight.bold,
-                //         ),
-                //       ),
-                //     ),
-                //   ],
-                // ),
-              ],
+              ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  void _submit() {
+    if (controller.isLoading.value) return;
+    if (controller.loginFormKey.currentState?.validate() ?? false) {
+      controller.loginUser();
+    }
   }
 }

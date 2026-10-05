@@ -1,3 +1,5 @@
+import '../../../../core/utils/json_parsers.dart';
+
 class FormalEducation {
   final int id;
   final int userId;
@@ -26,23 +28,23 @@ class FormalEducation {
   });
 
   factory FormalEducation.fromJson(Map<String, dynamic> json) {
+    // Every read is null-safe. These were `json['id'] as int` and
+    // `(json['score'] as num).toDouble()`, which throw the moment a field is
+    // absent or shifts type — and `score` is a string column, `start` an
+    // integer year, so both of those were a crash waiting for the first
+    // employee who had filled the tab in (MED-04).
     return FormalEducation(
-      id: json['id'] as int,
-      userId: json['user_id'] as int,
-      institution: json['institution'] as String,
-      majors: json['majors'] as String,
-      score: (json['score'] as num).toDouble(),
-      start: json['start'] != null ? DateTime.tryParse(json['start']) : null,
-      finish: json['finish'] != null ? DateTime.tryParse(json['finish']) : null,
-      status: json['status'] as String,
-      certification:
-          json['certification'] == true || json['certification'] == 1,
-      createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'])
-          : null,
-      updatedAt: json['updated_at'] != null
-          ? DateTime.tryParse(json['updated_at'])
-          : null,
+      id: asInt(json['id']) ?? 0,
+      userId: asInt(json['user_id']) ?? 0,
+      institution: asString(json['institution']) ?? '',
+      majors: asString(json['majors']) ?? '',
+      score: asDouble(json['score']) ?? 0,
+      start: asYear(json['start']),
+      finish: asYear(json['finish']),
+      status: asString(json['status']) ?? '',
+      certification: asBool(json['certification']) ?? false,
+      createdAt: asDate(json['created_at']),
+      updatedAt: asDate(json['updated_at']),
     );
   }
 

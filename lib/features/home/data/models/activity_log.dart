@@ -1,3 +1,4 @@
+import 'package:esas/core/utils/json_parsers.dart';
 import 'dart:convert';
 
 class ActivityLog {
@@ -11,8 +12,8 @@ class ActivityLog {
   final Map<String, dynamic> payload;
   final String ipAddress;
   final String userAgent;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
   final DateTime? deletedAt;
 
   ActivityLog({
@@ -26,8 +27,8 @@ class ActivityLog {
     required this.payload,
     required this.ipAddress,
     required this.userAgent,
-    required this.createdAt,
-    required this.updatedAt,
+    this.createdAt,
+    this.updatedAt,
     this.deletedAt,
   });
 
@@ -47,21 +48,23 @@ class ActivityLog {
     }
 
     return ActivityLog(
-      id: json['id'] as int? ?? 0,
-      userId: json['user_id'] as int? ?? 0,
-      method: json['method'] as String? ?? '',
-      url: json['url'] as String? ?? '',
-      action: json['action'] as String? ?? '',
-      modelType: json['model_type'] as String? ?? '',
-      modelId: json['model_id'] as int? ?? 0,
+      id: asInt(json['id']) ?? 0,
+      userId: asInt(json['user_id']) ?? 0,
+      method: asString(json['method']) ?? '',
+      url: asString(json['url']) ?? '',
+      action: asString(json['action']) ?? '',
+      modelType: asString(json['model_type']) ?? '',
+      modelId: asInt(json['model_id']) ?? 0,
       payload: parsedPayload,
-      ipAddress: json['ip_address'] as String? ?? '',
-      userAgent: json['user_agent'] as String? ?? '',
-      createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(json['updated_at'] ?? '') ?? DateTime.now(),
-      deletedAt: json['deleted_at'] != null
-          ? DateTime.tryParse(json['deleted_at'])
-          : null,
+      ipAddress: asString(json['ip_address']) ?? '',
+      userAgent: asString(json['user_agent']) ?? '',
+      // `DateTime.tryParse(json['x'] ?? '')` throws rather than returns null
+      // when the value is a number, and its `?? DateTime.now()` fallback put
+      // *this moment* on a row the server never dated — which on a security
+      // screen reads as activity that just happened.
+      createdAt: asDate(json['created_at']),
+      updatedAt: asDate(json['updated_at']),
+      deletedAt: asDate(json['deleted_at']),
     );
   }
 
@@ -77,8 +80,8 @@ class ActivityLog {
       'payload': payload, // biarkan sebagai Map, bukan jsonEncode
       'ip_address': ipAddress,
       'user_agent': userAgent,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
+      'created_at': createdAt?.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
       'deleted_at': deletedAt?.toIso8601String(),
     };
   }
