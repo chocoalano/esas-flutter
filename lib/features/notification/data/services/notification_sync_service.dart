@@ -8,6 +8,7 @@ import '../../../../core/utils/json_parsers.dart';
 import '../../../auth/data/repositories/session_repository.dart';
 import '../../../home/presentation/routes/home_routes.dart';
 import '../../../permit/presentation/routes/permit_routes.dart';
+import '../../../profile/presentation/routes/profile_routes.dart';
 import '../../presentation/routes/notification_routes.dart';
 import '../repositories/notification_repository.dart';
 
@@ -21,6 +22,12 @@ class NotificationDestination {
 
   static NotificationDestination fromData(Map<String, dynamic> data) {
     final type = asString(data['type']) ?? '';
+    final slipId = asInt(data['slip_id']);
+    if (type == 'payslip.available' && slipId != null && slipId > 0) {
+      return NotificationDestination(ProfileRoutes.payroll, {
+        'slip_id': slipId,
+      });
+    }
     final permitId = asInt(data['permit_id']);
     if (type.startsWith('permit.') && permitId != null && permitId > 0) {
       return NotificationDestination(PermitRoutes.show, {'id': permitId});
@@ -131,7 +138,11 @@ class NotificationSyncService extends GetxService with WidgetsBindingObserver {
       final destination = NotificationDestination.fromData(data);
       if (Get.currentRoute != destination.route ||
           destination.arguments != null) {
-        Get.toNamed(destination.route, arguments: destination.arguments);
+        Get.toNamed(
+          destination.route,
+          arguments: destination.arguments,
+          preventDuplicates: destination.arguments == null,
+        );
       }
     });
     WidgetsBinding.instance.scheduleFrame();

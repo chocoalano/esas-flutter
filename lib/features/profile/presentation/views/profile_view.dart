@@ -83,7 +83,7 @@ class ProfileView extends GetView<ProfileController> {
       ),
       ProfileMenuItem(
         Icons.account_balance_wallet_outlined,
-        'Info payroll',
+        'Slip gaji',
         ProfileRoutes.payroll,
       ),
     ]),

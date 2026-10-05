@@ -30,11 +30,19 @@ class ProfileApiService {
 
   /// Wage components: salary, grade, bank details, and the runs already paid.
   ///
-  /// **Not a payslip.** A payslip is a document a company publishes, with an
-  /// approval and a retention behind it, and this application does not produce
-  /// one yet. Naming this "slip gaji" in the UI would promise the other thing.
+  /// Detailed slips are read through [payslips] and [payslip].
   Future<Map<String, dynamic>> payroll() =>
       _client.getObject(ApiRoutes.payroll);
+
+  Future<Map<String, dynamic>> payslips({int page = 1}) => _client.getObject(
+    ApiRoutes.payslips,
+    query: {'page': page, 'per_page': 12},
+  );
+
+  Future<Map<String, dynamic>> payslip(int id) =>
+      _client.getObject(ApiRoutes.payslip(id));
+  Future<Map<String, dynamic>> payslipPdf(int id) =>
+      _client.getObject(ApiRoutes.payslipPdf(id));
 
   Future<Map<String, dynamic>> attendanceSummary({int? year, int? month}) =>
       _client.getObject(

@@ -97,7 +97,8 @@ class FirebaseMessagingService extends GetxService {
       FirebaseMessaging.onMessage.listen((message) {
         final sync = Get.find<NotificationSyncService>();
         if (!sync.accepts(message.data)) return;
-        final id = message.messageId;
+        final id =
+            message.data['notification_id']?.toString() ?? message.messageId;
         if (id != null && !_seenMessages.add(id)) return;
         if (_seenMessages.length > 100) {
           _seenMessages.remove(_seenMessages.first);

@@ -1,3 +1,9 @@
+import 'dart:typed_data';
+import 'package:flutter/widgets.dart';
+import '../../../../core/network/api_exception.dart';
+import '../../../auth/data/repositories/session_repository.dart';
+import '../../data/models/payslip.dart';
+import '../../data/repositories/payroll_repository.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
@@ -191,11 +197,132 @@ class ProfileExperienceController extends ProfileSectionController {
   }
 }
 
-/// The payroll tab has no data source yet.
-///
-/// It was an empty class with three commented-out lifecycle overrides. Kept as a
-/// placeholder so the route keeps working; the endpoint it needs is one of the
-/// eighteen the backend owes (`06-api-migration-map.md`).
-class ProfilePayrollController extends GetxController {
-  ProfilePayrollController();
+class ProfilePayrollController extends GetxController
+    with WidgetsBindingObserver {
+  ProfilePayrollController({
+    required PayrollRepository repository,
+    SessionRepository? session,
+  }) : _repository = repository,
+       _session = session;
+  final PayrollRepository _repository;
+  final SessionRepository? _session;
+  final slips = <Payslip>[].obs;
+  final isLoading = false.obs;
+  final isMoreLoading = false.obs;
+  final hasMore = false.obs;
+  final errorMessage = RxnString();
+  final detail = Rxn<Payslip>();
+  final isDetailLoading = false.obs;
+  final detailError = RxnString();
+  final isDownloading = false.obs;
+  int _page = 1, _generation = 0, _detailGeneration = 0;
+  Worker? _notifications;
+  int? _selectedId;
+
+  @override
+  void onInit() {
+    super.onInit();
+    WidgetsBinding.instance.addObserver(this);
+    if (_session != null) {
+      _notifications = ever(
+        _session.notificationRevision,
+        (_) => refreshSlips(),
+      );
+    }
+    refreshSlips();
+  }
+
+  @override
+  void onClose() {
+    _generation++;
+    _detailGeneration++;
+    _notifications?.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    super.onClose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) refreshSlips();
+  }
+
+  Future<void> refreshSlips() async {
+    final generation = ++_generation;
+    final token = _session?.token;
+    isLoading.value = true;
+    isMoreLoading.value = false;
+    errorMessage.value = null;
+    try {
+      final result = await _repository.page();
+      if (generation != _generation || token != _session?.token) return;
+      slips.assignAll(result.rows);
+      _page = result.currentPage;
+      hasMore.value = result.hasMore;
+      final selected = _selectedId;
+      if (selected != null) await loadDetail(selected);
+    } on ApiException catch (error) {
+      if (generation == _generation && token == _session?.token) {
+        errorMessage.value = error.message;
+      }
+    } finally {
+      if (generation == _generation) isLoading.value = false;
+    }
+  }
+
+  Future<void> loadMore() async {
+    if (isLoading.value || isMoreLoading.value || !hasMore.value) return;
+    final generation = _generation;
+    final token = _session?.token;
+    isMoreLoading.value = true;
+    try {
+      final result = await _repository.page(page: _page + 1);
+      if (generation != _generation || token != _session?.token) return;
+      slips.addAll(result.rows);
+      _page = result.currentPage;
+      hasMore.value = result.hasMore;
+      errorMessage.value = null;
+    } on ApiException catch (error) {
+      if (generation == _generation && token == _session?.token) {
+        errorMessage.value = error.message;
+      }
+    } finally {
+      if (generation == _generation) isMoreLoading.value = false;
+    }
+  }
+
+  Future<void> loadDetail(int id) async {
+    _selectedId = id;
+    final generation = ++_detailGeneration;
+    final token = _session?.token;
+    detail.value = null;
+    detailError.value = null;
+    isDetailLoading.value = true;
+    try {
+      final slip = await _repository.slip(id);
+      if (generation == _detailGeneration && token == _session?.token) {
+        detail.value = slip;
+      }
+    } on ApiException catch (error) {
+      if (generation == _detailGeneration && token == _session?.token) {
+        detailError.value = error.message;
+      }
+    } finally {
+      if (generation == _detailGeneration) isDetailLoading.value = false;
+    }
+  }
+
+  void closeDetail() {
+    _selectedId = null;
+    _detailGeneration++;
+    detail.value = null;
+  }
+
+  Future<({String filename, Uint8List bytes})> download(int id) async {
+    final token = _session?.token;
+    final pdf = await _repository.pdf(id);
+    if (token != _session?.token) {
+      throw const ApiException('Sesi berubah. Buka ulang slip gaji.');
+    }
+    return pdf;
+  }
 }

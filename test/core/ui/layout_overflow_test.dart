@@ -21,6 +21,8 @@
 library;
 
 import 'package:esas/core/network/api_exception.dart';
+import 'package:esas/features/profile/data/repositories/payroll_repository.dart';
+import 'package:esas/features/profile/data/models/payslip.dart';
 import 'package:esas/core/theme/app_palette.dart';
 import 'package:esas/core/theme/app_theme.dart';
 import 'package:esas/core/theme/theme_controller.dart';
@@ -122,6 +124,8 @@ class _MockAttendanceRepository extends Mock implements AttendanceRepository {}
 
 class _MockNotificationRepository extends Mock
     implements NotificationRepository {}
+
+class _MockPayrollRepository extends Mock implements PayrollRepository {}
 
 class _MockProfileRepository extends Mock implements ProfileRepository {}
 
@@ -1133,7 +1137,17 @@ void main() {
       return const ProfileExperienceView();
     },
     'ProfilePayrollView': () {
-      Get.put<ProfilePayrollController>(ProfilePayrollController());
+      final repository = _MockPayrollRepository();
+      when(() => repository.page()).thenAnswer(
+        (_) async => PayslipPage.fromJson({
+          'data': [],
+          'current_page': 1,
+          'last_page': 1,
+        }),
+      );
+      Get.put<ProfilePayrollController>(
+        ProfilePayrollController(repository: repository),
+      );
       return const ProfilePayrollView();
     },
     'ProfileBugReportView': () {

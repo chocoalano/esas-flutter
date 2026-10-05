@@ -98,6 +98,9 @@ class ApiRoutes {
 
   /// Wage components — **not** a payslip. Salary, grade, bank, settled runs.
   static const String payroll = '/payroll';
+  static const String payslips = '/payroll/slips';
+  static String payslip(int id) => '$payslips/$id';
+  static String payslipPdf(int id) => '$payslips/$id/pdf';
 
   // ── Home ─────────────────────────────────────────────────────────────────
 

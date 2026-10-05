@@ -6,6 +6,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../features/auth/data/repositories/auth_repository.dart';
 import '../../../../features/auth/data/repositories/session_repository.dart';
 import '../../data/repositories/profile_repository.dart';
+import '../../data/repositories/payroll_repository.dart';
 import '../../data/services/profile_api_service.dart';
 import '../controllers/profile_bug_report_controller.dart';
 import '../controllers/profile_controller.dart';
@@ -78,8 +79,12 @@ class ProfileExperienceBinding extends Bindings {
 
 class ProfilePayrollBinding extends Bindings {
   @override
-  void dependencies() =>
-      Get.lazyPut<ProfilePayrollController>(ProfilePayrollController.new);
+  void dependencies() => Get.lazyPut<ProfilePayrollController>(
+    () => ProfilePayrollController(
+      repository: PayrollRepository(ProfileApiService(Get.find<ApiClient>())),
+      session: Get.find<SessionRepository>(),
+    ),
+  );
 }
 
 class ProfileBugReportBinding extends Bindings {

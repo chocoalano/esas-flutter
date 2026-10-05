@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import '../../../../core/utils/json_parsers.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../../features/auth/data/models/auth_user.dart';
 import '../../../../features/auth/data/repositories/session_repository.dart';
 import '../models/user.dart';
@@ -49,7 +50,11 @@ class ProfileRepository {
     // It is also what the crash was. `/auth/me` flattens `company` to its name,
     // and feeding a string to `Company.fromJson` is a type error before the
     // screen draws anything.
+    final token = _session.token;
     final body = await _api.profile();
+    if (token != _session.token) {
+      throw const ApiException('Sesi berubah. Muat ulang profil.');
+    }
     final user = User.fromJson(_asUserJson(body));
 
     _cached = user;
@@ -59,7 +64,9 @@ class ProfileRepository {
     final identity = asObject(body['user']);
 
     if (identity.isNotEmpty) {
-      await _session.updateUser(AuthUser.fromJson({...identity, ...body}));
+      await _session.updateUser(
+        AuthUser.fromJson({...?_session.user?.raw, ...identity, ...body}),
+      );
     }
 
     return user;
