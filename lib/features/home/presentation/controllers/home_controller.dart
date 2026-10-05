@@ -7,6 +7,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../permit/data/models/leave_list.dart';
 import '../../data/models/announcement.dart';
 import '../../data/repositories/home_repository.dart';
+import '../../../auth/data/repositories/session_repository.dart';
 
 /// Hari kerja hari ini, sebagai satu keadaan yang bisa disaklar.
 ///
@@ -110,6 +111,8 @@ class HomeController extends GetxController {
     : _repository = repository;
 
   final HomeRepository _repository;
+  Worker? _notificationCountWorker;
+  Worker? _notificationRefreshWorker;
 
   /// Nomor urut penyegaran terakhir yang dimulai. Lihat [refreshDashboard].
   int _generation = 0;
@@ -195,6 +198,17 @@ class HomeController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    if (Get.isRegistered<SessionRepository>()) {
+      final session = Get.find<SessionRepository>();
+      _notificationCountWorker = ever(
+        session.unreadNotificationCount,
+        (count) => unreadNotifications.value = count,
+      );
+      _notificationRefreshWorker = ever(
+        session.notificationRevision,
+        (_) => refreshDashboard(force: true),
+      );
+    }
 
     userName.value = _repository.userName;
     userAvatarUrl.value = _repository.userAvatar;
@@ -204,6 +218,13 @@ class HomeController extends GetxController {
     currentDate.value = DateFormatter.nowFormatted('EEEE, d MMMM yyyy');
 
     refreshDashboard();
+  }
+
+  @override
+  void onClose() {
+    _notificationCountWorker?.dispose();
+    _notificationRefreshWorker?.dispose();
+    super.onClose();
   }
 
   /// Sudah absen masuk hari ini.

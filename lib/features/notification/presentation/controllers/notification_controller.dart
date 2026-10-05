@@ -16,6 +16,7 @@ class NotificationController extends GetxController {
        _session = session;
 
   final NotificationRepository _repository;
+  Worker? _notificationWorker;
 
   /// Tempat hitungan belum-dibaca diterbitkan supaya layar lain ikut tahu.
   ///
@@ -48,6 +49,7 @@ class NotificationController extends GetxController {
   late final ScrollController scrollController;
 
   int _page = 1;
+  int _generation = 0;
   static const int _perPage = 10;
 
   /// Angka yang digambar lencana.
@@ -69,11 +71,19 @@ class NotificationController extends GetxController {
   void onInit() {
     super.onInit();
     scrollController = ScrollController()..addListener(_onScroll);
+    if (_session != null) {
+      _notificationWorker = ever(
+        _session.notificationRevision,
+        (_) => refreshNotifications(),
+      );
+    }
     refreshNotifications();
   }
 
   @override
   void onClose() {
+    _generation++;
+    _notificationWorker?.dispose();
     // The previous controller attached this listener and never removed it, and
     // never disposed the controller either.
     scrollController.removeListener(_onScroll);
@@ -94,19 +104,21 @@ class NotificationController extends GetxController {
   }
 
   Future<void> refreshNotifications() async {
+    final generation = ++_generation;
+    isMoreLoading.value = false;
     isLoading.value = true;
     errorMessage.value = null;
     _page = 1;
     hasMore.value = true;
 
     try {
-      final page = await _fetch();
+      final page = await _fetch(generation);
 
-      if (page != null) {
+      if (generation == _generation && page != null) {
         notifications.assignAll(page.rows);
       }
     } finally {
-      isLoading.value = false;
+      if (generation == _generation) isLoading.value = false;
     }
   }
 
@@ -124,15 +136,17 @@ class NotificationController extends GetxController {
   }
 
   Future<void> _loadMore() async {
-    if (isMoreLoading.value || !hasMore.value) {
+    if (isLoading.value || isMoreLoading.value || !hasMore.value) {
       return;
     }
 
+    final generation = _generation;
     isMoreLoading.value = true;
     _page += 1;
 
     try {
-      final page = await _fetch();
+      final page = await _fetch(generation);
+      if (generation != _generation) return;
 
       if (page == null || page.rows.isEmpty) {
         // Do not strand the pager on a page that produced nothing.
@@ -141,7 +155,7 @@ class NotificationController extends GetxController {
         notifications.addAll(page.rows);
       }
     } finally {
-      isMoreLoading.value = false;
+      if (generation == _generation) isMoreLoading.value = false;
     }
   }
 
@@ -151,7 +165,7 @@ class NotificationController extends GetxController {
   /// layarnya menggambar keadaan gagal; halaman berikutnya yang gagal memakai
   /// snackbar, karena daftarnya sudah terlihat dan mengganti seluruh layar
   /// dengan pesan kesalahan akan membuang apa yang sedang dibaca orang.
-  Future<NotificationPage?> _fetch() async {
+  Future<NotificationPage?> _fetch(int generation) async {
     try {
       final page = await _repository.page(
         page: _page,
@@ -159,6 +173,7 @@ class NotificationController extends GetxController {
         unreadOnly: unreadOnly.value,
       );
 
+      if (generation != _generation) return null;
       hasMore.value = page.rows.length == _perPage;
       _serverUnread.value = page.unreadCount;
       _publishUnread(page.unreadCount);
@@ -166,6 +181,7 @@ class NotificationController extends GetxController {
 
       return page;
     } on ApiException catch (error) {
+      if (generation != _generation) return null;
       hasMore.value = false;
 
       if (_page <= 1) {
@@ -207,7 +223,10 @@ class NotificationController extends GetxController {
     try {
       await _repository.markAsRead(notificationId);
     } on ApiException catch (error) {
-      notifications[index] = original;
+      final currentIndex = notifications.indexWhere(
+        (n) => n.id == notificationId,
+      );
+      if (currentIndex != -1) notifications[currentIndex] = original;
       notifications.refresh();
       _serverUnread.value = countBefore;
       _publishUnread(countBefore);

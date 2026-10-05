@@ -1,6 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 
-import 'package:esas/features/notification/presentation/routes/notification_routes.dart';
+import 'package:esas/features/notification/data/services/notification_sync_service.dart';
 import 'package:esas/core/network/api_exception.dart';
 import 'package:esas/core/utils/app_logger.dart';
 import 'package:esas/features/auth/data/repositories/session_repository.dart';
@@ -23,10 +24,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // badan pesan berarti menuliskannya ke log perangkat selamanya.
   AppLogger.info('Background message received: ${message.messageId}');
 
-  NotificationService().showNotification(
-    message.notification?.title ?? "Background Notification",
-    message.notification?.body ?? "New background message",
-  );
+  // Notification payloads are displayed by the OS in the background. Creating
+  // another local notification here duplicates them and loses their data.
 }
 
 /// Minta izin notifikasi dan daftarkan token, bila push memang terpasang.
@@ -36,6 +35,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// Firebase tidak mendaftarkan servicenya — dan masuk ke aplikasi tidak boleh
 /// bergantung pada push.
 Future<void> ensurePushRegisteredIfAvailable() async {
+  if (Get.isRegistered<NotificationSyncService>()) {
+    Get.find<NotificationSyncService>().onSessionReady();
+  }
   if (!Get.isRegistered<FirebaseMessagingService>()) return;
 
   await Get.find<FirebaseMessagingService>().ensurePushRegistered();
@@ -46,6 +48,8 @@ class FirebaseMessagingService extends GetxService {
   late final NotificationService _notificationService;
   final AuthApiService _authApi = Get.find<AuthApiService>();
   final SessionRepository _session = Get.find<SessionRepository>();
+  final List<StreamSubscription<dynamic>> _subscriptions = [];
+  final Set<String> _seenMessages = {};
 
   // RxString untuk menyimpan token FCM (opsional, jika ingin ditampilkan di UI)
   final RxString _fcmToken = ''.obs;
@@ -72,34 +76,49 @@ class FirebaseMessagingService extends GetxService {
     // Ini juga jaring pengaman iOS: ketika APNs belum menyerahkan tokennya pada
     // langkah 2, Firebase menerbitkan token FCM-nya beberapa saat kemudian dan
     // pendaftaran menyusul lewat jalur ini tanpa perlu membuka ulang aplikasi.
-    _firebaseMessaging.onTokenRefresh.listen(
-      (newToken) {
-        AppLogger.info('FCM token refreshed.');
-        _fcmToken.value = newToken;
-        setupToken(newToken);
-      },
-      onError: (Object err) {
-        AppLogger.warning('FCM token refresh failed: $err');
-      },
+    _subscriptions.add(
+      _firebaseMessaging.onTokenRefresh.listen(
+        (newToken) {
+          AppLogger.info('FCM token refreshed.');
+          _fcmToken.value = newToken;
+          setupToken(newToken);
+        },
+        onError: (Object err) {
+          AppLogger.warning('FCM token refresh failed: $err');
+        },
+      ),
     );
 
     // 2. Mengatur handler pesan background global.
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     // 3. Menangani Pesan Foreground.
-    FirebaseMessaging.onMessage.listen((message) {
-      AppLogger.info('Foreground message received: ${message.messageId}');
-      _notificationService.showNotification(
-        message.notification?.title ?? "New Notification",
-        message.notification?.body ?? "You have a new message",
-      );
-    });
+    _subscriptions.add(
+      FirebaseMessaging.onMessage.listen((message) {
+        final sync = Get.find<NotificationSyncService>();
+        if (!sync.accepts(message.data)) return;
+        final id = message.messageId;
+        if (id != null && !_seenMessages.add(id)) return;
+        if (_seenMessages.length > 100) {
+          _seenMessages.remove(_seenMessages.first);
+        }
+        AppLogger.info('Foreground message received: ${message.messageId}');
+        _notificationService.showNotification(
+          message.notification?.title ?? "New Notification",
+          message.notification?.body ?? "You have a new message",
+          data: message.data,
+        );
+        unawaited(sync.received(message.data));
+      }),
+    );
 
     // 4. Menangani Pesan saat aplikasi dibuka dari keadaan terminated/background.
-    FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      AppLogger.info('Notification opened the app: ${message.messageId}');
-      _handleNotificationNavigation(message.data);
-    });
+    _subscriptions.add(
+      FirebaseMessaging.onMessageOpenedApp.listen((message) {
+        AppLogger.info('Notification opened the app: ${message.messageId}');
+        _handleNotificationNavigation(message.data);
+      }),
+    );
 
     // 5. Mengambil pesan awal jika aplikasi diluncurkan dari keadaan terminated oleh notifikasi.
     final initialMessage = await _firebaseMessaging.getInitialMessage();
@@ -230,10 +249,7 @@ class FirebaseMessagingService extends GetxService {
   /// Helper method untuk menangani navigasi berdasarkan data notifikasi.
   /// Ini bisa diperluas untuk mem-parsing kunci spesifik dari data.
   void _handleNotificationNavigation(Map<String, dynamic> data) {
-    // Every payload lands on the notification list, whatever it says. Turning a
-    // payload into a destination is P7-4's `NotificationRouter`; the sketch that
-    // used to sit here named a `Routes.PRODUCT_DETAIL` this app has never had.
-    Get.toNamed(NotificationRoutes.notification, arguments: data);
+    Get.find<NotificationSyncService>().open(data);
   }
 
   // Metode opsional untuk mengambil token FCM saat ini dari luar service
@@ -305,7 +321,9 @@ class FirebaseMessagingService extends GetxService {
 
   @override
   void onClose() {
-    // Bersihkan resource jika ada
+    for (final subscription in _subscriptions) {
+      unawaited(subscription.cancel());
+    }
     super.onClose();
   }
 }

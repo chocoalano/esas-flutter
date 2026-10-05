@@ -1,3 +1,5 @@
+import 'package:get/get.dart';
+
 import '../../../../core/storage/local_storage.dart';
 import '../../../../core/storage/storage_keys.dart';
 import '../../../../core/storage/token_storage.dart';
@@ -62,9 +64,10 @@ class SessionRepository {
   /// sumber yang sudah dibayar: payload sesi (bila backend mengirimkannya) dan
   /// respons daftar notifikasi, yang memang membawa `unread_count` di setiap
   /// halaman dan selama ini dibuang begitu layarnya ditutup.
-  int? _unreadNotifications;
+  final RxnInt unreadNotificationCount = RxnInt();
+  final RxInt notificationRevision = 0.obs;
 
-  int? get unreadNotifications => _unreadNotifications;
+  int? get unreadNotifications => unreadNotificationCount.value;
 
   /// Catat hitungan yang baru saja diketahui sebuah layar.
   ///
@@ -74,7 +77,7 @@ class SessionRepository {
   void noteUnreadNotifications(int? count) {
     if (count == null) return;
 
-    _unreadNotifications = count < 0 ? 0 : count;
+    unreadNotificationCount.value = count < 0 ? 0 : count;
   }
 
   String? get token => _tokens.token;
@@ -149,7 +152,7 @@ class SessionRepository {
     _user = null;
     // Hitungan milik orang sebelumnya tidak boleh menyeberang ke sesi
     // berikutnya di handset yang sama.
-    _unreadNotifications = null;
+    unreadNotificationCount.value = null;
 
     await _tokens.clear();
     await _local.removeAll(StorageKeys.legacy.sessionKeys);

@@ -1,10 +1,14 @@
 // lib/services/notification_service.dart
 
-import 'package:esas/features/notification/presentation/routes/notification_routes.dart';
+import 'dart:convert';
+
+import 'package:esas/features/notification/data/services/notification_sync_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
 
 class NotificationService extends GetxService {
+  static const channelId = 'esas_attendance';
+  int _nextNotificationId = DateTime.now().millisecondsSinceEpoch % 2147483647;
   static final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
@@ -49,19 +53,51 @@ class NotificationService extends GetxService {
       onDidReceiveNotificationResponse: (NotificationResponse response) {
         // Tangani ketika user tap notifikasi
         final payload = response.payload;
-        if (payload != null) Get.offAllNamed(NotificationRoutes.notification);
+        _openPayload(payload);
       },
       onDidReceiveBackgroundNotificationResponse:
           _onDidReceiveBackgroundNotificationResponse,
     );
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.createNotificationChannel(
+          const AndroidNotificationChannel(
+            channelId,
+            'Notifikasi ESAS',
+            importance: Importance.high,
+          ),
+        );
+    final launch = await flutterLocalNotificationsPlugin
+        .getNotificationAppLaunchDetails();
+    if (launch?.didNotificationLaunchApp == true) {
+      _openPayload(launch?.notificationResponse?.payload);
+    }
+  }
+
+  void _openPayload(String? payload) {
+    if (!Get.isRegistered<NotificationSyncService>()) return;
+    Map<String, dynamic> data = {};
+    try {
+      final decoded = jsonDecode(payload ?? '{}');
+      if (decoded is Map) data = Map<String, dynamic>.from(decoded);
+    } on FormatException {
+      // Notifications displayed by older builds carried a fixed string.
+    }
+    Get.find<NotificationSyncService>().open(data);
   }
 
   // Fungsi untuk menampilkan notifikasi
-  Future<void> showNotification(String title, String message) async {
+  Future<void> showNotification(
+    String title,
+    String message, {
+    Map<String, dynamic> data = const {},
+  }) async {
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
-          'notification', // ID channel
-          'notification', // Nama channel
+          channelId,
+          'Notifikasi ESAS',
           importance: Importance.max,
           priority: Priority.max,
           enableVibration: true,
@@ -79,11 +115,11 @@ class NotificationService extends GetxService {
     );
 
     await flutterLocalNotificationsPlugin.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000, // ID unik
+      _nextNotificationId = (_nextNotificationId + 1) % 2147483647,
       title, // Judul notifikasi
       message, // Isi pesan
       platformChannelSpecifics, // Detail spesifik platform
-      payload: 'Default_Payload', // Payload (opsional)
+      payload: jsonEncode(data),
     );
   }
 }

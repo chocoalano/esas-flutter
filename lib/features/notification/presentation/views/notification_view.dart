@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../data/models/notification.dart';
+import '../../data/services/notification_sync_service.dart';
 import '../controllers/notification_controller.dart';
 
 /// Kotak masuk.
@@ -162,7 +163,14 @@ class NotificationView extends GetView<NotificationController> {
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: _NotificationTile(
                 notification: notification,
-                onTap: () => controller.markAsRead(notification.id),
+                onTap: () async {
+                  await controller.markAsRead(notification.id);
+                  if (Get.isRegistered<NotificationSyncService>()) {
+                    Get.find<NotificationSyncService>().open(
+                      notification.data.payload,
+                    );
+                  }
+                },
               ),
             ),
           };

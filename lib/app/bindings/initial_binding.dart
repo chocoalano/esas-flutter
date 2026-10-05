@@ -13,6 +13,9 @@ import '../../core/ui/controllers/bottom_nav_controller.dart';
 import '../../features/attendance/presentation/routes/attendance_routes.dart';
 import '../../features/home/presentation/routes/home_routes.dart';
 import '../../features/notification/presentation/routes/notification_routes.dart';
+import '../../features/notification/data/repositories/notification_repository.dart';
+import '../../features/notification/data/services/notification_api_service.dart';
+import '../../features/notification/data/services/notification_sync_service.dart';
 import '../../features/permit/presentation/routes/permit_routes.dart';
 import '../../features/profile/presentation/routes/profile_routes.dart';
 import '../../features/auth/data/repositories/auth_repository.dart';
@@ -112,6 +115,15 @@ class InitialBinding extends Bindings {
 
     final authApi = AuthApiService(Get.find<ApiClient>());
     Get.put<AuthApiService>(authApi, permanent: true);
+    Get.put(
+      NotificationSyncService(
+        repository: NotificationRepository(
+          NotificationApiService(Get.find<ApiClient>()),
+        ),
+        session: session,
+      ),
+      permanent: true,
+    );
 
     Get.put<AuthRepository>(
       AuthRepository(

@@ -85,21 +85,25 @@ class NotificationData {
     required this.title,
     required this.message,
     required this.url,
+    this.payload = const {},
   });
 
   factory NotificationData.fromJson(Map<String, dynamic> json) {
     return NotificationData(
       title: asString(json['title']) ?? '',
-      message: asString(json['message']) ?? '',
+      message: asString(json['message']) ?? asString(json['body']) ?? '',
       url: asString(json['url']) ?? '',
+      payload: Map<String, dynamic>.from(json),
     );
   }
 
   final String title;
   final String message;
   final String url;
+  final Map<String, dynamic> payload;
 
   Map<String, dynamic> toJson() => {
+    ...payload,
     'title': title,
     'message': message,
     'url': url,
