@@ -1,5 +1,6 @@
 import java.io.FileInputStream
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
@@ -47,10 +48,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
-    }
-
     defaultConfig {
         applicationId = "com.example.esas"
         minSdk = flutter.minSdkVersion
@@ -93,6 +90,14 @@ android {
         getByName("debug") {
             signingConfig = signingConfigs.getByName("debug")
         }
+    }
+}
+
+// Kotlin 2.3 turned `android { kotlinOptions { jvmTarget = ... } }` into a
+// compile error; this is its replacement. Must match `compileOptions` above.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_11)
     }
 }
 

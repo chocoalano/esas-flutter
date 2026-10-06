@@ -6,12 +6,18 @@ import 'package:esas/core/storage/local_storage.dart';
 import 'package:esas/core/storage/token_storage.dart';
 import 'package:esas/features/auth/data/models/auth_user.dart';
 import 'package:esas/features/auth/data/repositories/auth_repository.dart';
+import 'package:esas/features/auth/data/repositories/firestore_user_repository.dart';
 import 'package:esas/features/auth/data/repositories/session_repository.dart';
 import 'package:esas/features/auth/data/services/auth_api_service.dart';
+import 'package:esas/features/auth/data/services/firebase_identity_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockAuthApi extends Mock implements AuthApiService {}
+
+class _MockIdentity extends Mock implements FirebaseIdentityService {}
+
+class _MockFirestoreUsers extends Mock implements FirestoreUserRepository {}
 
 void main() {
   late _MockAuthApi api;
@@ -254,5 +260,149 @@ void main() {
     await auth.expireSession();
 
     expect(auth.isAuthenticated, isFalse);
+  });
+
+  group('loginWithGoogle', () {
+    late _MockIdentity identity;
+    late _MockFirestoreUsers firestoreUsers;
+
+    const google = GoogleIdentity(
+      uid: 'firebase-uid',
+      idToken: 'firebase-id-token',
+      email: 'budi@example.com',
+    );
+
+    setUpAll(() => registerFallbackValue(google));
+
+    setUp(() {
+      identity = _MockIdentity();
+      firestoreUsers = _MockFirestoreUsers();
+      auth = AuthRepository(
+        api: api,
+        session: session,
+        identity: identity,
+        firestoreUsers: firestoreUsers,
+      );
+
+      when(() => identity.signOut()).thenAnswer((_) async {});
+      when(() => firestoreUsers.recordSignIn(any())).thenAnswer((_) async {});
+    });
+
+    void serverAnswers(Map<String, dynamic> body) {
+      when(
+        () => api.loginWithFirebase(
+          idToken: any(named: 'idToken'),
+          deviceId: any(named: 'deviceId'),
+        ),
+      ).thenAnswer((_) async => body);
+    }
+
+    test('is unavailable when Firebase did not come up', () async {
+      auth = AuthRepository(api: api, session: session);
+
+      expect(auth.canSignInWithGoogle, isFalse);
+      await expectLater(
+        auth.loginWithGoogle(deviceId: 'd'),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.code,
+            'code',
+            'google_unavailable',
+          ),
+        ),
+      );
+    });
+
+    test(
+      'exchanges the FIREBASE token and persists the ESAS session',
+      () async {
+        when(() => identity.signInWithGoogle()).thenAnswer((_) async => google);
+        serverAnswers({'token': 'abc', 'user': userJson});
+
+        final user = await auth.loginWithGoogle(deviceId: 'device-1');
+
+        expect(user?.name, 'Budi');
+        expect(session.token, 'abc');
+        verify(
+          () => api.loginWithFirebase(
+            idToken: 'firebase-id-token',
+            deviceId: 'device-1',
+          ),
+        ).called(1);
+        verify(() => firestoreUsers.recordSignIn(google)).called(1);
+        verifyNever(() => identity.signOut());
+      },
+    );
+
+    test('a closed account picker is not an error and asks nobody', () async {
+      when(() => identity.signInWithGoogle()).thenAnswer((_) async => null);
+
+      expect(await auth.loginWithGoogle(deviceId: 'd'), isNull);
+      expect(auth.isAuthenticated, isFalse);
+      verifyNever(
+        () => api.loginWithFirebase(
+          idToken: any(named: 'idToken'),
+          deviceId: any(named: 'deviceId'),
+        ),
+      );
+    });
+
+    test('a refusal undoes the Firebase sign-in and saves nothing', () async {
+      // Otherwise the handset keeps a Google session that opens nothing, and
+      // the next tap silently reuses the account the server just refused.
+      when(() => identity.signInWithGoogle()).thenAnswer((_) async => google);
+      when(
+        () => api.loginWithFirebase(
+          idToken: any(named: 'idToken'),
+          deviceId: any(named: 'deviceId'),
+        ),
+      ).thenThrow(
+        const ApiException('Email atau password salah.', status: 401),
+      );
+
+      await expectLater(
+        auth.loginWithGoogle(deviceId: 'd'),
+        throwsA(isA<ApiException>().having((e) => e.status, 'status', 401)),
+      );
+      expect(auth.isAuthenticated, isFalse);
+      verify(() => identity.signOut()).called(1);
+      verifyNever(() => firestoreUsers.recordSignIn(any()));
+    });
+
+    test('a malformed reply is a refusal too', () async {
+      when(() => identity.signInWithGoogle()).thenAnswer((_) async => google);
+      serverAnswers({'user': userJson});
+
+      await expectLater(
+        auth.loginWithGoogle(deviceId: 'd'),
+        throwsA(isA<ApiException>()),
+      );
+      verify(() => identity.signOut()).called(1);
+    });
+
+    test('Firestore failing does not fail the sign-in', () async {
+      when(() => identity.signInWithGoogle()).thenAnswer((_) async => google);
+      serverAnswers({'token': 'abc', 'user': userJson});
+      when(
+        () => firestoreUsers.recordSignIn(any()),
+      ).thenThrow(Exception('permission-denied'));
+
+      final user = await auth.loginWithGoogle(deviceId: 'd');
+
+      expect(user?.name, 'Budi');
+      expect(session.token, 'abc');
+    });
+
+    test('logout signs out of Firebase and Google as well', () async {
+      await session.save(token: 'abc', user: AuthUser.fromJson(userJson));
+      when(
+        () => api.logout(fcmToken: any(named: 'fcmToken')),
+      ).thenAnswer((_) async => {});
+
+      await auth.logout();
+
+      expect(auth.isAuthenticated, isFalse);
+      verify(() => identity.signOut()).called(1);
+    });
   });
 }

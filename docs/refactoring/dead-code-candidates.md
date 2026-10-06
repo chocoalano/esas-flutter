@@ -37,6 +37,9 @@ up breaks Firebase.
 
 **Action:** delete, or regenerate with `flutterfire configure`. **Do not leave as-is.**
 **Phase:** 7 (P7-7) · **Risk:** LOW
+**Status:** done 2026-10-05 — deleted, and replaced by `lib/firebase_options.dart`
+for the single project `absensascom`, which `bootstrap()` now passes to
+`Firebase.initializeApp`.
 
 ---
 

@@ -67,7 +67,7 @@ class LoginView extends GetView<LoginController> {
                     const SizedBox(height: AppSpacing.xxl),
 
                     Text(
-                      'Masuk ke ESAS',
+                      'Masuk ke Absensas',
                       style: theme.textTheme.headlineMedium,
                     ),
                     const SizedBox(height: AppSpacing.sm),
@@ -147,9 +147,61 @@ class LoginView extends GetView<LoginController> {
                       () => AppButton(
                         label: 'Masuk',
                         busy: controller.isLoading.value,
-                        onPressed: _submit,
+                        // Nonaktif selama pintu Google sedang terbuka: dua
+                        // sesi yang berlomba menulis token adalah satu sesi
+                        // yang salah.
+                        onPressed: controller.isGoogleLoading.value
+                            ? null
+                            : _submit,
                       ),
                     ),
+
+                    // Pintu kedua, untuk karyawan yang emailnya terdaftar di
+                    // HR. Tidak dirender sama sekali bila Firebase tidak
+                    // menyala saat boot — tombol yang pasti gagal lebih buruk
+                    // daripada tidak ada tombol.
+                    if (controller.canSignInWithGoogle) ...[
+                      const SizedBox(height: AppSpacing.xl),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Divider(
+                              height: 1,
+                              color: palette.borderSubtle,
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                            ),
+                            child: Text(
+                              'atau',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: palette.textMuted,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Divider(
+                              height: 1,
+                              color: palette.borderSubtle,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      Obx(
+                        () => AppButton(
+                          label: 'Masuk dengan Google',
+                          icon: Icons.account_circle_outlined,
+                          variant: AppButtonVariant.outlined,
+                          busy: controller.isGoogleLoading.value,
+                          onPressed: controller.isLoading.value
+                              ? null
+                              : controller.loginWithGoogle,
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: AppSpacing.xxl),
                     Row(
@@ -182,7 +234,7 @@ class LoginView extends GetView<LoginController> {
   }
 
   void _submit() {
-    if (controller.isLoading.value) return;
+    if (controller.isBusy) return;
     if (controller.loginFormKey.currentState?.validate() ?? false) {
       controller.loginUser();
     }

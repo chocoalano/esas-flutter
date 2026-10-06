@@ -157,7 +157,8 @@ class AttendanceShift {
 
   /// `08:00:00` and `08:00` both read as `08:00`. The seconds are noise on a
   /// shift boundary.
-  static String _hhmm(String raw) => raw.length >= 5 ? raw.substring(0, 5) : raw;
+  static String _hhmm(String raw) =>
+      raw.length >= 5 ? raw.substring(0, 5) : raw;
 
   static AttendanceShift? fromJson(Object? raw) {
     if (raw == null) return null;

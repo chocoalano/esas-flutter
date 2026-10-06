@@ -17,3 +17,14 @@ flutter_launcher_icons:
   # image_path_ios_tinted_grayscale: "assets/icon/icon_tinted.png"
   # desaturate_tinted_to_grayscale_ios: true
   background_color_ios: "#ffffff"
+
+  web:
+    generate: true
+    image_path: "assets/icon/icon.png"
+    background_color: "#ffffff"
+    theme_color: "#ffffff"
+
+  macos:
+    generate: true
+    # macOS draws no mask of its own: the rounded tile and margin are in the image.
+    image_path: "assets/icon/icon_macos.png"

@@ -21,7 +21,7 @@ class EsasApp extends StatelessWidget {
     return Obx(
       () => GetMaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'ESAS',
+        title: 'Absensas',
         initialRoute: AppPages.initial,
         getPages: AppPages.routes,
         theme: AppTheme.lightTheme,

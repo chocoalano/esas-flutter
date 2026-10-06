@@ -1,0 +1,18 @@
+{
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Absensas",
+        "supportEmail": "alan@sinergiabadisentosa.com"
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json",
+    "edition": "enterprise",
+    "database": "absensas",
+    "location": "asia-southeast2",
+    "dataAccessMode": "FIRESTORE_NATIVE"
+  }
+}

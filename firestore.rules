@@ -1,0 +1,108 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Written by lib/features/auth/data/repositories/firestore_user_repository.dart
+// after a successful "Masuk dengan Google".
+//
+// Collection: users
+// Document ID: the Firebase Auth uid
+// Fields:
+//   - uid: string (required, == document id, immutable)
+//   - email: string | null (required key; when present must equal the
+//       email in the caller's verified ID token)
+//   - displayName: string | null (required key, <= 200 chars)
+//   - photoUrl: string | null (required key, https URL, <= 2048 chars)
+//   - lastTenant: string | null (required key, workspace code, <= 63 chars).
+//       Client-written, so a HINT only. Nothing may grant access because of
+//       it: once Firestore holds workspace data, the workspace has to come
+//       from a custom claim set by the ESAS server (request.auth.token.tenant),
+//       never from a field the user can write.
+//   - createdAt: timestamp (required, server time on create, immutable)
+//   - lastSignInAt: timestamp (required, server time on every write)
+//
+// Everything else — employees, attendance, permits — still lives on the ESAS
+// server. Anything not matched below is denied.
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isNullableString(value, maxLen) {
+      return value == null || (value is string && value.size() <= maxLen);
+    }
+
+    // The email may only be the one Firebase verified for this caller.
+    function isTokenEmail(value) {
+      return value == null ||
+        ('email' in request.auth.token && value == request.auth.token.email);
+    }
+
+    function isHttpsUrlOrNull(value) {
+      return value == null ||
+        (value is string && value.size() <= 2048 && value.matches('^https://.+'));
+    }
+
+    function isWorkspaceCodeOrNull(value) {
+      return value == null ||
+        (value is string && value.matches('^[a-z0-9][a-z0-9-]{0,62}$'));
+    }
+
+    // Validator for BOTH create and update: the document as it will be after
+    // the write.
+    function isValidUser(userId) {
+      let data = request.resource.data;
+      return data.keys().hasOnly([
+          'uid', 'email', 'displayName', 'photoUrl', 'lastTenant',
+          'createdAt', 'lastSignInAt'
+        ]) &&
+        data.keys().hasAll([
+          'uid', 'email', 'displayName', 'photoUrl', 'lastTenant',
+          'createdAt', 'lastSignInAt'
+        ]) &&
+        data.uid == userId &&
+        isTokenEmail(data.email) &&
+        isNullableString(data.displayName, 200) &&
+        isHttpsUrlOrNull(data.photoUrl) &&
+        isWorkspaceCodeOrNull(data.lastTenant) &&
+        data.createdAt is timestamp &&
+        data.lastSignInAt == request.time;
+    }
+
+    // ===============================================================
+    // users/{userId} — owner only, no deletes from the client
+    // ===============================================================
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+
+      allow create: if isOwner(userId) &&
+        isValidUser(userId) &&
+        request.resource.data.createdAt == request.time;
+
+      allow update: if isOwner(userId) &&
+        isValidUser(userId) &&
+        request.resource.data.uid == resource.data.uid &&
+        request.resource.data.createdAt == resource.data.createdAt;
+
+      // Listing the collection would expose every employee's email.
+      allow list: if false;
+      allow delete: if false;
+    }
+  }
+}

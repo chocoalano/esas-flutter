@@ -4350,3 +4350,29 @@ supaya tidak dibuka kembali:
   token yang hidup di database tenant. Mengganti header tidak membuka tenant lain.
 
 ---
+
+
+Semua langkah dari prompt Anda sudah diterapkan. Build Android dan iOS berhasil, tetapi tombol Google belum bisa dicoba dari HP sampai tenancy-app dideploy ke server. Belum ada yang di-commit, baik di repo ini maupun di tenancy-app.
+
+Di Firebase (absensascom)
+- Aplikasi Apple: com.example.esas sudah terdaftar.
+- Google Sign-In: provider sudah aktif.
+- Firestore: database Enterprise absensas dibuat di asia-southeast2 (Jakarta), dan rules dari firestore.rules sudah dideploy.
+- Android: sidik jari SHA-1 dan SHA-256 debug sudah didaftarkan.
+- Rules Firestore: ini masih prototipe. Hanya pemilik akun yang bisa membaca dan menulis users/{uid} miliknya, email harus sama dengan yang diverifikasi Google, dan selebihnya ditolak. Sebaiknya Anda periksa dulu sebelum aplikasi dipakai luas.
+
+Di aplikasi (esas-selfservices)
+- File konfigurasi: GoogleService-Info.plist dan google-services.json diunduh ulang dari absensascom. Ada tambahan lib/firebase_options.dart dan URL scheme Google di Info.plist.
+- Login Google: tombol "Masuk dengan Google" sudah terpasang, beserta penukaran token kserver dan pencatatan profil
+- Hasil uji: flutter analyze bersih, dan build debug Android maupun iOS berhasil. Dari seluruh tes, 4409 lulus dan 1home_view_test: tes itumengharapkan teks "September" padahal sekarang sudah Oktober, dan tidak berkaitan    dengan perubahan ini.
+- ADR: keputusan ini dicatat di docs/adr/0009-firebase-google-sign-in-and-firestore.md.
+Di backend (tenancy-app)                                                               Endpoint POST /api/v1/auth/fites API lulus. Servermemverifikasi token Firebase, mencocokkan email Google dengan akun yang sudah ada, lamemberi jawaban yang sama sepidak pernah membuat akun baru.
+- Login Google yang ditolak dijawab 422 dengan pesan bawaan Laravel berbahasa Inggris, jadi di aplikasi saya ganti desan "Akun ini tidak lagiaktif." tetap ditampilkan apa adanya.
+
+Yang perlu Anda putuskan atau kerjakan                                                Deploy tenancy-app. Sebelum rfungsi. Di server perlucomposer install (ada paket baru kreait/firebase-tokens) dan                       FIREBASE_PROJECT_ID=absensas
+2. Versi plugin Firebase dikunci di rilis 3 Agustus 2026 karena Flutter di mesin ini  masih 3.35:
+   - firebase_core 4.13                                                               - firebase_auth 6.5.7
+   - firebase_messaging 16.5                                                          - cloud_firestore 6.8
+                                                                                      Versi yang lebih baru butuh OS gagal dengan "Cannot findtype FlutterSceneLifeCycleDelegate", dan di Android firebase_auth 6.5.x tidak bisa dikompilasi bersama firebaseFlutter di-upgrade, kunci inidibuka bersamaan.
+3. SHA rilis dan SHA Play App Skarena key.properties tidak adadi mesin ini. Tanpa itu, Google Sign-In tidak jalan di build rilis.                    Push iOS sekarang lewat abse4d5d. Pengirim notifikasi diserver harus memakai kredensial absensascom.                                           Bundle ID com.example.esas aau diganti, aplikasi iOS danAndroid harus didaftarkan ulang di Firebase.                                           Pod Firebase akan berhenti dh Oktober 2026. Cepat ataulambat iOS perlu pindah ke Swift Package Manager.                                      Dokumentasi device binding t Menurut laporan subagentbackend, handset kedua tidak ditolak: ia tetap mendapat token, hanya tanpa izin absen. README dan ADR-0006 (G-2) maditolak, jadi dokumen itu sudah tidak sesuai.                                                                      
+Kalau ingin langsung mencoba, saya bisa membantu menjalankan tenancy-app secara lokal atau menyiapkan commit untuk ke

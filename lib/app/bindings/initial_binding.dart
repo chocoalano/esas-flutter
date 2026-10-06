@@ -19,8 +19,10 @@ import '../../features/notification/data/services/notification_sync_service.dart
 import '../../features/permit/presentation/routes/permit_routes.dart';
 import '../../features/profile/presentation/routes/profile_routes.dart';
 import '../../features/auth/data/repositories/auth_repository.dart';
+import '../../features/auth/data/repositories/firestore_user_repository.dart';
 import '../../features/auth/data/repositories/session_repository.dart';
 import '../../features/auth/data/services/auth_api_service.dart';
+import '../../features/auth/data/services/firebase_identity_service.dart';
 import '../../utils/notification/firebase_messaging_services.dart';
 import '../../utils/notification/notification_services.dart';
 
@@ -58,6 +60,7 @@ class InitialBinding extends Bindings {
     required this.serverConfig,
     required this.tenantContext,
     required this.tokenStorage,
+    this.hasFirebase = false,
   });
 
   // Constructed by `bootstrap()` rather than here, because each needs an
@@ -68,6 +71,10 @@ class InitialBinding extends Bindings {
   final ServerConfig serverConfig;
   final TenantContext tenantContext;
   final TokenStorage tokenStorage;
+
+  /// Whether `Firebase.initializeApp()` succeeded at boot. Google sign-in and
+  /// Firestore are only wired when it did; NIP sign-in never depends on it.
+  final bool hasFirebase;
 
   @override
   void dependencies() {
@@ -129,6 +136,13 @@ class InitialBinding extends Bindings {
       AuthRepository(
         api: authApi,
         session: session,
+        // Not registered with GetX: nothing but `AuthRepository` should be
+        // signing anybody in or out of Firebase, and a `Get.find` elsewhere is
+        // how a second door into the session would appear.
+        identity: hasFirebase ? FirebaseIdentityService() : null,
+        firestoreUsers: hasFirebase
+            ? FirestoreUserRepository(tenantContext: tenantContext)
+            : null,
         // Dibaca LAZILY: `FirebaseMessagingService` didaftarkan setelah
         // `NotificationService.initialize()` selesai ditunggu bootstrap, jadi
         // pada saat baris ini dijalankan ia belum ada. Penjaga

@@ -12,13 +12,16 @@ import 'package:flutter/foundation.dart'; // Untuk debugPrint
 import 'package:get/get.dart';
 
 import '../../utils/notification/notification_services.dart'; // Sesuaikan path jika berbeda
+import '../../firebase_options.dart';
 
 // --- Global Background Message Handler ---
 // Penting: Fungsi ini HARUS tetap di level teratas (di luar class manapun).
 // Firebase memanggilnya dalam isolat Dart terpisah ketika aplikasi di-background/terminated.
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  // Isolat ini tidak melewati bootstrap, jadi opsinya harus disebut lagi di
+  // sini — tanpa itu ia bisa membuka project yang berbeda dari aplikasinya.
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Hanya id-nya. `debugPrint` TIDAK dihapus di build rilis, dan isi
   // notifikasi aplikasi HRIS menyebut gaji, cuti, dan absensi orang — mencetak
   // badan pesan berarti menuliskannya ke log perangkat selamanya.

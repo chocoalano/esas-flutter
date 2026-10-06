@@ -39,6 +39,23 @@ class AuthApiService {
     }, authenticated: false);
   }
 
+  /// Sign in with a Google identity, by exchanging the Firebase ID token for
+  /// this server's own token.
+  ///
+  /// The reply is the same shape as [login]'s, device block included, so an
+  /// account bound to another handset is told the same thing either way. A
+  /// Google account whose email matches nobody here is refused like a wrong
+  /// password: the server does not say whether the address exists.
+  Future<Map<String, dynamic>> loginWithFirebase({
+    required String idToken,
+    required String deviceId,
+  }) {
+    return _client.postObject(ApiRoutes.firebaseLogin, {
+      'id_token': idToken,
+      'device_id': deviceId,
+    }, authenticated: false);
+  }
+
   /// Who this token belongs to. Also the token-validity probe used at splash.
   ///
   /// Says who you are. It does **not** carry the employee record — that is

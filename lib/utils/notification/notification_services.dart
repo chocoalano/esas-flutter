@@ -65,7 +65,7 @@ class NotificationService extends GetxService {
         ?.createNotificationChannel(
           const AndroidNotificationChannel(
             channelId,
-            'Notifikasi ESAS',
+            'Notifikasi Absensas',
             importance: Importance.high,
           ),
         );
@@ -97,7 +97,7 @@ class NotificationService extends GetxService {
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
           channelId,
-          'Notifikasi ESAS',
+          'Notifikasi Absensas',
           importance: Importance.max,
           priority: Priority.max,
           enableVibration: true,

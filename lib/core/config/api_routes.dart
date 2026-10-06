@@ -59,6 +59,12 @@ class ApiRoutes {
   /// `identifier` (NIP **or** email) + `password` + `device_id`.
   static const String login = '/auth/login';
 
+  /// `id_token` (a Firebase ID token from Google sign-in) + `device_id`.
+  /// Answers exactly what [login] answers: the server verifies the token,
+  /// matches the verified Google email to an existing account, and issues the
+  /// same Sanctum session. It never creates an account.
+  static const String firebaseLogin = '/auth/firebase';
+
   /// **POST**, not GET. An optional `fcm_token` in the body releases this
   /// handset from the notification registry on the way out.
   static const String logout = '/auth/logout';

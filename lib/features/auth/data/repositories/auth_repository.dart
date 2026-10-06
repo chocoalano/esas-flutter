@@ -2,6 +2,8 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/utils/app_logger.dart';
 import '../models/auth_user.dart';
 import '../services/auth_api_service.dart';
+import '../services/firebase_identity_service.dart';
+import 'firestore_user_repository.dart';
 import 'session_repository.dart';
 
 /// Signing in, signing out, and deciding what a stored credential is worth.
@@ -10,12 +12,24 @@ class AuthRepository {
     required AuthApiService api,
     required SessionRepository session,
     Future<String?> Function()? currentPushToken,
+    FirebaseIdentityService? identity,
+    FirestoreUserRepository? firestoreUsers,
   }) : _api = api,
        _currentPushToken = currentPushToken,
+       _identity = identity,
+       _firestoreUsers = firestoreUsers,
        _session = session;
 
   final AuthApiService _api;
   final SessionRepository _session;
+
+  /// Google sign-in through Firebase. Null when Firebase did not come up at
+  /// boot, and then [canSignInWithGoogle] is false and the login screen shows
+  /// only the NIP form.
+  final FirebaseIdentityService? _identity;
+
+  /// Where a Google sign-in is recorded in Firestore. Null for the same reason.
+  final FirestoreUserRepository? _firestoreUsers;
 
   /// Token push perangkat ini, dibaca saat keluar.
   ///
@@ -29,6 +43,8 @@ class AuthRepository {
   AuthUser? get user => _session.user;
 
   bool get isAuthenticated => _session.isAuthenticated;
+
+  bool get canSignInWithGoogle => _identity != null;
 
   /// Sign in and persist the session.
   ///
@@ -52,6 +68,63 @@ class AuthRepository {
       deviceId: deviceId,
     );
 
+    return _establishSession(body);
+  }
+
+  /// Sign in with Google and persist the session.
+  ///
+  /// Two identities are involved and only one of them is the session. Google,
+  /// through Firebase, says who this person is; the ESAS server decides whether
+  /// that person has an account here, by matching the verified email, and
+  /// issues the same token a password would have. Every screen behind the
+  /// login keeps talking to the ESAS server exactly as before.
+  ///
+  /// Returns null when the person backed out of the Google account picker.
+  /// Throws [ApiException] for everything else.
+  ///
+  /// If the server refuses, the Firebase session is undone too. Otherwise the
+  /// handset holds a Google sign-in that opens nothing, and the next tap on the
+  /// button would silently reuse an account the server has already said no to.
+  Future<AuthUser?> loginWithGoogle({required String deviceId}) async {
+    final identity = _identity;
+
+    if (identity == null) {
+      throw const ApiException(
+        'Masuk dengan Google belum tersedia di perangkat ini.',
+        code: 'google_unavailable',
+      );
+    }
+
+    final google = await identity.signInWithGoogle();
+    if (google == null) return null;
+
+    final AuthUser user;
+
+    try {
+      final body = await _api.loginWithFirebase(
+        idToken: google.idToken,
+        deviceId: deviceId,
+      );
+      user = await _establishSession(body);
+    } on Object {
+      await identity.signOut();
+      rethrow;
+    }
+
+    // Best effort. The session is the ESAS token, and it is already saved: a
+    // Firestore that is unreachable, or rules not yet deployed, must not turn a
+    // successful sign-in into a failed one.
+    try {
+      await _firestoreUsers?.recordSignIn(google);
+    } on Object catch (error) {
+      AppLogger.warning('Could not record the sign-in in Firestore: $error');
+    }
+
+    return user;
+  }
+
+  /// Read a login reply — from either door — and persist what it grants.
+  Future<AuthUser> _establishSession(Map<String, dynamic> body) async {
     final token = body['token'];
     final rawUser = body['user'];
 
@@ -149,6 +222,9 @@ class AuthRepository {
       );
     } finally {
       await _session.clear();
+      // Never throws. Without it the next "Masuk dengan Google" on a shared
+      // handset would come back as the previous person.
+      await _identity?.signOut();
     }
   }
 

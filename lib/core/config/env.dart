@@ -96,6 +96,17 @@ class Env {
   /// The workspace this build starts on. Empty means the person is asked once.
   static const String defaultTenant = String.fromEnvironment('TENANT');
 
+  /// The Firestore database in the `absensascom` project.
+  ///
+  /// Not `(default)`: it is an Enterprise-edition database, and those must be
+  /// named. A client that falls back to the default database reaches one that
+  /// does not exist, and every read answers `not-found` rather than the error
+  /// that would point here.
+  static const String firestoreDatabase = String.fromEnvironment(
+    'FIRESTORE_DATABASE',
+    defaultValue: 'absensas',
+  );
+
   /// Which deployment this build is for. Drives the TLS policy and nothing else
   /// that changes behaviour.
   static const String environment = String.fromEnvironment(

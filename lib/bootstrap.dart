@@ -14,6 +14,7 @@ import 'core/tenancy/tenant_context.dart';
 import 'core/theme/system_ui_style.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/utils/app_logger.dart';
+import 'firebase_options.dart';
 import 'utils/my_http_overrides.dart';
 import 'utils/notification/notification_services.dart';
 
@@ -88,9 +89,15 @@ Future<BootReport> bootstrap() async {
   // Optional. ESAS is an ERP: attendance, permits and payslips do not need
   // push. The old code reached the same outcome by accident, via a `catch` that
   // only printed; this is the same behaviour chosen on purpose and recorded.
+  //
+  // Google sign-in and Firestore ride on it too. When it fails the login
+  // screen simply has no Google button — signing in with a NIP never needed
+  // Firebase. Options are explicit (project `absensascom`) rather than read
+  // from the native files alone, so Dart and the platform cannot disagree.
   final hasFirebase = await pipeline.optional(
     'firebase',
-    () => Firebase.initializeApp(),
+    () =>
+        Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
   );
 
   // ── Dependencies ─────────────────────────────────────────────────────────
@@ -101,6 +108,7 @@ Future<BootReport> bootstrap() async {
       serverConfig: serverConfig,
       tenantContext: tenantContext,
       tokenStorage: tokenStorage,
+      hasFirebase: hasFirebase,
     ).dependencies();
   });
 

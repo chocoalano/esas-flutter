@@ -103,7 +103,8 @@ Future<void> confirmExitApp(BuildContext context) async {
   final bool shouldExit = await showAppConfirmDialog(
     context,
     title: 'Keluar aplikasi?',
-    message: 'Anda akan menutup ESAS. Data yang sudah tersimpan tidak hilang.',
+    message:
+        'Anda akan menutup Absensas. Data yang sudah tersimpan tidak hilang.',
     confirmLabel: 'Keluar',
     cancelLabel: 'Tetap di sini',
     icon: Icons.logout_rounded,

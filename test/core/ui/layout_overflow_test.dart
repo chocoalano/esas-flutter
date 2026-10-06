@@ -1157,9 +1157,13 @@ void main() {
       return const ProfileBugReportView();
     },
     'LoginView': () {
+      // With the Google button: it is the taller of the two layouts, and the
+      // one an overflow would show up in.
+      final auth = _MockAuthRepository();
+      when(() => auth.canSignInWithGoogle).thenReturn(true);
       Get.put<LoginController>(
         LoginController(
-          authRepository: _MockAuthRepository(),
+          authRepository: auth,
           deviceInfo: _MockDeviceInfoService(),
         ),
       );
