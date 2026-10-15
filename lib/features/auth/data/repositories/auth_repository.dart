@@ -22,6 +22,7 @@ class AuthRepository {
 
   final AuthApiService _api;
   final SessionRepository _session;
+  bool _disconnecting = false;
 
   /// Google sign-in through Firebase. Null when Firebase did not come up at
   /// boot, and then [canSignInWithGoogle] is false and the login screen shows
@@ -135,19 +136,28 @@ class AuthRepository {
       );
     }
 
-    final user = AuthUser.fromJson(Map<String, dynamic>.from(rawUser));
+    final user = _userFromSession(body);
     await _session.save(token: token, user: user);
 
     return user;
   }
 
-  /// Decide what the stored credential is worth, without ever destroying it on
-  /// a guess.
-  ///
-  /// The method this replaces had a bare `catch (_) {}` around the probe, so a
-  /// `SocketException` came back as "invalid" and the caller wiped the session.
-  /// Opening the app on a train signed the employee out (HIGH-02). Here a
-  /// transport failure is [SessionState.offline] and the credential is kept.
+  /// Preserve token capabilities separately from the employee's policy flags.
+  /// `auth/me` may return only the user, so keep capabilities of the same token.
+  AuthUser _userFromSession(Map<String, dynamic> body, {AuthUser? previous}) {
+    final raw = Map<String, dynamic>.from(body['user'] as Map);
+    for (final key in const ['abilities', 'device']) {
+      if (body.containsKey(key)) {
+        raw[key] = body[key];
+      } else if (previous?.raw.containsKey(key) ?? false) {
+        raw[key] = previous!.raw[key];
+      }
+    }
+    return AuthUser.fromJson(raw);
+  }
+
+  /// Verify the stored session. A connection failure ends this online session;
+  /// an HTTP refusal or server error remains available for diagnosis/retry.
   Future<SessionState> restoreSession() async {
     await _session.restore();
 
@@ -166,7 +176,7 @@ class AuthRepository {
       }
 
       await _session.updateUser(
-        AuthUser.fromJson(Map<String, dynamic>.from(rawUser)),
+        _userFromSession(body, previous: _session.user),
       );
 
       return SessionState.authenticated;
@@ -177,8 +187,12 @@ class AuthRepository {
         return SessionState.expired;
       }
 
-      // Everything else — no route, a timeout, a 502 — says nothing about the
-      // session. Keep it.
+      if (error.isConnectionFailure) {
+        await disconnectSession();
+        return SessionState.connectionLost;
+      }
+
+      // An HTTP or decoding error does not establish a connection loss.
       AppLogger.warning(
         'Could not verify the session (${error.code ?? error.status}); '
         'keeping the stored credential.',
@@ -232,5 +246,19 @@ class AuthRepository {
   Future<void> expireSession() async {
     AppLogger.info('Session expired; clearing.');
     await _session.clear();
+  }
+
+  /// Clear locally without making another request to an unreachable server.
+  /// The caller that starts cleanup owns the navigation and connection alert.
+  Future<bool> disconnectSession() async {
+    if (_disconnecting || !_session.isAuthenticated) return false;
+    _disconnecting = true;
+    try {
+      await _session.clear();
+      await _identity?.signOut();
+      return true;
+    } finally {
+      _disconnecting = false;
+    }
   }
 }

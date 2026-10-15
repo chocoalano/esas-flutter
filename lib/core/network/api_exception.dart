@@ -53,12 +53,33 @@ class ApiException implements Exception {
   /// This account is authenticated but not permitted.
   bool get isForbidden => status == 403;
 
-  /// The request never got an answer. Distinguished from a refusal because the
-  /// two deserve opposite responses: a refusal is the server's verdict, a
-  /// transport failure is a reason to keep what we have and retry (HIGH-02).
+  /// No HTTP status was available. This can also describe a decoding failure.
   bool get isTransportFailure => status == null;
 
+  /// The app could not maintain its required connection to the server.
+  bool get isConnectionFailure =>
+      status == null &&
+      const {
+        'network_unreachable',
+        'timeout',
+        'transport_failure',
+      }.contains(code);
+
   bool get isValidationFailure => status == 422;
+
+  /// The workspace refuses every request for now (423): suspended by the
+  /// platform, not active yet, or its subscription cancelled.
+  ///
+  /// Not a session problem. The token stays valid and works again the moment
+  /// the workspace is operational, so this never signs anybody out - and it is
+  /// the server's verdict, not a network blip, so nothing retries it on a
+  /// timer.
+  bool get isWorkspaceUnavailable => status == 423;
+
+  /// Which of those three, read from the server's [code]; null unless this is
+  /// a 423.
+  WorkspaceUnavailability? get workspaceUnavailability =>
+      isWorkspaceUnavailable ? WorkspaceUnavailability.fromCode(code) : null;
 
   /// The first field error, for a form that shows one message at a time.
   String? get firstFieldError => errors.isEmpty ? null : errors.values.first;
@@ -66,4 +87,29 @@ class ApiException implements Exception {
   @override
   String toString() =>
       'ApiException($status${code == null ? '' : ' $code'}): $message';
+}
+
+/// Why a workspace answered 423, as the server's machine-readable `code` says.
+///
+/// The server sends the sentence too (`message`, in Indonesian), and that is
+/// what a screen shows; this is for choosing a title or an icon without matching
+/// words.
+enum WorkspaceUnavailability {
+  /// `tenant_activation_pending`: set up, but its HRMS subscription has not
+  /// started yet.
+  activationPending,
+
+  /// `tenant_subscription_cancelled`: its subscription ended. Data is kept.
+  subscriptionCancelled,
+
+  /// `tenant_suspended`: suspended by the platform administrator.
+  suspended;
+
+  /// A 423 without a code this app knows is read as a suspension: before the
+  /// other two existed it was the only reason a workspace answered 423.
+  static WorkspaceUnavailability fromCode(String? code) => switch (code) {
+    'tenant_activation_pending' => activationPending,
+    'tenant_subscription_cancelled' => subscriptionCancelled,
+    _ => suspended,
+  };
 }

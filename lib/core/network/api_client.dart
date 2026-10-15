@@ -73,12 +73,14 @@ class ApiClient extends GetConnect {
     Duration timeout = const Duration(seconds: 30),
     Duration scoringTimeout = defaultScoringTimeout,
     Future<void> Function()? onUnauthorized,
+    Future<void> Function()? onConnectionLost,
   }) : _serverConfig = serverConfig,
        _tenantContext = tenantContext,
        _auth = authInterceptor,
        _timeout = timeout,
        _scoringTimeout = scoringTimeout,
-       _onUnauthorized = onUnauthorized;
+       _onUnauthorized = onUnauthorized,
+       _onConnectionLost = onConnectionLost;
 
   final ServerConfig _serverConfig;
   final TenantContext _tenantContext;
@@ -113,6 +115,9 @@ class ApiClient extends GetConnect {
   /// Deliberately **authenticated requests only**. A 401 from `login` means the
   /// credentials were wrong, not that a session died.
   final Future<void> Function()? _onUnauthorized;
+
+  /// End an authenticated session when its required server connection fails.
+  final Future<void> Function()? _onConnectionLost;
 
   @override
   void onInit() {
@@ -195,15 +200,20 @@ class ApiClient extends GetConnect {
     bool authenticated = true,
     Map<String, String>? headers,
   }) async {
-    final response = await _send(
-      () => get(
-        path,
-        query: _stringifyQuery(query),
-        headers: _auth.headersFor(authenticated: authenticated, extra: headers),
-      ),
-    );
+    return _guardSession(authenticated, () async {
+      final response = await _send(
+        () => get(
+          path,
+          query: _stringifyQuery(query),
+          headers: _auth.headersFor(
+            authenticated: authenticated,
+            extra: headers,
+          ),
+        ),
+      );
 
-    return _guardSession(authenticated, () => _asObject(response));
+      return _asObject(response);
+    });
   }
 
   Future<List<dynamic>> getList(
@@ -212,15 +222,20 @@ class ApiClient extends GetConnect {
     bool authenticated = true,
     Map<String, String>? headers,
   }) async {
-    final response = await _send(
-      () => get(
-        path,
-        query: _stringifyQuery(query),
-        headers: _auth.headersFor(authenticated: authenticated, extra: headers),
-      ),
-    );
+    return _guardSession(authenticated, () async {
+      final response = await _send(
+        () => get(
+          path,
+          query: _stringifyQuery(query),
+          headers: _auth.headersFor(
+            authenticated: authenticated,
+            extra: headers,
+          ),
+        ),
+      );
 
-    return _guardSession(authenticated, () => _asList(response));
+      return _asList(response);
+    });
   }
 
   Future<Map<String, dynamic>> postObject(
@@ -230,16 +245,21 @@ class ApiClient extends GetConnect {
     bool authenticated = true,
     Map<String, String>? headers,
   }) async {
-    final response = await _send(
-      () => post(
-        path,
-        body,
-        query: _stringifyQuery(query),
-        headers: _auth.headersFor(authenticated: authenticated, extra: headers),
-      ),
-    );
+    return _guardSession(authenticated, () async {
+      final response = await _send(
+        () => post(
+          path,
+          body,
+          query: _stringifyQuery(query),
+          headers: _auth.headersFor(
+            authenticated: authenticated,
+            extra: headers,
+          ),
+        ),
+      );
 
-    return _guardSession(authenticated, () => _asObject(response));
+      return _asObject(response);
+    });
   }
 
   Future<Map<String, dynamic>> putObject(
@@ -248,15 +268,20 @@ class ApiClient extends GetConnect {
     bool authenticated = true,
     Map<String, String>? headers,
   }) async {
-    final response = await _send(
-      () => put(
-        path,
-        body,
-        headers: _auth.headersFor(authenticated: authenticated, extra: headers),
-      ),
-    );
+    return _guardSession(authenticated, () async {
+      final response = await _send(
+        () => put(
+          path,
+          body,
+          headers: _auth.headersFor(
+            authenticated: authenticated,
+            extra: headers,
+          ),
+        ),
+      );
 
-    return _guardSession(authenticated, () => _asObject(response));
+      return _asObject(response);
+    });
   }
 
   Future<Map<String, dynamic>> patchObject(
@@ -265,15 +290,20 @@ class ApiClient extends GetConnect {
     bool authenticated = true,
     Map<String, String>? headers,
   }) async {
-    final response = await _send(
-      () => patch(
-        path,
-        body,
-        headers: _auth.headersFor(authenticated: authenticated, extra: headers),
-      ),
-    );
+    return _guardSession(authenticated, () async {
+      final response = await _send(
+        () => patch(
+          path,
+          body,
+          headers: _auth.headersFor(
+            authenticated: authenticated,
+            extra: headers,
+          ),
+        ),
+      );
 
-    return _guardSession(authenticated, () => _asObject(response));
+      return _asObject(response);
+    });
   }
 
   /// One multipart field, as text a server will actually accept.
@@ -349,28 +379,42 @@ class ApiClient extends GetConnect {
       extra: headers,
     );
 
-    final response = await _send(
-      () => awaitsScoring
-          ? _scoring.post<dynamic>(path, body: form, headers: requestHeaders)
-          : post(path, form, headers: requestHeaders),
-    );
+    return _guardSession(authenticated, () async {
+      final response = await _send(
+        () => awaitsScoring
+            ? _scoring.post<dynamic>(path, body: form, headers: requestHeaders)
+            : post(path, form, headers: requestHeaders),
+      );
 
-    return _guardSession(authenticated, () => _asObject(response));
+      return _asObject(response);
+    });
   }
 
   // ── Plumbing ─────────────────────────────────────────────────────────────
 
-  /// Unwrap a response, and notify once if an authenticated call was refused
-  /// with 401.
+  /// Guard both sending and decoding an authenticated request.
   ///
   /// The exception is rethrown either way: ending the session is a side effect,
   /// not a substitute for telling the caller its request failed.
-  Future<T> _guardSession<T>(bool authenticated, T Function() unwrap) async {
+  Future<T> _guardSession<T>(
+    bool authenticated,
+    Future<T> Function() run,
+  ) async {
+    final credential = _auth.headersFor(
+      authenticated: authenticated,
+    )['Authorization'];
     try {
-      return unwrap();
+      return await run();
     } on ApiException catch (error) {
-      if (authenticated && error.isUnauthenticated) {
-        await _onUnauthorized?.call();
+      // A reply to a previous account must never end a newly signed-in session.
+      if (credential != null &&
+          credential ==
+              _auth.headersFor(authenticated: true)['Authorization']) {
+        if (error.isUnauthenticated) {
+          await _onUnauthorized?.call();
+        } else if (error.isConnectionFailure) {
+          await _onConnectionLost?.call();
+        }
       }
 
       rethrow;
@@ -449,10 +493,7 @@ class ApiClient extends GetConnect {
       return;
     }
 
-    // A null status means the request never reached a server. Kept distinct
-    // from a refusal because the two deserve opposite responses: a refusal is
-    // the server's verdict, a transport failure is a reason to keep the session
-    // and retry rather than sign the user out (HIGH-02).
+    // No HTTP answer is a connection failure; HTTP refusals keep their status.
     if (response.statusCode == null || response.status.connectionError) {
       // A deadline that passed is not a network that is down, and GetConnect
       // reports the two identically: it catches its own `TimeoutException` and

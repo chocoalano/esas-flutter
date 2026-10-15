@@ -339,8 +339,12 @@ class HomeController extends GetxController {
   /// Apakah ajakan absen boleh digambar sama sekali.
   ///
   /// Hanya `false` yang tegas dari server yang menyembunyikannya. `null` —
-  /// instalasi yang belum mengirim bendera ini — berarti boleh.
-  bool get canClock => attendanceEnabled.value != false;
+  /// instalasi yang belum mengirim bendera ini — berarti boleh. Penolakan izin
+  /// yang diketahui dari metadata sesi juga menahan ajakan, termasuk ketika
+  /// jam absensi lama masih tersimpan setelah penyegaran gagal.
+  bool get canClock =>
+      attendanceEnabled.value != false &&
+      attendanceError.value is! AttendanceAccessException;
 
   /// Keterlambatan hari ini dalam menit, `null` bila tidak terlambat atau tidak
   /// bisa dihitung.
@@ -383,7 +387,7 @@ class HomeController extends GetxController {
 
     try {
       await Future.wait(<Future<void>>[
-        _load(attendanceError, generation, () async {
+        _load('attendance', attendanceError, generation, () async {
           final times = await _repository.todayAttendance();
 
           if (_isStale(generation)) return;
@@ -400,28 +404,28 @@ class HomeController extends GetxController {
           dayContext.value = times.dayContext;
           contextAnswered.value = true;
         }),
-        _load(announcementError, generation, () async {
+        _load('announcements', announcementError, generation, () async {
           final rows = await _repository.activeAnnouncements();
 
           if (_isStale(generation)) return;
 
           announcements.assignAll(rows);
         }),
-        _load(leaveError, generation, () async {
+        _load('leave', leaveError, generation, () async {
           final rows = await _repository.leaveBalances(refresh: force);
 
           if (_isStale(generation)) return;
 
           leaveBalances.assignAll(rows);
         }),
-        _load(activityError, generation, () async {
+        _load('activity', activityError, generation, () async {
           final rows = await _repository.recentPermits();
 
           if (_isStale(generation)) return;
 
           recentPermits.assignAll(rows);
         }),
-        _load(summaryError, generation, () async {
+        _load('summary', summaryError, generation, () async {
           final summary = await _repository.monthSummary(refresh: force);
 
           if (_isStale(generation)) return;
@@ -450,6 +454,7 @@ class HomeController extends GetxController {
   /// yang disimpan adalah pengecualiannya sendiri sehingga statusnya tidak
   /// hilang sebelum sampai ke layar.
   Future<void> _load(
+    String panel,
     Rxn<ApiException> slot,
     int generation,
     Future<void> Function() run,
@@ -466,7 +471,7 @@ class HomeController extends GetxController {
       // Dicatat, bukan hanya disimpan. Sebuah panel yang gagal menampilkan satu
       // kalimat yang sengaja tidak teknis kepada karyawan, dan tanpa baris ini
       // kalimat itu adalah SATU-SATUNYA jejak yang tersisa — sehingga sebuah
-      // 403 dari abilities token (README G-3) tidak bisa dibedakan di lapangan
+      // penolakan izin token tidak bisa dibedakan di lapangan
       // dari absensi yang memang dimatikan untuk orangnya, padahal keduanya
       // menuntut perbaikan di tempat yang sama sekali berbeda.
       //
@@ -475,6 +480,7 @@ class HomeController extends GetxController {
       AppLogger.warning(
         'Panel beranda gagal dimuat',
         data: <String, Object?>{
+          'panel': panel,
           'status': error.status,
           'code': error.code,
           'transport': error.isTransportFailure,

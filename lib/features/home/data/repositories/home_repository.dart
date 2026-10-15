@@ -1,10 +1,33 @@
 import '../../../attendance/data/models/attendance_context.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/utils/json_parsers.dart';
 import '../../../../features/auth/data/repositories/session_repository.dart';
 import '../../../permit/data/models/leave_list.dart';
 import '../models/activity_log.dart';
 import '../models/announcement.dart';
 import '../services/home_api_service.dart';
+
+/// An attendance request already denied by the server's session metadata.
+/// No HTTP request is needed to repeat that decision. The device flag stays
+/// separate from the permission so a missing ability does not imply a device
+/// registration problem.
+class AttendanceAccessException extends ApiException {
+  const AttendanceAccessException({required this.isRegisteredDevice})
+    : super(
+        isRegisteredDevice == false
+            ? 'Perangkat ini belum terdaftar untuk absensi. Gunakan perangkat '
+                  'yang terdaftar atau hubungi administrator untuk memperbarui '
+                  'pendaftaran perangkat.'
+            : 'Sesi ini belum memiliki izin absensi. Hubungi administrator '
+                  'untuk memeriksa izin absensi akun dan sesi ini.',
+        status: 403,
+        code: isRegisteredDevice == false
+            ? 'attendance_device_unregistered'
+            : 'attendance_access_restricted',
+      );
+
+  final bool? isRegisteredDevice;
+}
 
 /// Jenis hari menurut kalender kerja server.
 ///
@@ -283,6 +306,16 @@ class HomeRepository {
   /// replaces called this same endpoint twice on every open — once for the
   /// clock and once for the shift it had just been told.
   Future<DashboardTimes> todayAttendance() async {
+    final user = _session.user;
+    if (user?.attendanceEnabled == false) {
+      return const DashboardTimes(attendanceEnabled: false);
+    }
+    if (user?.canRecordAttendance == false) {
+      throw AttendanceAccessException(
+        isRegisteredDevice: user?.isRegisteredDevice,
+      );
+    }
+
     final body = await _api.attendanceContext();
     final attendance = asObject(body['attendance']);
 
@@ -303,7 +336,8 @@ class HomeRepository {
       scheduleName: shift?.name,
       shift: shift,
       nextPresence: _direction(body['next_presence']),
-      attendanceEnabled: asBool(body['attendance_enabled']),
+      attendanceEnabled:
+          asBool(body['attendance_enabled']) ?? user?.attendanceEnabled,
       // Blok tambahan yang backward-compatible: sebuah backend yang belum
       // mengirimnya menghasilkan `null`, dan layar kembali ke perilaku lama.
       dayContext: DayContext.fromJson(body['day_context']),

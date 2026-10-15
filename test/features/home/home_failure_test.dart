@@ -1,4 +1,5 @@
 import 'package:esas/core/network/api_exception.dart';
+import 'package:esas/features/home/data/repositories/home_repository.dart';
 import 'package:esas/features/home/presentation/widgets/home_failure.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -55,6 +56,25 @@ void main() {
       expect(homeErrorRemedyFor(error), HomeErrorRemedy.retry);
     });
 
+    test('perangkat yang diketahui belum terdaftar tidak diberi retry', () {
+      const error = AttendanceAccessException(isRegisteredDevice: false);
+
+      expect(homeFailureKindOf(error), HomeFailureKind.deviceNotRegistered);
+      expect(homeErrorRemedyFor(error), HomeErrorRemedy.none);
+    });
+
+    test('izin sesi terbatas tidak disimpulkan sebagai perangkat salah', () {
+      for (final registered in <bool?>[true, null]) {
+        final error = AttendanceAccessException(isRegisteredDevice: registered);
+
+        expect(
+          homeFailureKindOf(error),
+          HomeFailureKind.attendanceAccessRestricted,
+        );
+        expect(homeErrorRemedyFor(error), HomeErrorRemedy.none);
+      }
+    });
+
     test('5xx adalah kegagalan server dan boleh dicoba lagi', () {
       const error = ApiException('Kesalahan server.', status: 503);
 
@@ -69,6 +89,49 @@ void main() {
 
       expect(homeFailureKindOf(error), HomeFailureKind.unknown);
       expect(homeErrorRemedyFor(error), HomeErrorRemedy.retry);
+    });
+
+    test('423 adalah workspace tidak aktif: tidak pernah keluar dari sesi', () {
+      // Belum aktif, langganan berakhir, atau ditangguhkan: tokennya tetap
+      // sah dan berlaku lagi begitu workspace aktif. Mengeluarkan orang dari
+      // aplikasi karena keputusan komersial adalah kerusakan yang pasti.
+      for (final (code, kind) in [
+        (
+          'tenant_activation_pending',
+          WorkspaceUnavailability.activationPending,
+        ),
+        (
+          'tenant_subscription_cancelled',
+          WorkspaceUnavailability.subscriptionCancelled,
+        ),
+        ('tenant_suspended', WorkspaceUnavailability.suspended),
+      ]) {
+        final error = ApiException('Kalimat server.', status: 423, code: code);
+
+        expect(homeFailureKindOf(error), HomeFailureKind.workspaceUnavailable);
+        expect(error.workspaceUnavailability, kind);
+        expect(error.isUnauthenticated, isFalse);
+        expect(homeErrorRemedyFor(error), HomeErrorRemedy.retry);
+      }
+    });
+
+    test('423 tanpa kode yang dikenal dibaca sebagai penangguhan', () {
+      // Sebelum dua keadaan lainnya ada, penangguhan adalah satu-satunya
+      // alasan sebuah workspace menjawab 423.
+      const error = ApiException('Workspace ditangguhkan.', status: 423);
+
+      expect(error.workspaceUnavailability, WorkspaceUnavailability.suspended);
+    });
+
+    test('bukan 423 tidak membawa keadaan workspace', () {
+      const error = ApiException(
+        'Tidak diizinkan.',
+        status: 403,
+        code: 'tenant_suspended',
+      );
+
+      expect(error.isWorkspaceUnavailable, isFalse);
+      expect(error.workspaceUnavailability, isNull);
     });
 
     test('tanpa galat sama sekali tidak ada yang perlu diklasifikasikan', () {

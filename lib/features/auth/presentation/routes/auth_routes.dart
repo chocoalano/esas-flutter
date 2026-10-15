@@ -11,4 +11,6 @@ class AuthRoutes {
 
   static const splash = '/splash';
   static const login = '/login';
+
+  static const connectionLostArgument = 'connection_lost';
 }

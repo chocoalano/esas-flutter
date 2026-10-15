@@ -92,6 +92,7 @@ class ApiErrorMapper {
       404 => 'Data tidak ditemukan.',
       409 => 'Konflik data. Data mungkin sudah diproses.',
       422 => 'Data tidak valid. Periksa kembali input Anda.',
+      423 => 'Workspace sedang tidak dapat digunakan. Hubungi administrator.',
       429 => 'Terlalu banyak permintaan. Coba lagi sebentar lagi.',
       >= 500 && < 600 => 'Kesalahan server internal. Coba lagi nanti.',
       _ => 'Terjadi kesalahan tidak dikenal. Kode: $status',

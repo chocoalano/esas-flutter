@@ -852,6 +852,47 @@ void main() {
       expect(find.text('Masuk kembali'), findsNothing);
     });
 
+    testWidgets(
+      'penolakan perangkat dijelaskan tanpa retry atau ajakan absen',
+      (tester) async {
+        await pumpHome(
+          tester,
+          attendanceThrows: const AttendanceAccessException(
+            isRegisteredDevice: false,
+          ),
+        );
+
+        expect(
+          find.text('Perangkat belum terdaftar untuk absensi'),
+          findsOneWidget,
+        );
+        expect(
+          find.textContaining('Gunakan perangkat yang terdaftar'),
+          findsOneWidget,
+        );
+        expect(find.text('Absensi belum dapat dimuat'), findsNothing);
+        expect(find.text('Coba lagi'), findsNothing);
+        expect(find.text('Absen masuk'), findsNothing);
+        expect(find.text('Masuk kembali'), findsNothing);
+      },
+    );
+
+    testWidgets('izin sesi yang terbatas tidak mengklaim perangkat salah', (
+      tester,
+    ) async {
+      await pumpHome(
+        tester,
+        attendanceThrows: const AttendanceAccessException(
+          isRegisteredDevice: true,
+        ),
+      );
+
+      expect(find.text('Izin absensi sesi ini terbatas'), findsOneWidget);
+      expect(find.textContaining('Hubungi administrator'), findsOneWidget);
+      expect(find.textContaining('belum terdaftar'), findsNothing);
+      expect(find.text('Coba lagi'), findsNothing);
+    });
+
     testWidgets('hanya attendance_enabled: false yang boleh mengklaimnya', (
       tester,
     ) async {
@@ -874,7 +915,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(TodayWorkCard),
-          matching: find.textContaining('September'),
+          matching: find.text(Get.find<HomeController>().currentDate.value),
         ),
         findsOneWidget,
       );

@@ -277,6 +277,16 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
       // menuntut tindakan darurat dari karyawan, dan merah disimpan untuk hal
       // yang benar-benar rusak.
       return switch (homeFailureKindOf(widget.error)) {
+        HomeFailureKind.deviceNotRegistered => (
+          'Perangkat belum terdaftar',
+          AppBadgeTone.neutral,
+          Icons.phonelink_lock_rounded,
+        ),
+        HomeFailureKind.attendanceAccessRestricted => (
+          'Izin absensi terbatas',
+          AppBadgeTone.neutral,
+          Icons.lock_outline_rounded,
+        ),
         HomeFailureKind.notPermitted => (
           'Belum tersedia',
           AppBadgeTone.neutral,
@@ -296,6 +306,11 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
           'Gangguan server',
           AppBadgeTone.warning,
           Icons.cloud_off_rounded,
+        ),
+        HomeFailureKind.workspaceUnavailable => (
+          'Workspace tidak aktif',
+          AppBadgeTone.neutral,
+          Icons.pause_circle_outline_rounded,
         ),
         HomeFailureKind.unknown => (
           'Belum tersedia',
@@ -387,6 +402,15 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
         ],
         const SizedBox(height: AppSpacing.lg),
         _facts(theme, palette),
+        if (widget.error is AttendanceAccessException) ...<Widget>[
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            widget.error!.message,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: palette.textMuted,
+            ),
+          ),
+        ],
         ..._action(theme),
       ];
     }
@@ -473,6 +497,14 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
 
     if (widget.state == HomeTodayState.unavailable) {
       return switch (homeFailureKindOf(widget.error)) {
+        HomeFailureKind.deviceNotRegistered => (
+          'Perangkat belum terdaftar untuk absensi',
+          widget.error?.message,
+        ),
+        HomeFailureKind.attendanceAccessRestricted => (
+          'Izin absensi sesi ini terbatas',
+          widget.error?.message,
+        ),
         // Tidak mengklaim apa pun tentang akun orangnya. Yang benar-benar
         // diketahui hanyalah bahwa permintaannya ditolak, dan penyebabnya ada
         // di sisi server — lihat [HomeFailureKind.notPermitted].
@@ -491,6 +523,18 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
         HomeFailureKind.server => (
           'Absensi belum dapat dimuat',
           'Server sedang bermasalah. Coba lagi sebentar lagi.',
+        ),
+        // Kalimat server sudah menyebut keadaannya dalam bahasa orangnya;
+        // judulnya dipilih dari `code`, bukan dari kata-kata.
+        HomeFailureKind.workspaceUnavailable => (
+          switch (widget.error?.workspaceUnavailability) {
+            WorkspaceUnavailability.activationPending =>
+              'Workspace belum aktif',
+            WorkspaceUnavailability.subscriptionCancelled =>
+              'Langganan workspace berakhir',
+            _ => 'Workspace ditangguhkan',
+          },
+          widget.error?.message,
         ),
         HomeFailureKind.unknown => (
           'Absensi belum dapat dimuat',

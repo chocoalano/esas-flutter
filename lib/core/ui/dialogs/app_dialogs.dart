@@ -4,6 +4,28 @@ import 'package:flutter/services.dart';
 import '../../theme/app_dimens.dart';
 import '../../theme/app_palette.dart';
 
+/// Informasi yang perlu dibaca sebelum melanjutkan dari halaman saat ini.
+Future<void> showAppInfoDialog(
+  BuildContext context, {
+  required String title,
+  required String message,
+  IconData? icon,
+}) => showDialog<void>(
+  context: context,
+  barrierDismissible: false,
+  builder: (context) => AlertDialog(
+    icon: icon == null ? null : Icon(icon),
+    title: Text(title),
+    content: Text(message),
+    actions: [
+      FilledButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: const Text('Mengerti'),
+      ),
+    ],
+  ),
+);
+
 /// Dialog konfirmasi baku aplikasi.
 ///
 /// Lima layar sebelumnya masing-masing menyusun `AlertDialog` "Keluar Aplikasi"

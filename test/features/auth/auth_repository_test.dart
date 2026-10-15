@@ -63,6 +63,40 @@ void main() {
       expect(auth.isAuthenticated, isTrue);
     });
 
+    test(
+      'login persists the token device permission outside the user object',
+      () async {
+        when(
+          () => api.login(
+            identifier: any(named: 'identifier'),
+            password: any(named: 'password'),
+            deviceId: any(named: 'deviceId'),
+          ),
+        ).thenAnswer(
+          (_) async => {
+            'token': 'abc',
+            'user': {...userJson, 'attendance_enabled': true},
+            'abilities': ['profile', 'permits'],
+            'device': {
+              'is_registered_device': false,
+              'can_record_attendance': false,
+            },
+          },
+        );
+
+        final user = await auth.login(
+          identifier: 'x',
+          password: 'y',
+          deviceId: 'other-device',
+        );
+        expect(user.attendanceEnabled, isTrue);
+        expect(user.canRecordAttendance, isFalse);
+        expect(user.isRegisteredDevice, isFalse);
+        await session.restore();
+        expect(session.user?.canRecordAttendance, isFalse);
+      },
+    );
+
     test('never stores the password anywhere', () async {
       // CRIT-03. The password authenticates and is then dropped.
       when(
@@ -97,7 +131,7 @@ void main() {
     });
   });
 
-  group('restoreSession — the three-way outcome (HIGH-02)', () {
+  group('restoreSession', () {
     setUp(() async {
       await session.save(token: 'abc', user: AuthUser.fromJson(userJson));
     });
@@ -116,6 +150,41 @@ void main() {
       expect(session.token, 'abc');
     });
 
+    test('auth/me keeps the device restriction granted at login', () async {
+      await session.save(
+        token: 'abc',
+        user: AuthUser.fromJson({
+          ...userJson,
+          'abilities': ['profile', 'permits'],
+          'device': {
+            'is_registered_device': false,
+            'can_record_attendance': false,
+          },
+        }),
+      );
+      when(() => api.currentUser()).thenAnswer((_) async => {'user': userJson});
+
+      expect(await auth.restoreSession(), SessionState.authenticated);
+      expect(session.user?.canRecordAttendance, isFalse);
+      expect(session.user?.isRegisteredDevice, isFalse);
+    });
+
+    test('auth/me updates explicit token capabilities', () async {
+      when(() => api.currentUser()).thenAnswer(
+        (_) async => {
+          'user': userJson,
+          'abilities': ['attendance'],
+          'device': {
+            'is_registered_device': true,
+            'can_record_attendance': true,
+          },
+        },
+      );
+
+      await auth.restoreSession();
+      expect(session.user?.canRecordAttendance, isTrue);
+    });
+
     test('expired ONLY on a 401, and the session is cleared', () async {
       when(
         () => api.currentUser(),
@@ -126,26 +195,24 @@ void main() {
       expect(local.hasData('auth_user_json'), isFalse);
     });
 
-    test('OFFLINE on a dead socket — the session is KEPT', () async {
-      // The bug this closes: the old probe swallowed SocketException in a bare
-      // `catch (_) {}`, returned false, and the caller wiped the session. Opening
-      // the app with no signal signed the employee out at the factory gate.
+    test('connection loss clears the stored session', () async {
       when(() => api.currentUser()).thenThrow(
         ApiErrorMapper.fromTransportError(const SocketException('no route')),
       );
 
-      expect(await auth.restoreSession(), SessionState.offline);
-      expect(session.token, 'abc', reason: 'the credential must survive');
-      expect(session.user?.name, 'Budi');
+      expect(await auth.restoreSession(), SessionState.connectionLost);
+      expect(session.token, isNull);
+      expect(session.user, isNull);
+      expect(local.hasData('auth_user_json'), isFalse);
     });
 
-    test('offline on a timeout — the session is kept', () async {
+    test('a connection timeout clears the session', () async {
       when(
         () => api.currentUser(),
       ).thenThrow(const ApiException('slow', code: 'timeout'));
 
-      expect(await auth.restoreSession(), SessionState.offline);
-      expect(session.token, 'abc');
+      expect(await auth.restoreSession(), SessionState.connectionLost);
+      expect(session.token, isNull);
     });
 
     test('offline on a 5xx — a broken server is not a dead session', () async {
@@ -261,6 +328,23 @@ void main() {
 
     expect(auth.isAuthenticated, isFalse);
   });
+
+  test(
+    'disconnectSession cleans up once without calling server logout',
+    () async {
+      await session.save(token: 'abc', user: AuthUser.fromJson(userJson));
+
+      final ended = await Future.wait([
+        auth.disconnectSession(),
+        auth.disconnectSession(),
+      ]);
+
+      expect(ended, [true, false]);
+      expect(session.token, isNull);
+      expect(session.user, isNull);
+      verifyNever(() => api.logout(fcmToken: any(named: 'fcmToken')));
+    },
+  );
 
   group('loginWithGoogle', () {
     late _MockIdentity identity;

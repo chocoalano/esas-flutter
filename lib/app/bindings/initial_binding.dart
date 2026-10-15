@@ -19,6 +19,7 @@ import '../../features/notification/data/services/notification_sync_service.dart
 import '../../features/permit/presentation/routes/permit_routes.dart';
 import '../../features/profile/presentation/routes/profile_routes.dart';
 import '../../features/auth/data/repositories/auth_repository.dart';
+import '../../features/auth/presentation/routes/auth_routes.dart';
 import '../../features/auth/data/repositories/firestore_user_repository.dart';
 import '../../features/auth/data/repositories/session_repository.dart';
 import '../../features/auth/data/services/auth_api_service.dart';
@@ -104,7 +105,22 @@ class InitialBinding extends Bindings {
         // client, so naming it here directly would be a cycle.
         onUnauthorized: () async {
           if (Get.isRegistered<AuthRepository>()) {
-            await Get.find<AuthRepository>().expireSession();
+            final auth = Get.find<AuthRepository>();
+            if (!auth.isAuthenticated) return;
+            await auth.expireSession();
+            if (Get.currentRoute != AuthRoutes.splash) {
+              Get.offAllNamed(AuthRoutes.login);
+            }
+          }
+        },
+        onConnectionLost: () async {
+          if (!Get.isRegistered<AuthRepository>()) return;
+          final ended = await Get.find<AuthRepository>().disconnectSession();
+          if (ended && Get.currentRoute != AuthRoutes.splash) {
+            Get.offAllNamed(
+              AuthRoutes.login,
+              arguments: AuthRoutes.connectionLostArgument,
+            );
           }
         },
       ),

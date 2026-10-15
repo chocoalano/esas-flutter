@@ -175,6 +175,17 @@ void main() {
       expect(loaded(attendanceEnabled: false).canClock, isFalse);
       expect(loaded(attendanceEnabled: true).canClock, isTrue);
     });
+
+    test('penolakan perangkat menahan ajakan meskipun jam lama masih ada', () {
+      final controller = loaded(timeIn: '08:03', attendanceEnabled: true);
+      controller.attendanceError.value = const AttendanceAccessException(
+        isRegisteredDevice: false,
+      );
+
+      expect(controller.todayState, HomeTodayState.working);
+      expect(controller.canClock, isFalse);
+      expect(controller.canPunchNow, isFalse);
+    });
   });
 
   group('lateMinutes', () {

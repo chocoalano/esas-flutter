@@ -18,6 +18,37 @@ void main() {
       expect(e.isValidationFailure, isTrue);
     });
 
+    test('a 423 keeps the server sentence and its machine code', () {
+      final e = ApiErrorMapper.fromResponse(
+        status: 423,
+        body: {
+          'message':
+              'Workspace ini belum aktif: langganan HRMS-nya belum dimulai. Hubungi administrator platform.',
+          'code': 'tenant_activation_pending',
+          'state': 'ACTIVATION_PENDING',
+        },
+      );
+
+      expect(e.message, startsWith('Workspace ini belum aktif'));
+      expect(e.isWorkspaceUnavailable, isTrue);
+      expect(
+        e.workspaceUnavailability,
+        WorkspaceUnavailability.activationPending,
+      );
+      expect(e.isUnauthenticated, isFalse);
+      expect(e.body['state'], 'ACTIVATION_PENDING');
+    });
+
+    test('a 423 without a body still says something true', () {
+      final e = ApiErrorMapper.fromResponse(status: 423, body: null);
+
+      expect(
+        e.message,
+        'Workspace sedang tidak dapat digunakan. Hubungi administrator.',
+      );
+      expect(e.workspaceUnavailability, WorkspaceUnavailability.suspended);
+    });
+
     test('lets a screen override both', () {
       // Login says "NIP/Email atau kata sandi salah" for a 401, which is a
       // better sentence than the generic one. Consolidating the three switch

@@ -30,6 +30,35 @@ class AuthUser {
 
   String? get status => asString(raw['status']);
 
+  /// Whether attendance is enabled for the employee, independently of the
+  /// permission granted to this device's token.
+  bool? get attendanceEnabled => asBool(raw['attendance_enabled']);
+
+  /// Whether this session may record attendance.
+  ///
+  /// Login sends device capability and token abilities outside `user`; the
+  /// repository keeps them in [raw]. An older payload without either remains
+  /// unknown so it can still ask the attendance endpoint.
+  bool? get canRecordAttendance {
+    final devicePermission =
+        asBool(dig(raw, ['device', 'can_record_attendance'])) ??
+        asBool(raw['can_record_attendance']);
+    if (devicePermission != null) return devicePermission;
+
+    final abilities = raw['abilities'];
+    if (abilities is! List || abilities.any((value) => value is! String)) {
+      return null;
+    }
+
+    return abilities.contains('attendance') || abilities.contains('*');
+  }
+
+  /// Whether the current device matches the employee's registered device.
+  /// Missing metadata does not establish that it is unregistered.
+  bool? get isRegisteredDevice =>
+      asBool(dig(raw, ['device', 'is_registered_device'])) ??
+      asBool(raw['is_registered_device']);
+
   /// Berapa notifikasi yang belum dibaca, menurut server.
   ///
   /// `null` berarti server pada instalasi ini TIDAK mengirimkannya, dan itu
@@ -100,9 +129,7 @@ class AuthUser {
 
 /// What a session restore concluded.
 ///
-/// Three outcomes, not two. The old `SplashController` had only "valid" and
-/// "everything else", and cleared the session for everything else — so opening
-/// the app with no signal signed the employee out (HIGH-02).
+/// Connection loss clears this online session; HTTP errors remain distinct.
 enum SessionState {
   /// No credential stored. Show login.
   absent,
@@ -113,7 +140,9 @@ enum SessionState {
   /// The server rejected the token. Clear it and show login.
   expired,
 
-  /// The server could not be reached. **Keep the credential** and let the
-  /// person retry; this is not evidence of anything about the session.
+  /// The required server connection failed. Clear the session and explain why.
+  connectionLost,
+
+  /// Verification failed with an HTTP or data error. Keep the credential.
   offline,
 }

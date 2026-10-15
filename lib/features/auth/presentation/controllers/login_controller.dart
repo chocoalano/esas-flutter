@@ -4,10 +4,12 @@ import 'package:get/get.dart';
 
 import 'package:esas/features/home/presentation/routes/home_routes.dart';
 import '../../../../core/ui/dialogs/app_snackbar.dart';
+import '../../../../core/ui/dialogs/app_dialogs.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/services/device_info_service.dart';
 import '../../../../utils/notification/firebase_messaging_services.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../routes/auth_routes.dart';
 
 class LoginController extends GetxController {
   LoginController({
@@ -34,6 +36,25 @@ class LoginController extends GetxController {
   /// Either door is mid-flight. Both buttons wait for it, so two sign-ins
   /// cannot race to write the session.
   bool get isBusy => isLoading.value || isGoogleLoading.value;
+
+  @override
+  void onReady() {
+    super.onReady();
+    if (Get.arguments == AuthRoutes.connectionLostArgument &&
+        Get.context != null) {
+      unawaited(
+        showAppInfoDialog(
+          Get.context!,
+          title: 'Koneksi internet diperlukan',
+          message:
+              'Koneksi ke server terputus sehingga Anda otomatis keluar. '
+              'Aplikasi ini wajib terhubung ke internet. Pastikan koneksi internet '
+              'aktif dan server dapat diakses, lalu masuk kembali.',
+          icon: Icons.wifi_off_rounded,
+        ),
+      );
+    }
+  }
 
   @override
   void onClose() {

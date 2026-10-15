@@ -74,12 +74,8 @@ class SplashController extends GetxController {
   /// Decide where the app opens, from what the stored credential turns out to
   /// be worth.
   ///
-  /// Four outcomes, where there used to be two. The old flow treated anything
-  /// that was not a confirmed-valid token as a reason to wipe the session, and
-  /// its probe swallowed `SocketException` in a bare `catch (_) {}` — so
-  /// launching with no signal, on hotel wi-fi, or during a brief API outage
-  /// signed the employee out and made them type their credentials again at the
-  /// factory gate (HIGH-02).
+  /// A connection failure goes to login with an explanation. HTTP errors keep
+  /// their own meaning and never claim the internet connection was lost.
   Future<void> _resolveStartDestination() async {
     isLoading.value = true;
 
@@ -107,13 +103,14 @@ class SplashController extends GetxController {
           _open(HomeRoutes.home);
 
         case SessionState.offline:
-          // The credential is untouched. Say what happened and let them in to
-          // retry rather than destroying a session we have no evidence against.
           showWarningSnackbar(
-            'Tidak dapat menghubungi server. Periksa koneksi Anda.',
-            title: 'Mode Luring',
+            'Server belum dapat memverifikasi sesi. Coba lagi sebentar lagi.',
+            title: 'Sesi belum dapat diperiksa',
           );
           _open(AuthRoutes.login);
+
+        case SessionState.connectionLost:
+          _open(AuthRoutes.login, arguments: AuthRoutes.connectionLostArgument);
 
         case SessionState.expired:
         case SessionState.absent:
@@ -129,13 +126,13 @@ class SplashController extends GetxController {
   }
 
   /// Buka satu tujuan, sekali saja.
-  void _open(String route) {
+  void _open(String route, {Object? arguments}) {
     if (_navigated) {
       return;
     }
 
     _navigated = true;
-    Get.offAllNamed(route);
+    Get.offAllNamed(route, arguments: arguments);
   }
 
   /// Whether this handset knows both halves of where it belongs.

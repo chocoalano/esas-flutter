@@ -1,4 +1,5 @@
 import 'package:esas/core/network/api_exception.dart';
+import 'package:esas/features/home/data/repositories/home_repository.dart';
 
 /// Mengapa sebuah panel Beranda gagal, sebagai fakta dan bukan sebagai kalimat.
 ///
@@ -30,14 +31,18 @@ enum HomeFailureKind {
   /// diulang.
   sessionExpired,
 
+  /// Session metadata says attendance is blocked on an unregistered device.
+  deviceNotRegistered,
+
+  /// Session metadata explicitly denies attendance, without establishing a
+  /// device registration problem.
+  attendanceAccessRestricted,
+
   /// Terautentikasi, tetapi permintaannya ditolak (403).
   ///
-  /// **Ini TIDAK berarti fitur absensi dimatikan untuk karyawan ini.** Sebuah
-  /// 403 pada `attendance/context` bisa berarti banyak hal, dan hampir semuanya
-  /// urusan server: abilities token yang terlalu sempit (README gap G-3 —
-  /// token dicetak dengan `['attendance']` saja, sehingga endpoint self-service
-  /// ditolak sampai diperlebar), guard rute, kebijakan tenant, atau konfigurasi
-  /// deployment.
+  /// Tanpa metadata kapabilitas, status ini tidak menetapkan penyebabnya:
+  /// abilities token, guard rute, kebijakan tenant, atau konfigurasi server.
+  /// Penolakan yang sudah dijelaskan payload sesi diklasifikasikan terpisah.
   ///
   /// Satu-satunya pernyataan yang sah tentang kapabilitas karyawan adalah
   /// `attendance_enabled: false` di dalam respons yang BERHASIL. Menyimpulkan
@@ -46,6 +51,13 @@ enum HomeFailureKind {
   /// aplikasi memberi tahu karyawan yang absensinya jelas-jelas aktif bahwa
   /// absensinya tidak aktif.
   notPermitted,
+
+  /// Workspace-nya sedang tidak dapat digunakan (423): belum aktif,
+  /// langganannya berakhir, atau ditangguhkan platform. Sesinya tetap sah —
+  /// jangan pernah mengeluarkan orang dari aplikasi karena ini — dan bukan
+  /// gangguan jaringan, jadi tidak diulang otomatis. Kalimatnya dari server
+  /// (`message`), jenisnya dari `code` ([WorkspaceUnavailability]).
+  workspaceUnavailable,
 
   /// Sisanya. Kalimatnya netral dan aksinya "coba lagi".
   unknown,
@@ -59,7 +71,13 @@ HomeFailureKind homeFailureKindOf(ApiException? error) {
   // sekali, jadi ia harus diperiksa sebelum cabang mana pun yang membaca angka.
   if (error.isTransportFailure) return HomeFailureKind.network;
   if (error.isUnauthenticated) return HomeFailureKind.sessionExpired;
+  if (error is AttendanceAccessException) {
+    return error.isRegisteredDevice == false
+        ? HomeFailureKind.deviceNotRegistered
+        : HomeFailureKind.attendanceAccessRestricted;
+  }
   if (error.isForbidden) return HomeFailureKind.notPermitted;
+  if (error.isWorkspaceUnavailable) return HomeFailureKind.workspaceUnavailable;
 
   final int status = error.status ?? 0;
 
@@ -84,6 +102,8 @@ enum HomeErrorRemedy {
 HomeErrorRemedy homeErrorRemedyFor(ApiException? error) {
   return switch (homeFailureKindOf(error)) {
     HomeFailureKind.sessionExpired => HomeErrorRemedy.signIn,
+    HomeFailureKind.deviceNotRegistered ||
+    HomeFailureKind.attendanceAccessRestricted => HomeErrorRemedy.none,
     // 403 mendapat "Coba lagi", bukan "tidak ada tombol".
     //
     // Versi sebelumnya tidak menawarkan apa pun, dengan alasan bahwa mencoba
