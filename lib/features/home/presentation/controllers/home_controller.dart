@@ -1,6 +1,8 @@
 import 'package:esas/core/tenancy/workspace_clock.dart';
+import 'package:esas/core/ui/controllers/bottom_nav_controller.dart';
 import 'package:esas/core/utils/app_logger.dart';
 import 'package:esas/core/utils/date_formatter.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/network/api_exception.dart';
@@ -113,6 +115,11 @@ class HomeController extends GetxController {
   final HomeRepository _repository;
   Worker? _notificationCountWorker;
   Worker? _notificationRefreshWorker;
+  Worker? _scrollToTopWorker;
+
+  /// Drives the home ListView. Animated to 0 when the home tab is re-tapped
+  /// while already active, via [BottomNavController.scrollToTopSignal].
+  final scrollController = ScrollController();
 
   /// Nomor urut penyegaran terakhir yang dimulai. Lihat [refreshDashboard].
   int _generation = 0;
@@ -209,10 +216,13 @@ class HomeController extends GetxController {
         session.unreadNotificationCount,
         (count) => unreadNotifications.value = count,
       );
-      _notificationRefreshWorker = ever(
-        session.notificationRevision,
-        (_) => refreshDashboard(force: true),
-      );
+      // A new notification may change what the dashboard says, so it is
+      // refreshed — but not forced past the caches, and not on top of a
+      // refresh already running (HOME-03). Every revision used to force a full
+      // reload: the cold start loaded twice, and every resume five times over.
+      _notificationRefreshWorker = ever(session.notificationRevision, (_) {
+        if (!isLoading.value) refreshDashboard();
+      });
     }
 
     userName.value = _repository.userName;
@@ -222,6 +232,21 @@ class HomeController extends GetxController {
     // of midnight showed a date the attendance below it disagreed with.
     currentDate.value = DateFormatter.nowFormatted('EEEE, d MMMM yyyy');
 
+    if (Get.isRegistered<BottomNavController>()) {
+      _scrollToTopWorker = ever(
+        Get.find<BottomNavController>().scrollToTopSignal,
+        (_) {
+          if (scrollController.hasClients) {
+            scrollController.animateTo(
+              0,
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeOut,
+            );
+          }
+        },
+      );
+    }
+
     refreshDashboard();
   }
 
@@ -229,6 +254,8 @@ class HomeController extends GetxController {
   void onClose() {
     _notificationCountWorker?.dispose();
     _notificationRefreshWorker?.dispose();
+    _scrollToTopWorker?.dispose();
+    scrollController.dispose();
     super.onClose();
   }
 
@@ -244,8 +271,13 @@ class HomeController extends GetxController {
   /// Apakah pengguna ini memegang otoritas persetujuan (approver / manager).
   final RxBool isApprover = false.obs;
 
-  bool isModuleActive(String module) =>
-      activeModules.contains(module.toLowerCase());
+  /// Compared as the server wrote them, case and spacing aside — the same
+  /// normalisation `ModuleRegistry` applies (HOME-06).
+  bool isModuleActive(String module) {
+    final wanted = module.trim().toLowerCase();
+
+    return activeModules.any((m) => m.trim().toLowerCase() == wanted);
+  }
 
   bool get hasGams => isModuleActive('gams');
   bool get hasItms => isModuleActive('itms');
@@ -279,6 +311,11 @@ class HomeController extends GetxController {
       return HomeTodayState.loading;
     }
 
+    // Pulang tercatat tanpa masuk (lupa absen masuk): harinya sudah selesai,
+    // bukan "belum absen" — lini masa di bawahnya sudah menulis jam pulangnya
+    // (HOME-17).
+    if (!hasCheckedIn && hasCheckedOut) return HomeTodayState.done;
+
     // Ketukan yang sudah tercatat mengalahkan galat: jam yang sudah sampai
     // tetap benar walaupun penyegaran berikutnya gagal.
     if (hasCheckedIn) {
@@ -300,6 +337,14 @@ class HomeController extends GetxController {
     // Orang yang dirosterkan pada hari raya tetap harus melihat shiftnya dan
     // tombolnya; menyembunyikan keduanya karena kalender berkata "libur" adalah
     // cara membuat orang yang benar-benar masuk kerja tidak bisa mengabsen.
+    //
+    // Kecuali cuti (HOME-05): cuti yang disetujui disimpan terpisah dari
+    // roster, jadi baris rosternya tetap ada — dan dulu menang, menyebut cuti
+    // sebagai kelalaian "Belum absen". Libur nasional tetap kalah oleh jadwal.
+    if (dayContext.value?.type == HomeDayType.leave) {
+      return HomeTodayState.onLeave;
+    }
+
     if (hasSchedule) {
       return HomeTodayState.notClockedIn;
     }
@@ -400,6 +445,10 @@ class HomeController extends GetxController {
 
     // Gratis, dan karena itu dilakukan di sini: sumbernya sesi, bukan jaringan.
     unreadNotifications.value = _repository.unreadNotifications;
+
+    // Tanggalnya juga (HOME-04): aplikasi yang dibuka Rabu malam lalu
+    // dilanjutkan Kamis pagi menyegarkan datanya, dan judulnya tetap Rabu.
+    currentDate.value = DateFormatter.nowFormatted('EEEE, d MMMM yyyy');
 
     isLoading.value = true;
 

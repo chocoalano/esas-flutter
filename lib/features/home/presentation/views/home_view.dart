@@ -91,18 +91,22 @@ class HomeView extends GetView<HomeController> {
   Widget build(BuildContext context) {
     final AppLayoutMetrics layout = AppLayout.of(context);
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (didPop) return;
-        confirmExitApp(context);
-      },
-      child: Scaffold(
+    return Title(
+      title: 'Beranda – Absensas',
+      color: Colors.black,
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (bool didPop, Object? result) {
+          if (didPop) return;
+          confirmExitApp(context);
+        },
+        child: Scaffold(
         body: SafeArea(
           bottom: false,
           child: RefreshIndicator(
             onRefresh: () => controller.refreshDashboard(force: true),
             child: ListView(
+              controller: controller.scrollController,
               // Margin horizontal halaman TIDAK ada di sini lagi. Selama ia
               // tinggal di `padding` daftar, setiap anak dijepit ke lebar yang
               // sudah dikurangi margin dan tidak ada satu pun bagian yang bisa
@@ -118,6 +122,7 @@ class HomeView extends GetView<HomeController> {
         ),
         bottomNavigationBar: const CustomBottomNavBar(),
       ),
+    ),
     );
   }
 
@@ -208,7 +213,10 @@ class HomeView extends GetView<HomeController> {
                 ? null
                 : controller.currentDate.value,
             onClock: () => Get.offAllNamed(AttendanceRoutes.attendance),
-            onHistory: () => Get.offAllNamed(AttendanceRoutes.list),
+            onHistory: () => Get.offAllNamed(
+              AttendanceRoutes.list,
+              arguments: const {'back': HomeRoutes.home},
+            ),
             onRetry: () => controller.refreshDashboard(force: true),
             onSignIn: _signInAgain,
           );
@@ -306,7 +314,10 @@ class HomeView extends GetView<HomeController> {
                   HomeQuickAction(
                     icon: Icons.receipt_long_outlined,
                     label: 'Riwayat',
-                    onTap: () => Get.offAllNamed(AttendanceRoutes.list),
+                    onTap: () => Get.offAllNamed(
+                      AttendanceRoutes.list,
+                      arguments: const {'back': HomeRoutes.home},
+                    ),
                   ),
                 ],
               );
@@ -331,23 +342,25 @@ class HomeView extends GetView<HomeController> {
         Obx(() {
           final activeModules = controller.activeModules.toList();
           final isApprover = controller.isApprover.value;
-          final hasSiblings = controller.hasGams || controller.hasItms || controller.hasMtms || isApprover;
-
-          if (!hasSiblings) {
-            return const SizedBox.shrink();
-          }
+          // Shown whenever there is anything to show (HOME-06). It was hidden unless
+          // a sibling panel was licensed or the person approved something — so
+          // an HRMS-only employee never reached the schedule, overtime, loans
+          // or the assistant, which have no other way in.
 
           final services = ModuleRegistry.getAvailableServices(
             activeModules: activeModules,
             isManager: isApprover,
           );
 
-          final enterpriseServices = services.where((s) =>
-            s.id != 'hrms_attendance' &&
-            s.id != 'hrms_permit_create' &&
-            s.id != 'hrms_permit_list' &&
-            s.id != 'hrms_attendance_history',
-          ).toList();
+          final enterpriseServices = services
+              .where(
+                (s) =>
+                    s.id != 'hrms_attendance' &&
+                    s.id != 'hrms_permit_create' &&
+                    s.id != 'hrms_permit_list' &&
+                    s.id != 'hrms_attendance_history',
+              )
+              .toList();
 
           if (enterpriseServices.isEmpty) {
             return const SizedBox.shrink();
@@ -397,7 +410,8 @@ class HomeView extends GetView<HomeController> {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 TextButton(
-                  onPressed: () => Get.offAllNamed(HomeRoutes.announcement),
+                  // Pushed, so back returns here (HOME-02).
+                  onPressed: () => Get.toNamed(HomeRoutes.announcement),
                   // `trailing` memintas konstruksi tombol bawaan
                   // `AppSectionHeader`, jadi target 48dp-nya ditulis ulang di
                   // sini alih-alih diwarisi.
@@ -471,7 +485,10 @@ class HomeView extends GetView<HomeController> {
           final HomeMonthlySnapshot snapshot = HomeMonthlySnapshot(
             summary: controller.monthSummary.value,
             loading: !controller.hasLoaded.value && controller.isLoading.value,
-            onOpen: () => Get.offAllNamed(AttendanceRoutes.list),
+            onOpen: () => Get.offAllNamed(
+              AttendanceRoutes.list,
+              arguments: const {'back': HomeRoutes.home},
+            ),
           );
 
           if (!snapshot.hasContent) return const SizedBox.shrink();
@@ -485,7 +502,10 @@ class HomeView extends GetView<HomeController> {
                 dense: true,
                 naturalCase: true,
                 actionLabel: 'Riwayat',
-                onAction: () => Get.offAllNamed(AttendanceRoutes.list),
+                onAction: () => Get.offAllNamed(
+                  AttendanceRoutes.list,
+                  arguments: const {'back': HomeRoutes.home},
+                ),
               ),
               snapshot,
             ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../theme/app_dimens.dart';
@@ -80,29 +81,39 @@ class CustomBottomNavBar extends GetView<BottomNavController> {
       ),
       child: SafeArea(
         top: false,
-        child: SizedBox(
-          height: 60,
+        // A floor, not a fixed height (UI-04): at the largest accessibility
+        // text sizes the label needs more than 60 dp, and a fixed box made it
+        // overflow onto the home indicator.
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 60),
           // Riak navigasi butuh sebuah [Material] di antaranya dan `Container`
           // opaque di atas. Tanpa lapisan ini setiap `InkWell` di bawah melukis
           // riaknya di belakang bilah, dan tidak seorang pun pernah melihat
           // umpan balik ketukan pada navigasi utama aplikasi.
           child: Material(
             type: MaterialType.transparency,
+            // As tall as the tallest item, and no taller. Without it each
+            // item's full-height Column took every pixel the Scaffold offered
+            // the bar, and the page above it was left with none.
             child: Obx(() {
               final int current = controller.currentIndex.value;
-              return Row(
-                children: List<Widget>.generate(_destinations.length, (index) {
-                  return Expanded(
-                    child: _NavItem(
-                      destination: _destinations[index],
-                      selected: index == current,
-                      badgeCount: index == _notificationIndex
-                          ? notificationCount
-                          : null,
-                      onTap: () => controller.changeIndex(index),
-                    ),
-                  );
-                }),
+              return IntrinsicHeight(
+                child: Row(
+                  children: List<Widget>.generate(_destinations.length, (
+                    index,
+                  ) {
+                    return Expanded(
+                      child: _NavItem(
+                        destination: _destinations[index],
+                        selected: index == current,
+                        badgeCount: index == _notificationIndex
+                            ? notificationCount
+                            : null,
+                        onTap: () => controller.onTabTapped(index),
+                      ),
+                    );
+                  }),
+                ),
               );
             }),
           ),
@@ -162,7 +173,10 @@ class _NavItem extends StatelessWidget {
           ? '${destination.label}, $count belum dibaca'
           : destination.label,
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
         borderRadius: AppRadii.mdAll,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
