@@ -258,8 +258,12 @@ class ServerConfig {
   /// Distinct from [isIpLiteral], which asks whether the host *is* an address
   /// and therefore cannot take a workspace on its front. `esas.test` can.
   static bool isDevelopmentHost(String host) {
-    if (isIpLiteral(host)) {
+    if (host.toLowerCase() == 'localhost') {
       return true;
+    }
+
+    if (isIpLiteral(host)) {
+      return _isPrivateOrLocalIp(host);
     }
 
     final labels = host.split('.');
@@ -270,10 +274,45 @@ class ServerConfig {
 
     // An address embedded in a name, as the wildcard-DNS services produce.
     for (var i = 0; i + 4 <= labels.length; i++) {
-      if (_isDottedQuad(labels.sublist(i, i + 4))) {
-        return true;
+      final quad = labels.sublist(i, i + 4);
+      if (_isDottedQuad(quad)) {
+        return _isPrivateOrLocalIp(quad.join('.'));
       }
     }
+
+    return false;
+  }
+
+  static bool _isPrivateOrLocalIp(String host) {
+    final clean = host.replaceAll(RegExp(r'[\[\]]'), '');
+    if (clean == '::1') {
+      return true;
+    }
+
+    final parts = clean.split('.');
+    if (parts.length != 4) {
+      return false;
+    }
+
+    final o1 = int.tryParse(parts[0]);
+    final o2 = int.tryParse(parts[1]);
+    final o3 = int.tryParse(parts[2]);
+    final o4 = int.tryParse(parts[3]);
+
+    if (o1 == null || o2 == null || o3 == null || o4 == null) {
+      return false;
+    }
+
+    // 127.0.0.0/8 Loopback
+    if (o1 == 127) return true;
+    // 10.0.0.0/8 Private (includes 10.0.2.2 Android emulator loopback)
+    if (o1 == 10) return true;
+    // 172.16.0.0/12 Private
+    if (o1 == 172 && o2 >= 16 && o2 <= 31) return true;
+    // 192.168.0.0/16 Private
+    if (o1 == 192 && o2 == 168) return true;
+    // 169.254.0.0/16 Link-local
+    if (o1 == 169 && o2 == 254) return true;
 
     return false;
   }

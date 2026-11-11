@@ -87,6 +87,10 @@ class AttendanceApiService {
         },
       );
 
+  /// Catatan lembur karyawan.
+  Future<Map<String, dynamic>> overtime() =>
+      _client.getObject(ApiRoutes.overtime);
+
   /// Redeem a code a DEPARTMENT is displaying.
   ///
   /// `token` is the 48-character secret out of the code's JSON. The department,

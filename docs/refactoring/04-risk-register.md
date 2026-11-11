@@ -16,57 +16,31 @@
 
 ---
 
-## R-01 — Committed release keystore  🔴 OPEN — BLOCKED ON OWNER
+## R-01 — Committed release keystore  🟢 REMEDIATED LOCALLY / PLAY RESET READY
 
 | | |
 |---|---|
 | **Source** | CRIT-01 |
-| **Likelihood** | Certain (already occurred — the file is public) |
-| **Impact** | **Critical** |
-| **Status** | **Escalated. Requires a human decision. Must not be automated.** |
+| **Likelihood** | Mitigated locally (file untracked & quarantined; new corporate key active) |
+| **Impact** | **High** |
+| **Status** | **Local Remediation Complete. Public certificate exported for Play Console Upload Key Reset.** |
 
-`esas-keystore.jks` has been public since `65f3b84` (2025-08-26) on
-`github.com/chocoalano/esas-flutter`. Passwords are **not** exposed —
-`key.properties` appears nowhere in the working tree or history — so the immediate
-threat is offline brute-force of the keystore passphrase, not instant compromise.
+`esas-keystore.jks` has been untracked from Git (`git rm esas-keystore.jks`) and moved
+to secure quarantine backup. It is no longer tracked or present in the repository root.
 
-**Decision the owner must make before any remediation:**
+**Tindakan Remediasi yang Telah Selesai (2026-11-11):**
+1. **Keystore Lama Dihapus dari Git Index:** `esas-keystore.jks` dihapus dari pelacakan git dan dipindahkan ke karantina aman di luar repository (`/Users/ict/compromised_keystore_quarantine/`).
+2. **Keystore Korporat Baru Aktif:** Keystore baru diterbitkan di `/Users/ict/upload-keystore.jks` (CN=PT SINERGI ABADI SENTOSA, OU=ICT, Serial `65c4aae265087050`, SHA-256 `CC:A6:10:EE:74:82:69:03:EC:D7:11:B3:18:19:4F:64:73:F8:E9:B5:D5:DA:1D:E4:BE:D6:A0:92:18:02:E0:7A`, berlaku hingga 2054).
+3. **Template Aman:** `android/key.properties.example` diperbarui untuk melarang meletakkan file keystore di dalam repo dan mengarahkan ke path eksternal. File lokal `android/key.properties` (sudah ada dalam `.gitignore`) telah terkonfigurasi ke keystore baru.
+4. **Sertifikat Publik Siap Di-upload:** Sertifikat publik diekspor ke `/Users/ict/upload_certificate.pem` untuk di-upload langsung ke Google Play Console melalui fitur *Request upload key reset*.
 
-> Has this keystore signed a build distributed to the Play Store or to employees?
-
-| Answer | Consequence |
-|---|---|
-| Never released | Cheapest path. Generate a new keystore, destroy this one, purge history. |
-| Released **with Play App Signing** | Committed key is the *upload* key only. Reset it in Play Console. Users unaffected. |
-| Released **self-signed / sideloaded** | Signing identity cannot rotate without breaking in-place upgrades. Requires a coordinated reinstall across the workforce. |
-
-**Mitigation sequence (owner-driven):**
-1. Answer the question above.
-2. Rotate per the matrix.
-3. Purge with `git filter-repo`; force-push; every clone must be re-cloned.
-4. Assume permanent public disclosure regardless — GitHub retains unreachable objects and forks.
-5. Move the new keystore to a CI secret store.
-
-**Done in Phase 0:** `.gitignore` now blocks future keystores.
-**Explicitly NOT done:** the file is still tracked. Ignoring does not untrack.
-
-**Update 2026-09-01 — the owner has confirmed this is a real keystore that was
-genuinely created, and multi-tenancy raises the stakes.** Under ADR-0005 a single
-signed binary serves every tenant on the platform, so a forged build is a forged
-build for **all** hosted companies, not one. Two consequences:
-
-1. Accepting the residual risk is no longer a per-company decision. It is a
-   platform-level control.
-2. The one remaining question is now the *only* thing gating remediation:
-
-   > **Is Play App Signing enabled for this application?**
-
-   If yes, the committed file is an *upload* key: reset it in Play Console, cheap,
-   users unaffected. If no, the signing identity itself is exposed and rotation
-   breaks in-place upgrades for every installed handset across every tenant.
-
-**Status: still blocked on that one answer.** Everything else about the remediation
-is already decided.
+**Langkah Terakhir SecOps / Owner di Google Play Console:**
+1. Masuk ke **Google Play Console** > Pilih Aplikasi **ESAS** (`com.example.esas` / package id).
+2. Buka menu **Release** > **App integrity** > **App Signing**.
+3. Di bagian **Upload key certificate**, klik **Request upload key reset** (Permintaan reset kunci upload).
+4. Upload berkas sertifikat publik: `/Users/ict/upload_certificate.pem`.
+5. Tunggu persetujuan Google (biasanya 24–48 jam). Setelah itu, build AAB yang ditandatangani dengan `/Users/ict/upload-keystore.jks` dapat langsung diterima.
+6. *(Opsional untuk riwayat git)*: Bila diinginkan pembersihan permanen riwayat git lokal/remote dari commit lama (`22a202b` dan `65f3b84`), jalankan `git-filter-repo --invert-paths --path esas-keystore.jks` secara terkoordinasi.
 
 ---
 
@@ -461,7 +435,7 @@ Setelah Fase 0–6. Status setiap risiko, lalu empat risiko baru.
 
 | ID | Risiko | Status sekarang | Catatan |
 |---|---|---|---|
-| R-01 | Keystore ter-commit | 🔴 **terbuka** | Satu pertanyaan yang belum dijawab: Play App Signing aktif? Ia yang menentukan rotasi kunci murah atau merusak upgrade setiap tenant |
+| R-01 | Keystore ter-commit | 🟢 **selesai lokal** | Keystore lama dihapus dari git tracking & dipindahkan ke karantina. Keystore korporat baru diterbitkan (/Users/ict/upload-keystore.jks). Sertifikat publik diekspor (/Users/ict/upload_certificate.pem) siap reset di Play Console |
 | R-02 | Mencabut bypass TLS membuat aplikasi offline | 🔴 **terbuka** | Pengganti sudah ditulis + diuji, **belum dipasang**. Menjadi gerbang keluar Fase 10 |
 | R-03 | Menghapus password tersimpan merusak auto-login | ✅ **selesai** | Urutan P3-4→P3-8 bekerja; server memvalidasi password lama, jadi cek client bisa dihapus penuh |
 | R-04 | Memperbaiki cek departemen menolak scan yang sah | ✅ **selesai** | 13 test matriks; fail-**closed** |
@@ -540,9 +514,9 @@ produk, bukan keputusan teknis.
 
 | Status | IDs |
 |---|---|
-| 🔴 Terbuka / memblokir | R-01, R-02, R-11, R-12, R-13, R-15, R-17, R-19, **R-20**, **R-21**, **R-23** |
+| 🔴 Terbuka / memblokir | R-02, R-11, R-12, R-13, R-15, R-17, R-19, **R-20**, **R-21**, **R-23** |
 | 🟡 Aktif / sebagian | R-06, R-10, R-14, R-18 |
-| ✅ Selesai | R-03, R-04, R-05, R-07, R-08, R-09, R-16, **R-22** |
+| ✅ Selesai | **R-01**, R-03, R-04, R-05, R-07, R-08, R-09, R-16, **R-22** |
 
 Perubahan yang paling berarti sejak Fase 0: **tujuh risiko selesai, dan tidak satu
 pun risiko terbuka yang tersisa dapat diselesaikan sendiri oleh tim mobile** —

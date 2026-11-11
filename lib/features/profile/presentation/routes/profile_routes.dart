@@ -13,6 +13,7 @@ class ProfileRoutes {
   static const education = '$profile$educationSegment';
   static const experience = '$profile$experienceSegment';
   static const payroll = '$profile$payrollSegment';
+  static const financial = '$profile$financialSegment';
   static const changePassword = '$profile$changePasswordSegment';
   static const bugReport = '$profile$bugReportSegment';
 
@@ -22,6 +23,7 @@ class ProfileRoutes {
   static const educationSegment = '/education';
   static const experienceSegment = '/experience';
   static const payrollSegment = '/payroll';
+  static const financialSegment = '/financial';
   static const changePasswordSegment = '/change-password';
   static const bugReportSegment = '/bug-report';
 }

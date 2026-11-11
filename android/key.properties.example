@@ -2,12 +2,14 @@
 #
 # This file is an example and is committed. `key.properties` itself is not, and
 # must never be: it names a keystore and carries its passwords.
+# Keystore files (*.jks, *.keystore) must NEVER be placed in this repository.
 #
 # A debug build needs none of this. Gradle only asks for these when a release is
 # actually being built (`assembleRelease` / `bundleRelease`), and refuses to
 # produce an unsigned one — see `android/app/build.gradle.kts`.
 
-storeFile=../esas-keystore.jks
+# Path to your securely stored upload keystore OUTSIDE the repository:
+storeFile=/path/to/upload-keystore.jks
 storePassword=
-keyAlias=
+keyAlias=upload
 keyPassword=

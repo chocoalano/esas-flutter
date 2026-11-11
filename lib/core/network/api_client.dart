@@ -306,6 +306,28 @@ class ApiClient extends GetConnect {
     });
   }
 
+  Future<Map<String, dynamic>> deleteObject(
+    String path, {
+    Map<String, dynamic>? query,
+    bool authenticated = true,
+    Map<String, String>? headers,
+  }) async {
+    return _guardSession(authenticated, () async {
+      final response = await _send(
+        () => delete(
+          path,
+          query: _stringifyQuery(query),
+          headers: _auth.headersFor(
+            authenticated: authenticated,
+            extra: headers,
+          ),
+        ),
+      );
+
+      return _asObject(response);
+    });
+  }
+
   /// One multipart field, as text a server will actually accept.
   ///
   /// Multipart has no types: every field crosses as a string, and the encoding

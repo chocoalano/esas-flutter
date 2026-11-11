@@ -9,6 +9,7 @@ import '../../data/repositories/attendance_repository.dart';
 import '../../data/services/attendance_api_service.dart';
 import '../controllers/attendance_controller.dart';
 import '../controllers/attendance_list_controller.dart';
+import '../controllers/overtime_list_controller.dart';
 
 /// The feature's own dependencies, scoped to its routes.
 ///
@@ -53,6 +54,15 @@ class AttendanceListBinding extends Bindings {
   void dependencies() {
     Get.lazyPut<AttendanceListController>(
       () => AttendanceListController(repository: _repository()),
+    );
+  }
+}
+
+class OvertimeListBinding extends Bindings {
+  @override
+  void dependencies() {
+    Get.lazyPut<OvertimeListController>(
+      () => OvertimeListController(repository: _repository()),
     );
   }
 }

@@ -125,6 +125,10 @@ class ApiRoutes {
   /// the shift, not by the person who would be paid for it.
   static const String overtime = '/me/overtime';
 
+  /// What this person still owes on company loans and advances.
+  static const String loans = '/me/loans';
+  static const String advances = '/me/advances';
+
   /// What this account has been doing — the security screen.
   static const String activity = '/activities';
 
@@ -216,4 +220,62 @@ class ApiRoutes {
   /// `approval_id`; which tier is being answered is the server's to decide, and
   /// answering out of turn is refused rather than recorded.
   static String permitApproval(Object id) => '/permits/$id/approval';
+
+  // ── AI Assistant / Copilot ───────────────────────────────────────────────
+
+  static const String aiChatContext = '/ai/chat/context';
+  static const String aiChatConversations = '/ai/chat/conversations';
+  static String aiChatConversation(String id) => '/ai/chat/conversations/$id';
+  static String aiChatMessages(String id) => '/ai/chat/conversations/$id/messages';
+
+  // ── GAMS (General Affairs) ────────────────────────────────────────────────
+  static const String gamsServiceDefinitions = '/gams/service-definitions';
+  static const String gamsServiceRequests = '/gams/service-requests';
+  static String gamsServiceRequest(Object id) => '/gams/service-requests/$id';
+  static const String gamsSpaces = '/gams/spaces';
+  static const String gamsSpaceReservations = '/gams/space-reservations';
+  static String gamsSpaceReservation(Object id) => '/gams/space-reservations/$id';
+  static const String gamsVehicles = '/gams/vehicles';
+  static const String gamsVehicleBookings = '/gams/vehicle-bookings';
+  static String gamsVehicleBooking(Object id) => '/gams/vehicle-bookings/$id';
+  static const String gamsVisits = '/gams/visits';
+  static const String gamsPackages = '/gams/packages';
+  static String gamsPackage(Object id) => '/gams/packages/$id';
+  static const String gamsGatePasses = '/gams/gate-passes';
+  static String gamsGatePass(Object id) => '/gams/gate-passes/$id';
+  static const String gamsParkingAreas = '/gams/parking-areas';
+  static const String gamsParkingPermits = '/gams/parking-permits';
+  static const String gamsInventoryItems = '/gams/inventory-items';
+  static const String gamsInventoryLocations = '/gams/inventory-locations';
+  static const String gamsInventoryRequests = '/gams/inventory-requests';
+  static const String gamsSecurityIncidents = '/gams/security-incidents';
+  static const String gamsKeyRegisters = '/gams/key-registers';
+  static const String gamsMyWorkOrders = '/gams/my-work-orders';
+  static String gamsCompleteWorkOrder(Object id) => '/gams/my-work-orders/$id/complete';
+
+  // ── ITMS (IT Service Management) ──────────────────────────────────────────
+  static const String itmsServices = '/itms/services';
+  static const String itmsTickets = '/itms/tickets';
+  static String itmsTicket(Object id) => '/itms/tickets/$id';
+  static const String itmsKnowledgeArticles = '/itms/knowledge-articles';
+  static String itmsKnowledgeArticle(Object id) => '/itms/knowledge-articles/$id';
+  static const String itmsMyAssets = '/itms/my-assets';
+  static String itmsAcknowledgeAsset(Object id) => '/itms/my-assets/$id/acknowledge';
+
+  // ── Unified Approval Inbox ────────────────────────────────────────────────
+  static const String tasksInbox = '/tasks/inbox';
+
+  // ── Expense Claims & Travel Requests ──────────────────────────────────────
+  static const String expenseClaims = '/me/expense-claims';
+  static const String expenseClaimCategories = '/me/expense-claims/categories';
+  static String expenseClaim(Object id) => '/me/expense-claims/$id';
+  static const String travelRequests = '/me/travel-requests';
+  static String travelRequest(Object id) => '/me/travel-requests/$id';
+
+  // ── Performance, Policies, Skills & Devices ───────────────────────────────
+  static const String performancePlans = '/me/performance-plans';
+  static String performancePlan(Object id) => '/me/performance-plans/$id';
+  static const String companyPolicies = '/company-policies';
+  static String companyPolicy(Object id) => '/company-policies/$id';
+  static const String skills = '/me/skills';
 }

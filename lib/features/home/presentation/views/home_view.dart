@@ -1,3 +1,4 @@
+import 'package:esas/core/registry/module_registry.dart';
 import 'package:esas/core/theme/app_dimens.dart';
 import 'package:esas/core/ui/components/app_section_header.dart';
 import 'package:esas/core/ui/components/custom_bottom_navbar.dart';
@@ -10,6 +11,7 @@ import 'package:esas/features/auth/presentation/routes/auth_routes.dart';
 import 'package:esas/features/home/presentation/controllers/home_controller.dart';
 import 'package:esas/features/home/presentation/routes/home_routes.dart';
 import 'package:esas/features/home/presentation/widgets/announcement_carousel.dart';
+import 'package:esas/features/home/presentation/widgets/enterprise_services_grid.dart';
 import 'package:esas/features/home/presentation/widgets/home_header.dart';
 import 'package:esas/features/home/presentation/widgets/home_quick_actions.dart';
 import 'package:esas/features/home/presentation/widgets/home_recent_activity.dart';
@@ -322,6 +324,52 @@ class HomeView extends GetView<HomeController> {
         // probe overflow menangkap LUAPAN, bukan margin yang hilang, jadi
         // sebuah bagian yang menempel di kaca tetap lulus setiap tes yang ada.
         // Yang menangkapnya cuma mata, atau sebuah pengukuran posisi x.
+      ),
+
+      // Layanan Perusahaan Enterprise (HRMS Ekstensi, GAMS, ITMS, Kotak Masuk Approval)
+      _Beat(
+        Obx(() {
+          final activeModules = controller.activeModules.toList();
+          final isApprover = controller.isApprover.value;
+          final hasSiblings = controller.hasGams || controller.hasItms || controller.hasMtms || isApprover;
+
+          if (!hasSiblings) {
+            return const SizedBox.shrink();
+          }
+
+          final services = ModuleRegistry.getAvailableServices(
+            activeModules: activeModules,
+            isManager: isApprover,
+          );
+
+          final enterpriseServices = services.where((s) =>
+            s.id != 'hrms_attendance' &&
+            s.id != 'hrms_permit_create' &&
+            s.id != 'hrms_permit_list' &&
+            s.id != 'hrms_attendance_history',
+          ).toList();
+
+          if (enterpriseServices.isEmpty) {
+            return const SizedBox.shrink();
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const SizedBox(height: AppSpacing.xxl),
+              const AppSectionHeader(
+                title: 'Layanan Perusahaan',
+                dense: true,
+                naturalCase: true,
+              ),
+              EnterpriseServicesGrid(
+                services: enterpriseServices,
+                onTapService: (service) => Get.toNamed(service.route),
+              ),
+            ],
+          );
+        }),
       ),
 
       // 32: jarak terbesar di halaman. Di sinilah topiknya berganti, dari

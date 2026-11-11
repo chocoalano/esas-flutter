@@ -11,6 +11,7 @@ class HomeRoutes {
   static const announcement = '$home$announcementSegment';
   static const announcementDetail = '$announcement$announcementDetailSegment';
   static const activity = '$home$activitySegment';
+  static const schedule = '/schedule';
 
   static const announcementSegment = '/announcement';
   static const announcementDetailSegment = '/detail';

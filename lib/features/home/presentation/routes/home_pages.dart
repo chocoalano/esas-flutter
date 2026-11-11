@@ -5,6 +5,7 @@ import '../views/activity_view.dart';
 import '../views/announcement_detail_view.dart';
 import '../views/announcement_view.dart';
 import '../views/home_view.dart';
+import '../views/schedule_calendar_view.dart';
 import 'home_routes.dart';
 
 /// The home feature's slice of the route table.
@@ -12,6 +13,12 @@ class HomePages {
   const HomePages._();
 
   static final List<GetPage> pages = [
+    GetPage(
+      name: HomeRoutes.schedule,
+      page: () => const ScheduleCalendarView(),
+      binding: ScheduleCalendarBinding(),
+      transition: Transition.noTransition,
+    ),
     GetPage(
       name: HomeRoutes.home,
       page: () => const HomeView(),

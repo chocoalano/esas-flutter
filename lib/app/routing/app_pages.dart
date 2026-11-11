@@ -1,9 +1,13 @@
 import 'package:get/get.dart';
 
+import '../../features/ai_chat/presentation/routes/ai_chat_pages.dart';
 import '../../features/attendance/presentation/routes/attendance_pages.dart';
 import '../../features/auth/presentation/routes/auth_pages.dart';
 import '../../features/auth/presentation/routes/auth_routes.dart';
+import '../../features/gams/presentation/routes/gams_pages.dart';
 import '../../features/home/presentation/routes/home_pages.dart';
+import '../../features/inbox/presentation/routes/inbox_pages.dart';
+import '../../features/itms/presentation/routes/itms_pages.dart';
 import '../../features/notification/presentation/routes/notification_pages.dart';
 import '../../features/permit/presentation/routes/permit_pages.dart';
 import '../../features/profile/presentation/routes/profile_pages.dart';
@@ -33,5 +37,9 @@ class AppPages {
     ...PermitPages.pages,
     ...NotificationPages.pages,
     ...ProfilePages.pages,
+    ...AiChatPages.pages,
+    ...GamsPages.pages,
+    ...ItmsPages.pages,
+    ...InboxPages.pages,
   ];
 }

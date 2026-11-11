@@ -7,6 +7,7 @@ import '../views/profile_bug_report_view.dart';
 import '../views/profile_education_view.dart';
 import '../views/profile_experience_view.dart';
 import '../views/profile_family_view.dart';
+import '../views/profile_financial_view.dart';
 import '../views/profile_payroll_view.dart';
 import '../views/profile_personal_view.dart';
 import '../views/profile_view.dart';
@@ -61,6 +62,12 @@ class ProfilePages {
           name: ProfileRoutes.payrollSegment,
           page: () => const ProfilePayrollView(),
           binding: ProfilePayrollBinding(),
+          transition: Transition.noTransition,
+        ),
+        GetPage(
+          name: ProfileRoutes.financialSegment,
+          page: () => const ProfileFinancialView(),
+          binding: ProfileFinancialBinding(),
           transition: Transition.noTransition,
         ),
         GetPage(

@@ -11,6 +11,7 @@ import '../models/attendance.dart';
 import '../models/attendance_history_page.dart';
 import '../models/attendance_month_totals.dart';
 import '../models/attendance_context.dart';
+import '../models/overtime_entry.dart';
 import '../models/scanned_code.dart';
 import '../services/attendance_api_service.dart';
 
@@ -195,6 +196,13 @@ class AttendanceRepository {
       // "keep what you had" rather than "there is nothing".
       monthTotals: AttendanceMonthTotals.tryParseAll(body),
     );
+  }
+
+  /// Catatan dan permohonan lembur karyawan.
+  Future<List<OvertimeEntry>> overtime() async {
+    final body = await _api.overtime();
+    final list = asList(body['overtime']);
+    return list.map((item) => OvertimeEntry.fromJson(asObject(item))).toList();
   }
 
   /// Redeem a scanned code, whichever of the two it turned out to be.

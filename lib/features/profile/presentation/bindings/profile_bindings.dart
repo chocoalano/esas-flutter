@@ -10,6 +10,7 @@ import '../../data/repositories/payroll_repository.dart';
 import '../../data/services/profile_api_service.dart';
 import '../controllers/profile_bug_report_controller.dart';
 import '../controllers/profile_controller.dart';
+import '../controllers/profile_financial_controller.dart';
 import '../controllers/profile_tab_controllers.dart';
 
 /// One repository across the profile tabs, so the five that used to fetch the
@@ -83,6 +84,15 @@ class ProfilePayrollBinding extends Bindings {
     () => ProfilePayrollController(
       repository: PayrollRepository(ProfileApiService(Get.find<ApiClient>())),
       session: Get.find<SessionRepository>(),
+    ),
+  );
+}
+
+class ProfileFinancialBinding extends Bindings {
+  @override
+  void dependencies() => Get.lazyPut<ProfileFinancialController>(
+    () => ProfileFinancialController(
+      repository: PayrollRepository(ProfileApiService(Get.find<ApiClient>())),
     ),
   );
 }

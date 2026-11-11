@@ -15,7 +15,7 @@ import 'core/theme/system_ui_style.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/utils/app_logger.dart';
 import 'firebase_options.dart';
-import 'utils/my_http_overrides.dart';
+import 'core/network/dev_http_overrides.dart';
 import 'utils/notification/notification_services.dart';
 
 /// Bring the application up, in a defined order, with a defined answer for each
@@ -148,14 +148,10 @@ Future<BootReport> bootstrap() async {
   });
 
   // ── TLS ──────────────────────────────────────────────────────────────────
-  // NOTE (CRIT-02 / R-02): this still installs the global bypass that accepts
-  // every certificate in release builds. `core/network/dev_http_overrides.dart`
-  // is the scoped replacement and is ready, but swapping it in while
-  // `:9443` may serve an invalid chain would take the app fully
-  // offline. It is gated on that server certificate being verified — see
-  // `docs/refactoring/04-risk-register.md` R-02. Left here, loudly, rather than
-  // moved somewhere it stops being obvious.
-  MyHttpOverrides.install();
+  // Enforces strict TLS validation in release builds. Development hosts
+  // (IP literals and local test domains) are supported only in debug mode
+  // via assert-scoped installDevHttpOverrides().
+  installDevHttpOverrides();
 
   final report = pipeline.report;
 

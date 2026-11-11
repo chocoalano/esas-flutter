@@ -200,6 +200,11 @@ class HomeController extends GetxController {
     super.onInit();
     if (Get.isRegistered<SessionRepository>()) {
       final session = Get.find<SessionRepository>();
+      final u = session.user;
+      if (u != null) {
+        activeModules.assignAll(u.activeModules);
+        isApprover.value = u.isApprover;
+      }
       _notificationCountWorker = ever(
         session.unreadNotificationCount,
         (count) => unreadNotifications.value = count,
@@ -232,6 +237,19 @@ class HomeController extends GetxController {
 
   /// Sudah absen pulang hari ini.
   bool get hasCheckedOut => timeOut.value != null;
+
+  /// Modul aktif tenant saat ini.
+  final RxList<String> activeModules = <String>['hrms'].obs;
+
+  /// Apakah pengguna ini memegang otoritas persetujuan (approver / manager).
+  final RxBool isApprover = false.obs;
+
+  bool isModuleActive(String module) =>
+      activeModules.contains(module.toLowerCase());
+
+  bool get hasGams => isModuleActive('gams');
+  bool get hasItms => isModuleActive('itms');
+  bool get hasMtms => isModuleActive('mtms');
 
   /// Berapa ketukan absen yang hari ini belum tercatat: 1 sebelum absen masuk,
   /// 1 lagi selama absen pulang belum ada, 0 setelah keduanya lengkap.

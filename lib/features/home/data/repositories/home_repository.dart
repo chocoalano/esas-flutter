@@ -5,6 +5,7 @@ import '../../../../features/auth/data/repositories/session_repository.dart';
 import '../../../permit/data/models/leave_list.dart';
 import '../models/activity_log.dart';
 import '../models/announcement.dart';
+import '../models/schedule_calendar.dart';
 import '../services/home_api_service.dart';
 
 /// An attendance request already denied by the server's session metadata.
@@ -544,5 +545,11 @@ class HomeRepository {
     final body = await _api.announcement(id);
 
     return Announcement.fromJson(asObject(body['announcement']));
+  }
+
+  /// Jadwal kerja karyawan beserta informasi libur nasional / perusahaan.
+  Future<ScheduleCalendar> scheduleCalendar({String? from, String? to}) async {
+    final body = await _api.schedule(from: from, to: to);
+    return ScheduleCalendar.fromJson(body);
   }
 }

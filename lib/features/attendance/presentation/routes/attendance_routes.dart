@@ -4,6 +4,7 @@ class AttendanceRoutes {
 
   static const attendance = '/attendance';
   static const list = '$attendance$listSegment';
+  static const overtime = '/overtime';
 
   static const listSegment = '/list';
 }

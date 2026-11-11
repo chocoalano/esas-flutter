@@ -44,6 +44,69 @@ class ProfileApiService {
   Future<Map<String, dynamic>> payslipPdf(int id) =>
       _client.getObject(ApiRoutes.payslipPdf(id));
 
+  Future<Map<String, dynamic>> loans() =>
+      _client.getObject(ApiRoutes.loans);
+
+  Future<Map<String, dynamic>> advances() =>
+      _client.getObject(ApiRoutes.advances);
+
+  Future<Map<String, dynamic>> expenseClaims({int page = 1}) =>
+      _client.getObject(ApiRoutes.expenseClaims, query: {'page': page});
+
+  Future<Map<String, dynamic>> submitExpenseClaim({
+    required String title,
+    required List<Map<String, dynamic>> items,
+  }) =>
+      _client.postObject(ApiRoutes.expenseClaims, {
+        'title': title,
+        'items': items,
+      });
+
+  Future<Map<String, dynamic>> travelRequests({int page = 1}) =>
+      _client.getObject(ApiRoutes.travelRequests, query: {'page': page});
+
+  Future<Map<String, dynamic>> submitTravelRequest({
+    required String destination,
+    required String purpose,
+    required String departureDate,
+    required String returnDate,
+    double? estimatedCost,
+  }) =>
+      _client.postObject(ApiRoutes.travelRequests, {
+        'destination': destination,
+        'purpose': purpose,
+        'departure_date': departureDate,
+        'return_date': returnDate,
+        if (estimatedCost != null) 'estimated_cost': estimatedCost,
+      });
+
+  Future<Map<String, dynamic>> performancePlans({int page = 1}) =>
+      _client.getObject(ApiRoutes.performancePlans, query: {'page': page});
+
+  Future<Map<String, dynamic>> performancePlan(int id) =>
+      _client.getObject(ApiRoutes.performancePlan(id));
+
+  Future<Map<String, dynamic>> companyPolicies({String? query, int page = 1}) =>
+      _client.getObject(
+        ApiRoutes.companyPolicies,
+        query: {
+          if (query != null && query.isNotEmpty) 'q': query,
+          'page': page,
+        },
+      );
+
+  Future<Map<String, dynamic>> companyPolicy(int id) =>
+      _client.getObject(ApiRoutes.companyPolicy(id));
+
+  Future<Map<String, dynamic>> skills() =>
+      _client.getObject(ApiRoutes.skills);
+
+  Future<Map<String, dynamic>> devices() =>
+      _client.getObject(ApiRoutes.devices);
+
+  Future<Map<String, dynamic>> forgetDevice(String deviceId) =>
+      _client.postObject(ApiRoutes.forgetDevice, {'device_id': deviceId});
+
   Future<Map<String, dynamic>> attendanceSummary({int? year, int? month}) =>
       _client.getObject(
         ApiRoutes.attendanceSummary,

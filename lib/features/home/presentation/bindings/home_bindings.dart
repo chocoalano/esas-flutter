@@ -8,6 +8,7 @@ import '../controllers/activity_controller.dart';
 import '../controllers/announcement_controller.dart';
 import '../controllers/announcement_detail_controller.dart';
 import '../controllers/home_controller.dart';
+import '../controllers/schedule_calendar_controller.dart';
 
 HomeRepository _repository() {
   if (Get.isRegistered<HomeRepository>()) {
@@ -62,6 +63,15 @@ class AnnouncementDetailBinding extends Bindings {
   void dependencies() {
     Get.lazyPut<AnnouncementDetailController>(
       () => AnnouncementDetailController(repository: _repository()),
+    );
+  }
+}
+
+class ScheduleCalendarBinding extends Bindings {
+  @override
+  void dependencies() {
+    Get.lazyPut<ScheduleCalendarController>(
+      () => ScheduleCalendarController(repository: _repository()),
     );
   }
 }

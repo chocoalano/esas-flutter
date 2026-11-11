@@ -83,6 +83,26 @@ class AuthUser {
   /// value that server was itself using.
   WorkspaceClock get clock => WorkspaceClock.fromJson(raw['timezone']);
 
+  /// The active modules entitled for this workspace.
+  List<String> get activeModules {
+    final modules = asList(raw['active_modules']);
+    if (modules.isEmpty) {
+      return const ['hrms'];
+    }
+    return modules.map((e) => '$e').toList();
+  }
+
+  bool isModuleActive(String module) =>
+      activeModules.contains(module.toLowerCase());
+
+  bool get hasGams => isModuleActive('gams');
+  bool get hasItms => isModuleActive('itms');
+  bool get hasMtms => isModuleActive('mtms');
+  bool get hasHrms => isModuleActive('hrms');
+
+  /// Whether this employee has managerial / approver responsibilities.
+  bool get isApprover => asBool(raw['is_approver']) ?? false;
+
   /// Company id, from either the flat column or the nested object.
   int? get companyId =>
       asInt(raw['company_id']) ?? asInt(dig(raw, ['company', 'id']));

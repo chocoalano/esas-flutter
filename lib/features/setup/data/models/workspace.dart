@@ -12,6 +12,7 @@ class Workspace {
     required this.name,
     required this.clock,
     this.apiVersion,
+    this.activeModules = const ['hrms'],
   });
 
   /// What the server calls this workspace — `acme`.
@@ -19,6 +20,9 @@ class Workspace {
 
   /// The company's display name, shown back to the person setting up.
   final String name;
+
+  /// The active modules entitled for this workspace (e.g. hrms, gams, itms).
+  final List<String> activeModules;
 
   /// The contract version the server answers on, where it says so.
   ///
@@ -47,11 +51,17 @@ class Workspace {
     final subdomain = asString(json['subdomain']);
     final name = asString(json['name']);
 
+    final rawModules = asList(json['active_modules']);
+    final activeModules = rawModules.isEmpty
+        ? const ['hrms']
+        : rawModules.map((e) => '$e').toList();
+
     return Workspace(
       subdomain: subdomain == null || subdomain.isEmpty ? fallback : subdomain,
       name: name == null || name.isEmpty ? fallback : name,
       apiVersion: asString(json['api_version']),
       clock: WorkspaceClock.fromJson(json['timezone']),
+      activeModules: activeModules,
     );
   }
 }

@@ -69,5 +69,32 @@ void main() {
       expect(user.canRecordAttendance, isFalse);
       expect(user.isRegisteredDevice, isTrue);
     });
+
+    test('active_modules defaults to hrms when missing or empty', () {
+      final userDefault = AuthUser.fromJson({});
+      expect(userDefault.activeModules, contains('hrms'));
+      expect(userDefault.hasHrms, isTrue);
+      expect(userDefault.hasGams, isFalse);
+      expect(userDefault.hasItms, isFalse);
+    });
+
+    test('active_modules reflects entitled sibling modules', () {
+      final user = AuthUser.fromJson({
+        'active_modules': ['hrms', 'gams', 'itms'],
+      });
+      expect(user.hasHrms, isTrue);
+      expect(user.hasGams, isTrue);
+      expect(user.hasItms, isTrue);
+      expect(user.hasMtms, isFalse);
+      expect(user.isModuleActive('GAMS'), isTrue);
+    });
+
+    test('isApprover reflects manager or approval authority', () {
+      final staff = AuthUser.fromJson({'is_approver': false});
+      expect(staff.isApprover, isFalse);
+
+      final approver = AuthUser.fromJson({'is_approver': true});
+      expect(approver.isApprover, isTrue);
+    });
   });
 }
