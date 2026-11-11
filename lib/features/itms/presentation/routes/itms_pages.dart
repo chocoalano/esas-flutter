@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 
 import '../bindings/itms_bindings.dart';
 import '../views/itms_dashboard_view.dart';
+import '../views/itms_ticket_create_view.dart';
 import 'itms_routes.dart';
 
 class ItmsPages {
@@ -32,6 +33,10 @@ class ItmsPages {
       binding: ItmsDashboardBinding(),
       transition: Transition.noTransition,
     ),
+    GetPage(
+      name: ItmsRoutes.ticketCreate,
+      page: () => const ItmsTicketCreateView(),
+      binding: ItmsTicketCreateBinding(),
+    ),
   ];
 }
-

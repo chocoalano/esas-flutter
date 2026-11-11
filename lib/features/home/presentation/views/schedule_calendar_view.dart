@@ -37,7 +37,11 @@ class ScheduleCalendarView extends GetView<ScheduleCalendarController> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.error_outline, size: 48, color: palette.danger.foreground),
+                    Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: palette.danger.foreground,
+                    ),
                     const SizedBox(height: AppSpacing.md),
                     Text(
                       controller.error.value!.message,
@@ -60,7 +64,9 @@ class ScheduleCalendarView extends GetView<ScheduleCalendarController> {
             return Center(
               child: Text(
                 'Tidak ada jadwal untuk periode ini.',
-                style: theme.textTheme.bodyMedium?.copyWith(color: palette.textMuted),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: palette.textMuted,
+                ),
               ),
             );
           }
@@ -93,17 +99,25 @@ class ScheduleCalendarView extends GetView<ScheduleCalendarController> {
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.celebration_rounded, size: 20, color: theme.colorScheme.primary),
+                            Icon(
+                              Icons.celebration_rounded,
+                              size: 20,
+                              color: theme.colorScheme.primary,
+                            ),
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: Text(
                                 holiday.name,
-                                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                             Text(
                               holiday.date,
-                              style: theme.textTheme.labelSmall?.copyWith(color: palette.textMuted),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: palette.textMuted,
+                              ),
                             ),
                           ],
                         ),
@@ -137,7 +151,8 @@ class _ScheduleCard extends StatelessWidget {
     final theme = Theme.of(context);
     final palette = theme.palette;
 
-    final isOff = item.isDayOff;
+    // Leave is not a working day either (HOME-11); drawn like a day off.
+    final isOff = item.isDayOff || item.isLeave;
     final isHoliday = item.isHoliday;
 
     return Padding(
@@ -149,7 +164,9 @@ class _ScheduleCard extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: isOff || isHoliday ? palette.surfaceSubtle : palette.brandSubtle,
+                color: isOff || isHoliday
+                    ? palette.surfaceSubtle
+                    : palette.brandSubtle,
                 borderRadius: AppRadii.lgAll,
               ),
               alignment: Alignment.center,
@@ -157,9 +174,11 @@ class _ScheduleCard extends StatelessWidget {
                 isOff
                     ? Icons.weekend_outlined
                     : isHoliday
-                        ? Icons.celebration_outlined
-                        : Icons.work_outline,
-                color: isOff || isHoliday ? palette.textMuted : theme.colorScheme.primary,
+                    ? Icons.celebration_outlined
+                    : Icons.work_outline,
+                color: isOff || isHoliday
+                    ? palette.textMuted
+                    : theme.colorScheme.primary,
               ),
             ),
             const SizedBox(width: AppSpacing.md),
@@ -168,13 +187,24 @@ class _ScheduleCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item.shift ?? (isOff ? 'Hari Libur / Off' : isHoliday ? 'Libur Nasional' : 'Jadwal Standar'),
-                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    item.shift ??
+                        (item.isLeave
+                            ? 'Cuti'
+                            : isOff
+                            ? 'Hari Libur / Off'
+                            : isHoliday
+                            ? 'Libur Nasional'
+                            : 'Jadwal Standar'),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     item.date,
-                    style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: palette.textMuted,
+                    ),
                   ),
                 ],
               ),

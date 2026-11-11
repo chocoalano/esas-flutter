@@ -1,5 +1,7 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+
+import '../../../../core/services/camera_permission_service.dart';
 import 'package:get/get.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
@@ -95,6 +97,7 @@ class AttendanceView extends GetView<AttendanceController> {
                           ),
                           AttendanceMethodNote(
                             status: controller.unavailableStatus,
+                            method: controller.unavailableMethod,
                           ),
                         ],
                       ),
@@ -382,6 +385,40 @@ class AttendanceView extends GetView<AttendanceController> {
   Widget _faceMode(BuildContext context) {
     final session = controller.capture.value;
 
+    // The face method's own camera answer (ATTP-09).
+    final camera = controller.faceCameraPermission.value;
+    if (session == null && camera == CameraPermission.permanentlyDenied) {
+      return AttendanceViewportState(
+        icon: Icons.lock_outline_rounded,
+        tone: ViewportTone.warning,
+        title: 'Izin kamera ditolak permanen',
+        message:
+            'Verifikasi wajah memerlukan kamera depan. Izin ini hanya bisa '
+            'dipulihkan dari pengaturan aplikasi.',
+        primaryLabel: 'Buka pengaturan',
+        primaryIcon: Icons.settings_outlined,
+        onPrimary: controller.openCameraSettings,
+        secondaryLabel: 'Saya sudah mengizinkan',
+        onSecondary: () => _beginFace(context),
+      );
+    }
+
+    if (session == null &&
+        camera != null &&
+        camera != CameraPermission.granted) {
+      return AttendanceViewportState(
+        icon: Icons.photo_camera_outlined,
+        tone: ViewportTone.warning,
+        title: 'Izin kamera diperlukan',
+        message:
+            'Verifikasi wajah memerlukan kamera depan. Berikan izin kamera '
+            'untuk melanjutkan.',
+        primaryLabel: 'Izinkan kamera',
+        primaryIcon: Icons.photo_camera_rounded,
+        onPrimary: () => _beginFace(context),
+      );
+    }
+
     if (session == null) {
       final direction = controller.direction;
 
@@ -525,6 +562,22 @@ class AttendanceView extends GetView<AttendanceController> {
   // ── Outcomes ─────────────────────────────────────────────────────────────
 
   Widget _success(AttendanceReceipt receipt) {
+    // 202 `face_pending_review`: recorded for an officer to decide, not a
+    // clock that counts yet (W4-FACE-202). Neither the check mark nor the
+    // word "berhasil" may say otherwise.
+    if (receipt.pendingReview) {
+      return AttendanceViewportState(
+        icon: Icons.hourglass_top_rounded,
+        tone: ViewportTone.warning,
+        title: '${receipt.direction.label} menunggu konfirmasi',
+        message: receipt.message,
+        footnote: 'Petugas akan meninjau verifikasi wajah Anda.',
+        primaryLabel: 'Lihat riwayat',
+        primaryIcon: Icons.arrow_forward_rounded,
+        onPrimary: controller.finishReceipt,
+      );
+    }
+
     return AttendanceViewportState(
       icon: Icons.check_rounded,
       tone: ViewportTone.success,
@@ -595,11 +648,14 @@ class AttendanceView extends GetView<AttendanceController> {
       tone: tone,
       title: title,
       message: refusal.message,
-      primaryLabel: retryable
-          ? (controller.mode.value == AttendanceMethod.face
+      primaryLabel: !retryable
+          ? 'Lihat riwayat'
+          // The status itself is what is missing (ATTP-12).
+          : refusal.code == 'context_unavailable'
+          ? 'Muat ulang'
+          : (controller.mode.value == AttendanceMethod.face
                 ? 'Ulangi verifikasi'
-                : 'Pindai lagi')
-          : 'Lihat riwayat',
+                : 'Pindai lagi'),
       primaryIcon: retryable
           ? Icons.refresh_rounded
           : Icons.arrow_forward_rounded,

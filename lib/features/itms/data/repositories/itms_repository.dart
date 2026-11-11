@@ -31,17 +31,21 @@ class ItmsRepository {
     required int serviceId,
     required String subject,
     String? description,
-  }) =>
-      _api.createTicket(
-        serviceId: serviceId,
-        subject: subject,
-        description: description,
-      );
+  }) => _api.createTicket(
+    serviceId: serviceId,
+    subject: subject,
+    description: description,
+  );
 
-  Future<List<ItmsKnowledgeArticle>> knowledgeArticles({String? query, int page = 1}) async {
+  Future<List<ItmsKnowledgeArticle>> knowledgeArticles({
+    String? query,
+    int page = 1,
+  }) async {
     final response = await _api.knowledgeArticles(query: query, page: page);
     final data = asList(response['data']);
-    return data.map((item) => ItmsKnowledgeArticle.fromJson(asObject(item))).toList();
+    return data
+        .map((item) => ItmsKnowledgeArticle.fromJson(asObject(item)))
+        .toList();
   }
 
   Future<ItmsKnowledgeArticle> knowledgeArticle(int id) async {
@@ -57,4 +61,3 @@ class ItmsRepository {
 
   Future<void> acknowledgeAsset(int id) => _api.acknowledgeAsset(id);
 }
-

@@ -12,11 +12,12 @@ class AiChatConversation {
   factory AiChatConversation.fromJson(Map<String, dynamic> json) {
     return AiChatConversation(
       id: asString(json['id']) ?? asString(json['uuid']) ?? '',
-      title: asString(json['title']) ?? asString(json['summary']) ?? 'Percakapan',
+      title:
+          asString(json['title']) ?? asString(json['summary']) ?? 'Percakapan',
       createdAt: asString(json['created_at']),
-      messages: asList(json['messages'])
-          .map((m) => AiChatMessage.fromJson(asObject(m)))
-          .toList(),
+      messages: asList(
+        json['messages'],
+      ).map((m) => AiChatMessage.fromJson(asObject(m))).toList(),
     );
   }
 
@@ -25,4 +26,3 @@ class AiChatConversation {
   final String? createdAt;
   final List<AiChatMessage> messages;
 }
-

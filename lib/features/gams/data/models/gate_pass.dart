@@ -37,4 +37,3 @@ class GatePass {
   final String? carrierOrActor;
   final String? createdAt;
 }
-

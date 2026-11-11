@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../../core/network/api_client.dart';
 import '../../data/repositories/gams_repository.dart';
 import '../../data/services/gams_api_service.dart';
+import '../controllers/gams_create_controller.dart';
 import '../controllers/gams_dashboard_controller.dart';
 
 GamsRepository _gamsRepository() {
@@ -24,3 +25,18 @@ class GamsDashboardBinding extends Bindings {
   }
 }
 
+/// The binding of one GAMS form (GAMS-01), tagged by its kind so the four
+/// forms never share a controller.
+class GamsCreateBinding extends Bindings {
+  GamsCreateBinding(this.kind);
+
+  final GamsCreateKind kind;
+
+  @override
+  void dependencies() {
+    Get.lazyPut<GamsCreateController>(
+      () => GamsCreateController(repository: _gamsRepository(), kind: kind),
+      tag: kind.name,
+    );
+  }
+}

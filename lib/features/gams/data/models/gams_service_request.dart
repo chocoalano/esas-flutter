@@ -40,19 +40,21 @@ class GamsServiceRequest {
   final String? createdAt;
   final String? resolvedAt;
 
-  bool get isClosed => status == 'closed' || status == 'resolved';
+  // `cancelled` is finished too (backend ServiceRequestStatus) — UAT review H4.
+  bool get isClosed =>
+      status == 'closed' || status == 'resolved' || status == 'cancelled';
   bool get isDraft => status == 'draft';
 
   String get statusLabel => switch (status.toLowerCase()) {
-        'draft' => 'Draft',
-        'submitted' => 'Terkirim',
-        'triage' => 'Dalam Peninjauan',
-        'in_progress' || 'assigned' => 'Sedang Dikerjakan',
-        'resolved' => 'Selesai',
-        'closed' => 'Ditutup',
-        'cancelled' => 'Dibatalkan',
-        _ => status,
-      };
+    'draft' => 'Draft',
+    'submitted' => 'Terkirim',
+    'triage' => 'Dalam Peninjauan',
+    'in_progress' || 'assigned' => 'Sedang Dikerjakan',
+    'resolved' => 'Selesai',
+    'closed' => 'Ditutup',
+    'cancelled' => 'Dibatalkan',
+    _ => status,
+  };
 }
 
 class GamsServiceDefinition {
@@ -100,4 +102,3 @@ class GamsFacility {
   final String name;
   final String code;
 }
-

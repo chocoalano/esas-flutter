@@ -20,7 +20,8 @@ class UnifiedInboxView extends GetView<UnifiedInboxController> {
         title: const Text('Kotak Masuk Persetujuan'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Get.back(),
+          // The page, not the decision snackbar on top of it (as GAMS-04).
+          onPressed: () => Navigator.of(context).maybePop(),
         ),
       ),
       body: SafeArea(
@@ -35,7 +36,12 @@ class UnifiedInboxView extends GetView<UnifiedInboxController> {
                 ),
                 child: Row(
                   children: [
-                    _filterChip('all', 'Semua (${controller.tasks.length})', theme, palette),
+                    _filterChip(
+                      'all',
+                      'Semua (${controller.tasks.length})',
+                      theme,
+                      palette,
+                    ),
                     const SizedBox(width: AppSpacing.xs),
                     _filterChip('hrms', 'HRMS', theme, palette),
                     const SizedBox(width: AppSpacing.xs),
@@ -50,7 +56,9 @@ class UnifiedInboxView extends GetView<UnifiedInboxController> {
             Expanded(
               child: Obx(() {
                 if (controller.isLoading.value) {
-                  return const Center(child: CircularProgressIndicator.adaptive());
+                  return const Center(
+                    child: CircularProgressIndicator.adaptive(),
+                  );
                 }
 
                 if (controller.error.value != null) {
@@ -60,7 +68,11 @@ class UnifiedInboxView extends GetView<UnifiedInboxController> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.error_outline, size: 48, color: palette.danger.foreground),
+                          Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: palette.danger.foreground,
+                          ),
                           const SizedBox(height: AppSpacing.md),
                           Text(
                             controller.error.value!.message,
@@ -84,7 +96,9 @@ class UnifiedInboxView extends GetView<UnifiedInboxController> {
                     child: Text(
                       'Tidak ada tugas atau permohonan persetujuan yang menunggu.',
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(color: palette.textMuted),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: palette.textMuted,
+                      ),
                     ),
                   );
                 }
@@ -97,7 +111,8 @@ class UnifiedInboxView extends GetView<UnifiedInboxController> {
                       vertical: AppSpacing.sm,
                     ),
                     itemCount: displayList.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(height: AppSpacing.sm),
                     itemBuilder: (context, index) {
                       final task = displayList[index];
                       return _TaskCard(
@@ -119,13 +134,20 @@ class UnifiedInboxView extends GetView<UnifiedInboxController> {
     );
   }
 
-  Widget _filterChip(String key, String label, ThemeData theme, AppPalette palette) {
+  Widget _filterChip(
+    String key,
+    String label,
+    ThemeData theme,
+    AppPalette palette,
+  ) {
     final isSelected = controller.selectedFilter.value == key;
     return ChoiceChip(
       label: Text(label),
       selected: isSelected,
       labelStyle: theme.textTheme.labelSmall?.copyWith(
-        color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
+        color: isSelected
+            ? theme.colorScheme.onPrimary
+            : theme.colorScheme.onSurface,
         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
       ),
       selectedColor: theme.colorScheme.primary,
@@ -165,7 +187,13 @@ class UnifiedInboxView extends GetView<UnifiedInboxController> {
           Get.snackbar('Validasi', 'Alasan penolakan tidak boleh kosong');
           return;
         }
-        Get.back();
+        // The dialog and nothing else. A bare `Get.back()` closed only the
+        // validation snackbar when one was showing (INBOX-01), and
+        // `closeOverlays: true` pops the dialog and then the inbox under it
+        // too (UAT review H1). Snackbars are overlay entries, not routes, so
+        // once they are dismissed the top route is the dialog.
+        if (Get.isSnackbarOpen) Get.closeAllSnackbars();
+        Navigator.of(Get.overlayContext ?? context).pop();
         controller.decideTask(
           taskId: task.id,
           decision: 'rejected',
@@ -195,8 +223,8 @@ class _TaskCard extends StatelessWidget {
     final IconData icon = task.isHrms
         ? Icons.badge_outlined
         : task.isGams
-            ? Icons.home_repair_service_outlined
-            : Icons.confirmation_number_outlined;
+        ? Icons.home_repair_service_outlined
+        : Icons.confirmation_number_outlined;
 
     return AppCard(
       child: Column(
@@ -229,19 +257,25 @@ class _TaskCard extends StatelessWidget {
               if (task.createdAt != null)
                 Text(
                   task.createdAt!.split('T').first,
-                  style: theme.textTheme.labelSmall?.copyWith(color: palette.textMuted),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: palette.textMuted,
+                  ),
                 ),
             ],
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
             task.title,
-            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 2),
           Text(
             'Pemohon: ${task.requesterName}${task.requesterNip != null ? ' (${task.requesterNip})' : ''}',
-            style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: palette.textMuted,
+            ),
           ),
           if (task.notes != null && task.notes!.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.tight),
@@ -252,33 +286,50 @@ class _TaskCard extends StatelessWidget {
               style: theme.textTheme.bodyMedium,
             ),
           ],
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              OutlinedButton.icon(
-                onPressed: onReject,
-                icon: Icon(Icons.close, size: 16, color: palette.danger.foreground),
-                label: Text('Tolak', style: TextStyle(color: palette.danger.foreground)),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: palette.danger.foreground),
-                  visualDensity: VisualDensity.compact,
-                ),
+          // Only where the server says it can be decided here (INBOX-02).
+          if (!task.canDecide) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Diputuskan di modul asalnya, bukan dari kotak masuk ini.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: palette.textMuted,
               ),
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                onPressed: onApprove,
-                icon: const Icon(Icons.check, size: 16),
-                label: const Text('Setujui'),
-                style: FilledButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
+            ),
+          ] else ...[
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: onReject,
+                  icon: Icon(
+                    Icons.close,
+                    size: 16,
+                    color: palette.danger.foreground,
+                  ),
+                  label: Text(
+                    'Tolak',
+                    style: TextStyle(color: palette.danger.foreground),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: palette.danger.foreground),
+                    visualDensity: VisualDensity.compact,
+                  ),
                 ),
-              ),
-            ],
-          ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: onApprove,
+                  icon: const Icon(Icons.check, size: 16),
+                  label: const Text('Setujui'),
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 }
-

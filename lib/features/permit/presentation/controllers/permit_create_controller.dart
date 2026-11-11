@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -6,8 +8,10 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
 import 'package:esas/features/permit/presentation/routes/permit_routes.dart';
+import '../../../../core/ui/dialogs/app_dialogs.dart';
 import '../../../../core/ui/dialogs/app_snackbar.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/tenancy/workspace_clock.dart';
 import '../../../../core/network/idempotency_key.dart';
 import '../../../../core/network/upload.dart';
 import '../../../../core/utils/app_logger.dart';
@@ -86,6 +90,9 @@ class PermitCreateController extends GetxController {
   /// perlindungan itu tidak ada.
   String? _submissionKey;
 
+  /// What [_submissionKey] was sent with (PRMT-07).
+  String? _submissionFingerprint;
+
   /// Formulir yang dibuka jenis izin ini.
   ///
   /// Dibaca dari jenisnya, bukan dari `permit_type_id`. Dulu dua angka — 15 dan
@@ -107,25 +114,44 @@ class PermitCreateController extends GetxController {
     return start.isNotEmpty && start == endDateC.text.trim();
   }
 
+  /// Berapa hari ke belakang sebuah pengajuan boleh bertanggal (PRMT-06).
+  ///
+  /// Server menerima tanggal lampau — penyesuaian jam MEMANG membetulkan hari
+  /// yang sudah dijalani, dan izin sakit kemarin diajukan dengan surat dokter
+  /// hari ini. Yang dulu menutupnya hanya jendela formulir ini: "hari ini
+  /// sampai +30". Jendela yang diminta ke server sekarang mencakup 30 hari ke
+  /// belakang; rentangnya tetap di bawah batas 90 hari endpoint formulir.
+  static const lookbackDays = 30;
+  static const lookaheadDays = 30;
+
   /// Hari paling awal yang boleh diajukan.
   ///
-  /// Jendela roster milik server, bukan `DateTime(2000)`. Tanpa jawaban server
-  /// dipakai bawaan yang sama dengan bawaannya: hari ini sampai 30 hari ke
-  /// depan.
-  DateTime get earliestDate => rosterFrom.value ?? _today;
+  /// Jendela roster milik server, bukan `DateTime(2000)`. Sebelum server
+  /// menjawab, jendela yang sama dengan yang diminta.
+  DateTime get earliestDate => rosterFrom.value ?? _defaultFrom;
 
-  DateTime get latestDate =>
-      rosterTo.value ?? _today.add(const Duration(days: 30));
+  DateTime get latestDate => rosterTo.value ?? _defaultTo;
 
+  /// Hari ini menurut jam workspace, bukan jam perangkat.
   static DateTime get _today {
-    final now = DateTime.now();
+    final today = WorkspaceClock.current.today();
 
-    return DateTime(now.year, now.month, now.day);
+    return DateTime(today.year, today.month, today.day);
   }
+
+  static DateTime get _defaultFrom =>
+      DateTime(_today.year, _today.month, _today.day - lookbackDays);
+
+  static DateTime get _defaultTo =>
+      DateTime(_today.year, _today.month, _today.day + lookaheadDays);
 
   @override
   void onInit() {
     super.onInit();
+
+    // The schedule follows the start date, whichever of the two moved
+    // (PRMT-16).
+    startDateC.addListener(_followStartDate);
 
     final args = Get.arguments;
 
@@ -145,6 +171,7 @@ class PermitCreateController extends GetxController {
 
   @override
   void onClose() {
+    startDateC.removeListener(_followStartDate);
     // None of these were disposed before.
     for (final controller in [
       timeinAdjustC,
@@ -209,6 +236,21 @@ class PermitCreateController extends GetxController {
   /// Indonesia, validator membersihkan satu sisi saja menjadi `08:30`, dan
   /// `':'` lebih besar daripada `'.'` — jadi 08:30 lolos sebagai "setelah"
   /// 08.45.
+  /// Whether the chosen schedule's shift runs past midnight (PRMT-11).
+  ///
+  /// A 23:00–07:00 shift ends on a smaller clock time than it starts, on the
+  /// same work day as far as the roster is concerned. "End after start" is the
+  /// wrong rule for it — for the permit's hours and for an adjustment's alike.
+  bool get selectedShiftCrossesMidnight {
+    final schedule = scheduleList.firstWhereOrNull(
+      (s) => s.id == selectedScheduleId.value,
+    );
+    final start = minutesOfDay(schedule?.shiftIn ?? '');
+    final end = minutesOfDay(schedule?.shiftOut ?? '');
+
+    return start != null && end != null && end < start;
+  }
+
   static int? minutesOfDay(String raw) {
     final cleaned = raw
         .replaceAll(RegExp(r'[^\x20-\x7E]'), '')
@@ -233,6 +275,48 @@ class PermitCreateController extends GetxController {
 
   // ── Muat & isian awal ─────────────────────────────────────────────────────
 
+  /// Keep the chosen schedule on the start date's day (PRMT-16).
+  ///
+  /// The screen says the dates follow the schedule, but a date could be
+  /// picked on its own while the schedule id stayed — and the server trusts a
+  /// named schedule over the date, so a request dated on a rest day passed
+  /// `permit_no_schedule`, tied to another day's roster row.
+  void _followStartDate() {
+    final date = DateTime.tryParse(startDateC.text.trim());
+    final current = _scheduleById(selectedScheduleId.value);
+
+    if (current != null && date != null && _sameDay(current.workDay, date)) {
+      return;
+    }
+
+    final match = date == null
+        ? null
+        : scheduleList.firstWhereOrNull((s) => _sameDay(s.workDay, date));
+
+    // Moved only onto a schedule that exists. A day without one is reported at
+    // the date field ([scheduleErrorFor]) and never sent with another day's
+    // schedule ([buildFields]) — clearing the choice here would also hide the
+    // date fields that show only once a schedule is chosen.
+    if (match != null) selectedScheduleId.value = match.id;
+  }
+
+  /// Why [startDate] cannot carry a request, or null (PRMT-16).
+  String? scheduleErrorFor(String startDate) {
+    final date = DateTime.tryParse(startDate.trim());
+
+    if (date == null || scheduleList.isEmpty) return null;
+
+    final scheduled = scheduleList.any((s) => _sameDay(s.workDay, date));
+
+    return scheduled ? null : 'Tidak ada jadwal kerja pada tanggal ini.';
+  }
+
+  Schedule? _scheduleById(int? id) =>
+      id == null ? null : scheduleList.firstWhereOrNull((s) => s.id == id);
+
+  static bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
   void onScheduleChanged(int? newId) {
     selectedScheduleId.value = newId;
 
@@ -251,7 +335,10 @@ class PermitCreateController extends GetxController {
       // No type, company, department or employee. The server reads all of them
       // off the token, so a cached user missing one of them no longer means a
       // form that will not open.
-      final form = await _repository.formData();
+      final form = await _repository.formData(
+        from: dateFormatter.format(_defaultFrom),
+        to: dateFormatter.format(_defaultTo),
+      );
 
       scheduleList.assignAll(form.schedules);
       shiftList.assignAll(form.shifts);
@@ -303,7 +390,8 @@ class PermitCreateController extends GetxController {
       // posted back; the server mints it, because a reference somebody quotes
       // on a form is the application's job to issue - two requests could
       // otherwise share one and a typo was silent.
-      'user_timework_schedule_id': selectedScheduleId.value,
+      // Only a schedule on the start date's own day (PRMT-16).
+      'user_timework_schedule_id': _scheduleOnStartDate()?.id,
       'permit_type_id': selectedPermitTypeId.value,
       'start_date': startDateC.text,
       'end_date': endDateC.text,
@@ -341,11 +429,41 @@ class PermitCreateController extends GetxController {
       return;
     }
 
+    // Kunci milik ISI yang dikirim (PRMT-07). Setelah percobaan yang hasilnya
+    // belum pasti, isi yang berubah adalah permintaan lain — tetapi yang
+    // pertama mungkin sudah tercatat. Orangnya ditanya dulu, bukan diberi
+    // pengajuan kedua diam-diam; dan kunci lama tidak dipakai untuk isi baru,
+    // yang membuat server me-replay jawaban lama (lampiran lama tersimpan)
+    // atau menolaknya dengan pesan teknis.
+    final fingerprint = _fingerprint();
+
+    if (_submissionKey != null && _submissionFingerprint != fingerprint) {
+      final context = Get.context;
+      final asNew =
+          context != null &&
+          await showAppConfirmDialog(
+            context,
+            title: 'Pengajuan sebelumnya belum pasti',
+            message:
+                'Pengiriman sebelumnya tidak mendapat jawaban dan mungkin '
+                'sudah tercatat. Periksa daftar pengajuan lebih dulu, atau '
+                'kirim isi yang sekarang sebagai pengajuan baru.',
+            confirmLabel: 'Kirim sebagai baru',
+            cancelLabel: 'Periksa dulu',
+            icon: Icons.help_outline_rounded,
+          );
+
+      if (!asNew) return;
+
+      _submissionKey = null;
+    }
+
     isSubmitting.value = true;
 
-    // Kunci bertahan melintasi percobaan ulang; hanya dilepas bila permintaan
-    // benar-benar sampai dan dijawab.
+    // Kunci bertahan melintasi percobaan ulang dengan isi yang sama; hanya
+    // dilepas bila permintaan benar-benar sampai dan dijawab.
     _submissionKey ??= IdempotencyKey.mint();
+    _submissionFingerprint = fingerprint;
 
     try {
       final created = await _repository.create(
@@ -360,22 +478,59 @@ class PermitCreateController extends GetxController {
       }
 
       _submissionKey = null;
+      _submissionFingerprint = null;
       showSuccessSnackbar('Permohonan izin berhasil dibuat!');
       Get.offAllNamed(PermitRoutes.list, arguments: createType.value);
     } on ApiException catch (error) {
-      // Server menolak dengan sadar (4xx): permintaan tidak tercatat, dan yang
-      // dikirim berikutnya adalah pengajuan lain. Kegagalan transport atau 5xx
-      // justru sebaliknya — ia mungkin sudah tercatat, jadi kuncinya dipegang.
-      final int? status = error.status;
-
-      if (status != null && status >= 400 && status < 500) {
+      // Server menolak dengan sadar: permintaan tidak tercatat, dan yang
+      // dikirim berikutnya adalah pengajuan lain. Selain itu kuncinya dipegang
+      // — lihat [_outcomeUnknown].
+      if (!_outcomeUnknown(error)) {
         _submissionKey = null;
+        _submissionFingerprint = null;
       }
 
       showErrorSnackbar(error.firstFieldError ?? error.message);
     } finally {
       isSubmitting.value = false;
     }
+  }
+
+  /// Whether the request may have been recorded although no answer said so.
+  ///
+  /// A transport failure or a 5xx, as before — and also 409
+  /// `idempotency_in_progress`, which says the first request is still running
+  /// and will most likely be recorded, and 429, which looked at nothing
+  /// (PRMT-08). Dropping the key on those threw away the protection exactly
+  /// when it was needed.
+  static bool _outcomeUnknown(ApiException error) {
+    final status = error.status;
+
+    return status == null ||
+        status >= 500 ||
+        status == 429 ||
+        error.code == 'idempotency_in_progress';
+  }
+
+  /// What was sent, for telling a retry from a different request.
+  String _fingerprint() {
+    final file = selectedFile.value;
+
+    return jsonEncode({
+      ...buildFields(),
+      '_attachment': file == null
+          ? null
+          : '${file.name}|${file.size}|${file.path ?? ''}',
+    });
+  }
+
+  Schedule? _scheduleOnStartDate() {
+    final schedule = _scheduleById(selectedScheduleId.value);
+    final date = DateTime.tryParse(startDateC.text.trim());
+
+    return schedule != null && date != null && _sameDay(schedule.workDay, date)
+        ? schedule
+        : null;
   }
 
   /// Yang tidak bisa diperiksa oleh validator satu field.
@@ -443,11 +598,12 @@ class PermitCreateController extends GetxController {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: allowedExtensions,
-      // Supaya berkas dari penyedia yang tidak menyimpan salinan lokal tetap
-      // punya isi untuk dikirim. Ukurannya dibatasi tepat di bawah ini, jadi
-      // yang dibaca ke memori tidak pernah lebih besar dari yang diterima
-      // server.
-      withData: true,
+      // Bukan `withData` (PRMT-13): itu membuat plugin menyalin dan membaca
+      // SELURUH berkas ke memori — lalu sekali lagi lewat platform channel —
+      // sebelum batas 5 MB di bawah ini sempat diperiksa. Sebuah aliran baca
+      // tidak membaca apa pun sampai didengarkan, dan hanya didengarkan untuk
+      // berkas tanpa path yang ukurannya sudah lolos.
+      withReadStream: true,
     );
 
     // Membatalkan pemilih berarti membatalkan pemilihan, bukan membuang berkas
@@ -466,7 +622,9 @@ class PermitCreateController extends GetxController {
       return;
     }
 
-    if (file.bytes == null && file.path == null) {
+    final readable = await _readable(file);
+
+    if (readable == null) {
       showWarningSnackbar(
         'Berkas itu tidak bisa dibaca dari lokasinya. Unduh dulu ke '
         'perangkat, lalu pilih kembali.',
@@ -474,7 +632,39 @@ class PermitCreateController extends GetxController {
       return;
     }
 
-    selectedFile.value = file;
+    selectedFile.value = readable;
+  }
+
+  /// [file], with something [attachment] can send: its path, or — for a
+  /// provider that keeps no local copy — its bytes, read now that the size is
+  /// known to be acceptable. Null when there is neither.
+  ///
+  /// The read stops past the limit, so a provider that reported the wrong
+  /// size still cannot fill the memory.
+  Future<PlatformFile?> _readable(PlatformFile file) async {
+    if (file.path != null || file.bytes != null) return file;
+
+    final stream = file.readStream;
+    if (stream == null) return null;
+
+    final bytes = BytesBuilder(copy: false);
+
+    try {
+      await for (final chunk in stream) {
+        bytes.add(chunk);
+        if (bytes.length > maxAttachmentBytes) return null;
+      }
+    } on Object catch (error) {
+      AppLogger.warning('Could not read the chosen attachment: $error');
+      return null;
+    }
+
+    return PlatformFile(
+      name: file.name,
+      size: bytes.length,
+      bytes: bytes.takeBytes(),
+      identifier: file.identifier,
+    );
   }
 
   void clearFile() => selectedFile.value = null;
@@ -482,6 +672,7 @@ class PermitCreateController extends GetxController {
   // ── Pemilih tanggal & jam ─────────────────────────────────────────────────
 
   Future<void> pickDate(BuildContext context, TextEditingController c) async {
+    FocusManager.instance.primaryFocus?.unfocus();
     final DateTime first = earliestDate;
     final DateTime last = latestDate.isBefore(first) ? first : latestDate;
     final DateTime current = DateTime.tryParse(c.text) ?? first;

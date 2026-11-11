@@ -63,14 +63,18 @@ void main() {
       expect(ids, isNot(contains('gams_service_request')));
     });
 
-    test('When MTMS is active, MTMS services are dynamically included', () {
+    // CORE-06. MTMS has no page in this app yet; its tile pointed at a route
+    // nothing answers and did nothing. An active MTMS module therefore adds no
+    // tile until the page exists — `registry_routes_test.dart` pins that every
+    // advertised tile opens a registered page.
+    test('When MTMS is active, no tile is offered until its page exists', () {
       final services = ModuleRegistry.getAvailableServices(
         activeModules: ['hrms', 'mtms'],
         isManager: false,
       );
 
       final ids = services.map((s) => s.id).toList();
-      expect(ids, contains('mtms_work_orders'));
+      expect(ids, isNot(contains('mtms_work_orders')));
       expect(ids, isNot(contains('gams_service_request')));
       expect(ids, isNot(contains('itms_tickets')));
     });

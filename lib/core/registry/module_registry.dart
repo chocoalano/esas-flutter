@@ -77,7 +77,7 @@ class ModuleRegistry {
       title: 'Pengajuan',
       description: 'Daftar dan status permohonan izin/cuti',
       icon: Icons.fact_check_outlined,
-      route: '/permit-list',
+      route: '/permit/list',
     ),
     EnterpriseServiceItem(
       id: 'hrms_attendance_history',
@@ -181,14 +181,10 @@ class ModuleRegistry {
     ),
 
     // ── MTMS Operational Services ──
-    EnterpriseServiceItem(
-      id: 'mtms_work_orders',
-      module: EsasModules.mtms,
-      title: 'Perawatan',
-      description: 'Laporan perbaikan mesin dan work order teknis',
-      icon: Icons.build_circle_outlined,
-      route: '/mtms/work-orders',
-    ),
+    // MTMS has no page in this app yet (CORE-06). Its tile pointed at
+    // `/mtms/work-orders`, which nothing answers, and did nothing when tapped.
+    // Re-add it in the same change that adds the page; the registry test
+    // fails if a tile points anywhere the route table does not.
 
     // ── Cross-Panel Unified Approval Inbox ──
     EnterpriseServiceItem(

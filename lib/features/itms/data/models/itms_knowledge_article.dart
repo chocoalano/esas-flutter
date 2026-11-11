@@ -25,4 +25,3 @@ class ItmsKnowledgeArticle {
   final String? body;
   final String? publishedAt;
 }
-

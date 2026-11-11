@@ -313,6 +313,11 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
   /// the body changed.
   String? _attemptKey;
 
+  /// The key the current attempt is named by. Read-only, for the test that
+  /// pins what an unanswered attempt keeps — nothing on screen shows it.
+  @visibleForTesting
+  String? get attemptKey => _attemptKey;
+
   // ── Derived ──────────────────────────────────────────────────────────────
 
   /// The direction the employee has chosen, when they have chosen one.
@@ -444,6 +449,11 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
   /// with no geofence the handset is never asked where it is, and a screen that
   /// demanded a fix anyway would strand somebody indoors over a rule that does
   /// not apply to them.
+  /// Whether a required location is still being measured, or was refused.
+  bool get _locationPending =>
+      locationStatus.value == LocationStatus.checking ||
+      locationStatus.value == LocationStatus.blocked;
+
   bool get canCapture =>
       context.value?.canClock != false &&
       locationStatus.value != LocationStatus.blocked &&
@@ -451,6 +461,21 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
 
   /// Whether a face attempt is currently running.
   bool get faceRunning => capture.value != null;
+
+  /// The camera's answer for the face method, when it was not a yes (ATTP-09).
+  ///
+  /// Its own value: [scannerState] is the QR camera's, and the face screen does
+  /// not read it — so a permanent refusal left the start card unchanged and
+  /// every tap on it doing nothing.
+  final Rxn<CameraPermission> faceCameraPermission = Rxn<CameraPermission>();
+
+  /// Which method [unavailableStatus] is about (ATTP-13).
+  AttendanceMethod? get unavailableMethod {
+    if (!qrStatus.usable) return AttendanceMethod.qr;
+    if (!faceStatus.usable) return AttendanceMethod.face;
+
+    return null;
+  }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -502,16 +527,7 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
     switch (state) {
       case AppLifecycleState.resumed:
         _resumed = true;
-        unawaited(_syncCamera());
-        // A fix taken before the phone went into a pocket is a fix taken
-        // somewhere else. Nothing here invents a maximum age — the server has
-        // no field for one and the domain has set no threshold — but the one
-        // moment the handset KNOWS it may have moved is the moment it comes
-        // back, and taking a new reading then costs a second and removes the
-        // guesswork.
-        if (locationStatus.value != LocationStatus.notRequired) {
-          unawaited(revalidateLocation());
-        }
+        unawaited(_onResumed());
 
       case AppLifecycleState.inactive:
         _resumed = false;
@@ -526,16 +542,44 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
         // and the challenge is on a two-minute clock. Ended here, saying so,
         // rather than resumed into a frozen preview that reports "wajah tidak
         // terdeteksi" thirty seconds later.
-        if (faceRunning) {
+        //
+        // Except once it is being submitted (ATTP-06): the camera is done and
+        // the request is on its way. Saying "stopped" then was untrue, and the
+        // answer that arrived later tore down whatever came next.
+        if (faceRunning && stage.value != CaptureStage.submitting) {
           unawaited(_abandonFace());
         }
     }
   }
 
+  /// Come back to the screen in the right order.
+  ///
+  /// The status first, when it never loaded (ATTP-12). Then — where the
+  /// company requires it — a new fix, BEFORE the camera (ATTP-05): a fix taken
+  /// before the phone went into a pocket is a fix taken somewhere else, and a
+  /// camera started first let a code be scanned in the gap and spent. The
+  /// check does not prompt for permission (ATTP-04); the dialog itself is what
+  /// sent the app through inactive → resumed.
+  Future<void> _onResumed() async {
+    if (contextUnavailable.value) {
+      // Reloaded without asking (UAT review A3): the dialog's own resume
+      // would otherwise ask again, and a second "deny" is permanent.
+      await loadContext(mayAsk: false);
+      return;
+    }
+
+    if (locationStatus.value != LocationStatus.notRequired) {
+      await revalidateLocation(mayAsk: false);
+      return;
+    }
+
+    await _syncCamera();
+  }
+
   // ── Context ──────────────────────────────────────────────────────────────
 
   /// Read what this person may do, and where from.
-  Future<void> loadContext() async {
+  Future<void> loadContext({bool mayAsk = true}) async {
     loadingContext.value = true;
     contextUnavailable.value = false;
 
@@ -550,6 +594,14 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
       // bisa dipakai".
       if (mode.value == AttendanceMethod.face && !faceStatus.usable) {
         mode.value = AttendanceMethod.qr;
+      }
+
+      // And the other way round (ATTP-14): with QR switched off, opening on QR
+      // meant a spinner that never finished over a method nobody can use.
+      if (mode.value == AttendanceMethod.qr &&
+          !qrStatus.usable &&
+          faceStatus.usable) {
+        mode.value = AttendanceMethod.face;
       }
     } on ApiException catch (error) {
       AppLogger.warning('Attendance context unavailable: ${error.message}');
@@ -568,7 +620,7 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
       loadingContext.value = false;
     }
 
-    await revalidateLocation();
+    await revalidateLocation(mayAsk: mayAsk);
     await _syncCamera();
   }
 
@@ -592,7 +644,7 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
   ///   whatever is submitted, and a failure is silent. Awaiting it here would
   ///   hold the camera shut for up to fifteen seconds waiting on something
   ///   nobody is going to check.
-  Future<void> revalidateLocation() async {
+  Future<void> revalidateLocation({bool mayAsk = true}) async {
     final fence = context.value?.geofence;
 
     if (fence == null || !fence.required_) {
@@ -602,7 +654,7 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
       _position = null;
 
       // Not awaited, and nothing on screen waits for it.
-      unawaited(_recordPositionQuietly());
+      unawaited(_recordPositionQuietly(mayAsk: mayAsk));
 
       return;
     }
@@ -610,12 +662,28 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
     locationStatus.value = LocationStatus.checking;
     locationBlock.value = null;
     distanceMeters.value = null;
-    _position = null;
+    // The last fix is kept until a new one replaces it (ATTP-05): nothing can
+    // be captured while checking, and a fix thrown away here was a submission
+    // without coordinates if anything slipped through.
 
-    final result = await _location.currentPosition();
+    await _measureLocation(fence, mayAsk: mayAsk);
+
+    // Whatever the answer, the camera follows it (ATTP-01). A location fixed by
+    // "Coba lagi" used to leave the QR screen on "Menyiapkan kamera" for good.
+    await _syncCamera();
+  }
+
+  Future<void> _measureLocation(
+    AttendanceGeofence fence, {
+    required bool mayAsk,
+  }) async {
+    final result = mayAsk
+        ? await _location.currentPosition()
+        : await _location.currentPosition(mayAsk: false);
 
     switch (result) {
       case LocationRejected(reason: final reason):
+        _position = null;
         locationBlock.value = _blockFor(reason);
         locationStatus.value = LocationStatus.blocked;
 
@@ -668,8 +736,10 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
   /// clock to go up without coordinates exactly as it did before. The attendance
   /// is the point; the coordinates are a fact about it that is worth having when
   /// it can be had.
-  Future<void> _recordPositionQuietly() async {
-    final result = await _location.currentPosition();
+  Future<void> _recordPositionQuietly({bool mayAsk = true}) async {
+    final result = mayAsk
+        ? await _location.currentPosition()
+        : await _location.currentPosition(mayAsk: false);
 
     // The screen may have moved on — a submission in flight, a fence that now
     // applies after a reload. Never overwrite a fix that a required check made.
@@ -730,6 +800,11 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
     refusal.value = null;
     faceMessage.value = null;
 
+    // A refusal belongs to the method that was refused. Left in place, the
+    // stage kept `onDetect` shut: a live camera that ignored every code
+    // (ATTP-02).
+    if (stage.value == CaptureStage.refused) _reset();
+
     if (next == AttendanceMethod.qr) {
       await _teardownFace();
     } else {
@@ -751,7 +826,9 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
         // A method the company has switched off must not hold the sensor open
         // behind its own explanation.
         qrStatus.usable &&
-        stage.value != CaptureStage.succeeded &&
+        // Only on the scanning state itself (ATTP-15). Behind a refusal, a
+        // submission or a receipt it held the sensor open with no preview.
+        stage.value == CaptureStage.idle &&
         canCapture;
 
     if (!wants) {
@@ -942,6 +1019,8 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
   /// spending a single-use code, each answering `code_already_used`.
   Future<void> onDetect(BarcodeCapture capture) async {
     if (_inFlight || stage.value != CaptureStage.idle) return;
+    // A location still being checked is not a location (ATTP-05).
+    if (locationStatus.value == LocationStatus.checking) return;
 
     final raw = capture.barcodes.firstOrNull?.rawValue;
 
@@ -959,6 +1038,19 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
         code: 'unrecognised',
       );
 
+      return;
+    }
+
+    // A machine code carries no direction; it takes the one the status says is
+    // owed. With the status never loaded that is UNKNOWN, not "complete"
+    // (ATTD-04, ATTP-12) — and a single-use code is not spent finding out.
+    if (scanned is MachineCode && direction == null && context.value == null) {
+      // The camera stops behind the refusal, as after any other (UAT review
+      // A8): left running it went on reading codes under the panel.
+      await _pauseScanner();
+      await _stopScanner();
+      stage.value = CaptureStage.refused;
+      refusal.value = _statusNotLoaded;
       return;
     }
 
@@ -1058,14 +1150,26 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
   Future<void> startFace() async {
     if (_inFlight || faceRunning) return;
 
+    // The QR path waits for the location check; the face path did not (UAT
+    // review A1). While a resume re-checks, the last fix is still held
+    // (ATTP-05), so a face attempt started now would carry the coordinates
+    // from before the app was left. Blocked is refused the same way.
+    if (_locationPending) return;
+
     final owed = direction;
 
     if (owed == null) {
-      refusal.value = const AttendanceRefusal(
-        kind: RefusalKind.clockRejected,
-        message: 'Absensi untuk hari ini sudah lengkap.',
-        code: 'no_clock_owed',
-      );
+      // Drawn only on a refused stage, so the stage is set too (ATTP-08) —
+      // without it the button did nothing at all. And an unloaded status is
+      // not a complete day (ATTP-12).
+      stage.value = CaptureStage.refused;
+      refusal.value = context.value == null
+          ? _statusNotLoaded
+          : const AttendanceRefusal(
+              kind: RefusalKind.clockRejected,
+              message: 'Absensi untuk hari ini sudah lengkap.',
+              code: 'no_clock_owed',
+            );
 
       return;
     }
@@ -1076,12 +1180,14 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
       final granted = await _camera.request();
 
       if (granted != CameraPermission.granted) {
-        scannerState.value = _stateFor(granted);
+        faceCameraPermission.value = granted;
         faceMessage.value = null;
 
         return;
       }
     }
+
+    faceCameraPermission.value = null;
 
     _inFlight = true;
     refusal.value = null;
@@ -1095,6 +1201,16 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
         await _repository.faceChallenge(owed),
       );
 
+      // The challenge took a moment. If the person switched to QR or left the
+      // screen meanwhile, nothing may open the front camera now (ATTP-07).
+      if (isClosed || _closing || mode.value != AttendanceMethod.face) {
+        _reset();
+        // The switch to QR happened while the stage was not idle, so it could
+        // not start the camera then; it can now (UAT review A2).
+        if (!isClosed && !_closing) await _syncCamera();
+        return;
+      }
+
       challenge.value = drawn;
 
       // A new challenge is a new attempt, always: the old one is spent or dead,
@@ -1105,6 +1221,17 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
       capture.value = session;
 
       final result = await session.run();
+
+      // A re-check that began during the challenge (the app was left and
+      // resumed) means the fix in hand is no longer known to be current.
+      if (_locationPending) {
+        // Nothing is sent, and the photograph goes as it would after a send.
+        await LivenessCapture.discard(result.image);
+        await _teardownFace();
+        _reset();
+        await _syncCamera();
+        return;
+      }
 
       faceMessage.value = 'Verifikasi wajah berhasil. Memproses absensi…';
       stage.value = CaptureStage.submitting;
@@ -1153,9 +1280,30 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
       // the one request this screen makes outside the repository's own two, and
       // a second copy of "what may an employee read" here is how the two paths
       // would drift.
-      refusal.value = AttendanceRepository.refusalFor(error);
+      //
+      // Only the challenge request reaches here — a submission's failure comes
+      // back as an outcome. Asking for a challenge writes nothing, so a timeout
+      // is a try-again, not "check your history first" (ATTP-11).
+      refusal.value = error.isTransportFailure
+          ? AttendanceRefusal(
+              kind: RefusalKind.transient,
+              message:
+                  'Tantangan verifikasi belum diterima. Periksa koneksi, lalu '
+                  'coba lagi.',
+              code: error.code,
+            )
+          : AttendanceRepository.refusalFor(error);
     }
   }
+
+  /// The day's status never loaded: which clock is owed is unknown.
+  static const _statusNotLoaded = AttendanceRefusal(
+    kind: RefusalKind.transient,
+    message:
+        'Status absensi belum dimuat, jadi belum diketahui absen apa yang '
+        'harus dicatat. Muat ulang, lalu coba lagi.',
+    code: 'context_unavailable',
+  );
 
   /// Stop a face attempt the person no longer wants.
   Future<void> cancelFace() async {
@@ -1214,8 +1362,9 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
         // the next visit starts from what the server says again.
         chosenDirection.value = null;
         // The one moment in this product worth a distinct physical signal, and
-        // it fires only for a clock the SERVER wrote.
-        _tap(HapticFeedback.mediumImpact);
+        // it fires only for a clock the SERVER wrote — not for a 202 that a
+        // person has yet to review (UAT review A7).
+        if (!confirmed.pendingReview) _tap(HapticFeedback.mediumImpact);
         receipt.value = confirmed;
         stage.value = CaptureStage.succeeded;
         refusal.value = null;
@@ -1235,6 +1384,7 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
         refusal.value = refused;
         faceMessage.value = null;
         _inFlight = false;
+        _tap(HapticFeedback.vibrate);
 
         // Do not restart the camera automatically after a rejected QR. The
         // code is usually still in front of the lens, so resuming here creates
@@ -1247,6 +1397,13 @@ class AttendanceController extends GetxController with WidgetsBindingObserver {
   /// Clear a refusal and go back to looking.
   Future<void> retryCapture() async {
     _reset();
+
+    // A status that never loaded is loaded first (ATTP-12): without it a
+    // machine code has no direction and a face attempt nothing owed.
+    if (context.value == null) {
+      await loadContext();
+      return;
+    }
 
     if (mode.value == AttendanceMethod.qr) await _syncCamera();
   }

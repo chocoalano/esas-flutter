@@ -18,6 +18,10 @@ abstract interface class LocalStorage {
   Future<void> removeAll(Iterable<String> keys);
 
   bool hasData(String key);
+
+  /// Whether nothing at all has been written. True only on a fresh install,
+  /// because the documents directory goes with an uninstall.
+  bool get isEmpty;
 }
 
 class GetStorageLocalStorage implements LocalStorage {
@@ -43,6 +47,9 @@ class GetStorageLocalStorage implements LocalStorage {
 
   @override
   bool hasData(String key) => _box.hasData(key);
+
+  @override
+  bool get isEmpty => _box.getKeys<Iterable<dynamic>>().isEmpty;
 }
 
 class InMemoryLocalStorage implements LocalStorage {
@@ -68,4 +75,7 @@ class InMemoryLocalStorage implements LocalStorage {
 
   @override
   bool hasData(String key) => _values.containsKey(key);
+
+  @override
+  bool get isEmpty => _values.isEmpty;
 }

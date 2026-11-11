@@ -7,4 +7,3 @@ class GamsRoutes {
   static const vehicleBookings = '$gams/vehicle-bookings';
   static const visitorPasses = '$gams/visitor-passes';
 }
-

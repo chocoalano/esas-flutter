@@ -5,12 +5,15 @@ import 'package:esas/core/network/api_exception.dart';
 import 'package:esas/core/services/camera_permission_service.dart';
 import 'package:esas/core/services/location_service.dart';
 import 'package:esas/core/storage/local_storage.dart';
+import 'package:esas/features/attendance/data/liveness/liveness_capture.dart';
 import 'package:esas/features/attendance/data/models/attendance_context.dart';
+import 'package:esas/features/attendance/data/models/liveness_challenge.dart';
 import 'package:esas/features/attendance/data/models/scanned_code.dart';
 import 'package:esas/features/attendance/data/repositories/attendance_repository.dart';
 import 'package:esas/features/attendance/presentation/controllers/attendance_controller.dart';
 import 'package:esas/features/auth/data/models/auth_user.dart';
 import 'package:esas/features/auth/data/repositories/session_repository.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
@@ -166,6 +169,10 @@ void main() {
     // happened is part of the record. A test that says nothing about location
     // gets a refusal, which is silent when no fence applies.
     when(() => location.currentPosition()).thenAnswer(
+      (_) async => const LocationRejected(LocationFailure.unavailable),
+    );
+    // The same for the quiet read a resume makes without asking.
+    when(() => location.currentPosition(mayAsk: false)).thenAnswer(
       (_) async => const LocationRejected(LocationFailure.unavailable),
     );
   });
@@ -998,11 +1005,43 @@ void main() {
       final controller = await boot();
       await controller.onDetect(capture(departmentPayload()));
       final first = keyUsed;
+      expect(first, isNotNull);
 
-      // The screen offers no retry here today, so reach the state directly.
+      // The camera goes on reading the code under the refusal; that must not
+      // become a second submission.
+      await controller.onDetect(capture(departmentPayload()));
+      verify(
+        () => repository.redeem(
+          any(),
+          fallbackDirection: any(named: 'fallbackDirection'),
+          position: any(named: 'position'),
+          idempotencyKey: any(named: 'idempotencyKey'),
+        ),
+      ).called(1);
+
+      // And the attempt is still named by its key. This used to be asserted
+      // through a second `onDetect` — which the guard above returns from
+      // before it sends anything, so the test passed whether or not the key
+      // was kept (audit, test closure).
+      expect(controller.attemptKey, first);
+    });
+
+    test('a definitive refusal lets go of the key at once', () async {
+      answerWith(
+        const AttendanceRefused(
+          AttendanceRefusal(
+            kind: RefusalKind.codeRejected,
+            message: 'Kode QR sudah kedaluwarsa.',
+            code: 'qr_expired',
+          ),
+        ),
+      );
+
+      final controller = await boot();
       await controller.onDetect(capture(departmentPayload()));
 
-      expect(keyUsed, first);
+      expect(keyUsed, isNotNull);
+      expect(controller.attemptKey, isNull);
     });
   });
 
@@ -1338,6 +1377,497 @@ void main() {
       controller.chooseDirection(PresenceDirection.clockOut);
 
       expect(controller.intentLine, 'Absen pulang');
+    });
+  });
+
+  // ── Remediation, wave 4 ─────────────────────────────────────────────────
+  group('remediasi wave 4', () {
+    setUpAll(() => registerFallbackValue(PresenceDirection.clockIn));
+
+    Position fix() => Position(
+      latitude: -6.2,
+      longitude: 106.8,
+      timestamp: DateTime.now(),
+      accuracy: 5,
+      altitude: 0,
+      altitudeAccuracy: 0,
+      heading: 0,
+      headingAccuracy: 0,
+      speed: 0,
+      speedAccuracy: 0,
+    );
+
+    String machineCode() {
+      final exp =
+          DateTime.now()
+              .add(const Duration(minutes: 5))
+              .millisecondsSinceEpoch ~/
+          1000;
+      final segment = base64Url
+          .encode(utf8.encode(json.encode({'jti': 'm-1', 'exp': exp})))
+          .replaceAll('=', '');
+      return '$segment.sig';
+    }
+
+    void inside() {
+      when(
+        () => location.distanceBetween(
+          fromLatitude: any(named: 'fromLatitude'),
+          fromLongitude: any(named: 'fromLongitude'),
+          toLatitude: any(named: 'toLatitude'),
+          toLongitude: any(named: 'toLongitude'),
+        ),
+      ).thenReturn(10);
+    }
+
+    void geofenced() => when(
+      () => repository.context(),
+    ).thenAnswer((_) async => contextOf(locationRequired: true, radius: 100));
+
+    // ATTP-01. Fixing the location (indoors GPS timeout, "Coba lagi") left the
+    // QR screen on "Menyiapkan kamera" for ever: nothing started the camera.
+    test('a location that comes good starts the camera', () async {
+      geofenced();
+      inside();
+      final controller = await boot();
+      expect(controller.locationStatus.value, LocationStatus.blocked);
+      final before = scanner.starts;
+
+      when(
+        () => location.currentPosition(),
+      ).thenAnswer((_) async => LocationSuccess(fix()));
+      await controller.revalidateLocation();
+      await pumpEventQueue();
+
+      expect(controller.locationStatus.value, LocationStatus.ready);
+      expect(scanner.starts, before + 1);
+    });
+
+    // ATTP-02. Falling back to QR after a refused face attempt left the stage
+    // `refused`: a live camera that ignored every code.
+    test(
+      'switching method after a refusal leaves a scanner that scans',
+      () async {
+        when(
+          () => repository.context(),
+        ).thenAnswer((_) async => contextOf(faceEnrolled: true));
+        when(
+          () => repository.redeem(
+            any(),
+            fallbackDirection: any(named: 'fallbackDirection'),
+            position: any(named: 'position'),
+            idempotencyKey: any(named: 'idempotencyKey'),
+          ),
+        ).thenAnswer(
+          (_) async => const AttendanceRefused(
+            AttendanceRefusal(kind: RefusalKind.codeRejected, message: 'x'),
+          ),
+        );
+        final controller = await boot();
+        await controller.switchTo(AttendanceMethod.face);
+        controller.stage.value = CaptureStage.refused;
+        controller.refusal.value = const AttendanceRefusal(
+          kind: RefusalKind.faceRejected,
+          message: 'Verifikasi belum berhasil',
+        );
+
+        await controller.switchTo(AttendanceMethod.qr);
+        expect(controller.stage.value, CaptureStage.idle);
+
+        await controller.onDetect(capture(departmentPayload()));
+        verify(
+          () => repository.redeem(
+            any(),
+            fallbackDirection: any(named: 'fallbackDirection'),
+            position: any(named: 'position'),
+            idempotencyKey: any(named: 'idempotencyKey'),
+          ),
+        ).called(1);
+      },
+    );
+
+    // ATTP-04. The permission dialog itself sends the app through
+    // inactive → resumed; re-checking on resume asked again, and on Android 11+
+    // a second "deny" is permanent.
+    test('coming back does not ask for location permission', () async {
+      geofenced();
+      when(() => location.currentPosition(mayAsk: false)).thenAnswer(
+        (_) async => const LocationRejected(LocationFailure.permissionDenied),
+      );
+      final controller = await boot();
+
+      controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await pumpEventQueue();
+
+      verify(() => location.currentPosition(mayAsk: false)).called(1);
+    });
+
+    // ATTP-05 / ATTP-15. On resume the camera came back before the new fix —
+    // and with the old one already thrown away — so a scan in that gap went up
+    // without coordinates and burnt a single-use machine code.
+    test('on resume the camera waits for the location check', () async {
+      geofenced();
+      inside();
+      when(
+        () => location.currentPosition(),
+      ).thenAnswer((_) async => LocationSuccess(fix()));
+      final controller = await boot();
+      final before = scanner.starts;
+
+      final pending = Completer<LocationResult>();
+      when(
+        () => location.currentPosition(mayAsk: false),
+      ).thenAnswer((_) => pending.future);
+
+      controller.didChangeAppLifecycleState(AppLifecycleState.inactive);
+      controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await pumpEventQueue();
+      expect(scanner.starts, before);
+
+      pending.complete(LocationSuccess(fix()));
+      await pumpEventQueue();
+      expect(scanner.starts, before + 1);
+    });
+
+    test('a resumed screen showing a refusal keeps the camera off', () async {
+      final controller = await boot();
+      controller.stage.value = CaptureStage.refused;
+      final before = scanner.starts;
+
+      controller.didChangeAppLifecycleState(AppLifecycleState.inactive);
+      controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await pumpEventQueue();
+
+      expect(scanner.starts, before);
+    });
+
+    // ATTP-06. Leaving the app while the face answer is on its way must not
+    // tell the person the attempt stopped — the request is still running.
+    test(
+      'a submission in flight survives the app going to the background',
+      () async {
+        final controller = await boot();
+        // A face session is still attached while its answer is on the way —
+        // which is what made the old code abandon it.
+        controller.capture.value = LivenessCapture(
+          challenge: LivenessChallenge.fromJson({
+            'challenge_id': 'c',
+            'token': 't',
+            'actions': const <Object>[],
+            'expires_at': DateTime.now()
+                .add(const Duration(minutes: 2))
+                .toIso8601String(),
+          }),
+        );
+        controller.stage.value = CaptureStage.submitting;
+
+        controller.didChangeAppLifecycleState(AppLifecycleState.paused);
+        await pumpEventQueue();
+
+        expect(controller.stage.value, CaptureStage.submitting);
+        expect(controller.refusal.value, isNull);
+      },
+    );
+
+    // ATTP-07. A challenge that arrives after the person switched to QR must
+    // not open the front camera behind their back.
+    test(
+      'a challenge that arrives after switching to QR opens nothing',
+      () async {
+        when(
+          () => repository.context(),
+        ).thenAnswer((_) async => contextOf(faceEnrolled: true));
+        final pending = Completer<Map<String, dynamic>>();
+        when(
+          () => repository.faceChallenge(any()),
+        ).thenAnswer((_) => pending.future);
+        final controller = await boot();
+        await controller.switchTo(AttendanceMethod.face);
+
+        final started = controller.startFace();
+        await pumpEventQueue();
+        await controller.switchTo(AttendanceMethod.qr);
+        pending.complete({
+          'challenge_id': 'c',
+          'token': 't',
+          'actions': <Object>[],
+          'expires_at': DateTime.now()
+              .add(const Duration(minutes: 2))
+              .toIso8601String(),
+        });
+        await started;
+
+        expect(controller.capture.value, isNull);
+        expect(controller.stage.value, CaptureStage.idle);
+      },
+    );
+
+    // UAT review A1 (High). ATTP-05 keeps the last fix while the location is
+    // re-checked on resume, and only the QR path waited for the check. A face
+    // attempt started in that window went up with the coordinates from before
+    // the app was left — inside the fence, wherever the person now is.
+    test(
+      'no face attempt starts while the location is being re-checked',
+      () async {
+        geofenced();
+        inside();
+        when(() => repository.context()).thenAnswer(
+          (_) async => contextOf(
+            faceEnrolled: true,
+            locationRequired: true,
+            radius: 100,
+          ),
+        );
+        when(
+          () => location.currentPosition(),
+        ).thenAnswer((_) async => LocationSuccess(fix()));
+        when(
+          () => repository.faceChallenge(any()),
+        ).thenAnswer((_) => Completer<Map<String, dynamic>>().future);
+        final controller = await boot();
+        await controller.switchTo(AttendanceMethod.face);
+        expect(controller.locationStatus.value, LocationStatus.ready);
+
+        final pending = Completer<LocationResult>();
+        when(
+          () => location.currentPosition(mayAsk: false),
+        ).thenAnswer((_) => pending.future);
+        controller.didChangeAppLifecycleState(AppLifecycleState.inactive);
+        controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+        await pumpEventQueue();
+        expect(controller.locationStatus.value, LocationStatus.checking);
+
+        await controller.startFace();
+
+        verifyNever(() => repository.faceChallenge(any()));
+        pending.complete(LocationSuccess(fix()));
+        await pumpEventQueue();
+      },
+    );
+
+    // UAT review A2. Switching to QR while the face challenge was loading: the
+    // late challenge was dropped (ATTP-07) but nothing restarted the QR camera,
+    // because the switch happened while the stage was not idle.
+    test(
+      'a dropped challenge hands the screen back to a running QR camera',
+      () async {
+        when(
+          () => repository.context(),
+        ).thenAnswer((_) async => contextOf(faceEnrolled: true));
+        final pending = Completer<Map<String, dynamic>>();
+        when(
+          () => repository.faceChallenge(any()),
+        ).thenAnswer((_) => pending.future);
+        final controller = await boot();
+        await controller.switchTo(AttendanceMethod.face);
+
+        final started = controller.startFace();
+        await pumpEventQueue();
+        await controller.switchTo(AttendanceMethod.qr);
+        final before = scanner.starts;
+        pending.complete({
+          'challenge_id': 'c',
+          'token': 't',
+          'actions': <Object>[],
+          'expires_at': DateTime.now()
+              .add(const Duration(minutes: 2))
+              .toIso8601String(),
+        });
+        await started;
+        await pumpEventQueue();
+
+        expect(controller.stage.value, CaptureStage.idle);
+        expect(scanner.starts, greaterThan(before));
+      },
+    );
+
+    // UAT review A3. ATTP-04 said a resume must not ask for location again —
+    // but with the status unloaded, resume reloads it, and the reload asked.
+    // The second "deny" from the dialog's own resume is permanent on Android 11+.
+    test(
+      'a resume that reloads an unloaded status does not ask for location',
+      () async {
+        when(
+          () => repository.context(),
+        ).thenThrow(const ApiException('offline', code: 'network_unreachable'));
+        when(() => location.currentPosition()).thenAnswer(
+          (_) async => const LocationRejected(LocationFailure.permissionDenied),
+        );
+        when(() => location.currentPosition(mayAsk: false)).thenAnswer(
+          (_) async => const LocationRejected(LocationFailure.permissionDenied),
+        );
+        final controller = await boot();
+        expect(controller.contextUnavailable.value, isTrue);
+        clearInteractions(location);
+
+        controller.didChangeAppLifecycleState(AppLifecycleState.inactive);
+        controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+        await pumpEventQueue();
+
+        verifyNever(() => location.currentPosition());
+      },
+    );
+
+    // UAT review A7. The success haptic is for a clock the server wrote; a
+    // 202 is a clock waiting for a person to look at it.
+    test('a clock awaiting review does not feel like a success', () async {
+      final calls = <String>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            if (call.method == 'HapticFeedback.vibrate') {
+              calls.add('${call.arguments}');
+            }
+            return null;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+      when(
+        () => repository.redeem(
+          any(),
+          fallbackDirection: any(named: 'fallbackDirection'),
+          position: any(named: 'position'),
+          idempotencyKey: any(named: 'idempotencyKey'),
+        ),
+      ).thenAnswer(
+        (_) async => const AttendanceAccepted(
+          AttendanceReceipt(
+            direction: PresenceDirection.clockIn,
+            message: 'Menunggu konfirmasi.',
+            pendingReview: true,
+          ),
+        ),
+      );
+      final controller = await boot();
+
+      await controller.onDetect(capture(departmentPayload()));
+
+      expect(controller.receipt.value?.pendingReview, isTrue);
+      expect(calls, isNot(contains('HapticFeedbackType.mediumImpact')));
+    });
+
+    // ATTP-08. With nothing owed, the refusal was set but the stage was not —
+    // and only a `refused` stage is drawn. The button did nothing.
+    test(
+      'a refused camera on the face method is remembered for the screen',
+      () async {
+        when(
+          () => repository.context(),
+        ).thenAnswer((_) async => contextOf(faceEnrolled: true));
+        when(
+          () => permission.status(),
+        ).thenAnswer((_) async => CameraPermission.permanentlyDenied);
+        when(
+          () => permission.request(),
+        ).thenAnswer((_) async => CameraPermission.permanentlyDenied);
+        final controller = await boot();
+        await controller.switchTo(AttendanceMethod.face);
+
+        await controller.startFace();
+
+        expect(
+          controller.faceCameraPermission.value,
+          CameraPermission.permanentlyDenied,
+        );
+      },
+    );
+
+    test('starting a face attempt with nothing owed says why', () async {
+      when(() => repository.context()).thenAnswer(
+        (_) async => contextOf(faceEnrolled: true, nextPresence: null),
+      );
+      final controller = await boot();
+      await controller.switchTo(AttendanceMethod.face);
+
+      await controller.startFace();
+
+      expect(controller.stage.value, CaptureStage.refused);
+      expect(controller.refusal.value, isNotNull);
+    });
+
+    // ATTP-11. Asking for a challenge writes nothing; a timeout there is a
+    // try-again, not "check your history before trying".
+    test('a challenge that times out may simply be asked for again', () async {
+      when(
+        () => repository.context(),
+      ).thenAnswer((_) async => contextOf(faceEnrolled: true));
+      when(
+        () => repository.faceChallenge(any()),
+      ).thenThrow(const ApiException('Koneksi terlalu lama.', code: 'timeout'));
+      final controller = await boot();
+      await controller.switchTo(AttendanceMethod.face);
+
+      await controller.startFace();
+
+      expect(controller.refusal.value?.kind, RefusalKind.transient);
+    });
+
+    // ATTP-12 / ATTD-04. With the context unloaded the direction is unknown,
+    // not "complete" — and the screen can try again.
+    group('when the attendance status could not be loaded', () {
+      setUp(() {
+        when(
+          () => repository.context(),
+        ).thenThrow(const ApiException('Offline', code: 'network_unreachable'));
+      });
+
+      test('a machine code is not refused as "already complete"', () async {
+        final controller = await boot();
+
+        await controller.onDetect(capture(machineCode()));
+
+        expect(controller.refusal.value?.message, contains('belum dimuat'));
+        verifyNever(
+          () => repository.redeem(
+            any(),
+            fallbackDirection: any(named: 'fallbackDirection'),
+            position: any(named: 'position'),
+            idempotencyKey: any(named: 'idempotencyKey'),
+          ),
+        );
+      });
+
+      // UAT review A8. The refusal panel covered a camera still reading codes.
+      test('the camera stops behind the refusal', () async {
+        final controller = await boot();
+        expect(controller.scannerState.value, ScannerState.ready);
+
+        await controller.onDetect(capture(machineCode()));
+
+        expect(controller.scannerState.value, ScannerState.idle);
+      });
+
+      test('trying again loads the status first', () async {
+        final controller = await boot();
+        when(() => repository.context()).thenAnswer((_) async => contextOf());
+
+        await controller.retryCapture();
+
+        expect(controller.context.value, isNotNull);
+      });
+
+      test('coming back to the app tries again', () async {
+        final controller = await boot();
+        when(() => repository.context()).thenAnswer((_) async => contextOf());
+
+        controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+        await pumpEventQueue();
+
+        expect(controller.contextUnavailable.value, isFalse);
+        expect(controller.context.value, isNotNull);
+      });
+    });
+
+    // ATTP-14. QR switched off and a face enrolled: open on the face.
+    test('a workspace without QR opens on the face method', () async {
+      when(() => repository.context()).thenAnswer(
+        (_) async => contextOf(qrEnabled: false, faceEnrolled: true),
+      );
+
+      final controller = await boot();
+
+      expect(controller.mode.value, AttendanceMethod.face);
     });
   });
 }

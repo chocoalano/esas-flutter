@@ -37,6 +37,30 @@ class ShiftTrack extends StatelessWidget {
   /// Keduanya dibawa [HomeController.wrapMinutes] supaya shift yang melewati
   /// tengah malam tidak menghasilkan panjang negatif.
   double? get _progress {
+    final int? now = timeOut == null
+        ? HomeController.nowMinutes()
+        : HomeController.minutesOfDay(timeOut);
+
+    if (now == null) return null;
+
+    return progressFor(
+      scheduleIn: scheduleIn,
+      scheduleOut: scheduleOut,
+      timeIn: timeIn,
+      timeOut: timeOut,
+      nowMinutes: now,
+    );
+  }
+
+  /// How far through the shift [nowMinutes] is, 0–1, or null when the
+  /// schedule has no length.
+  static double? progressFor({
+    required String scheduleIn,
+    required String scheduleOut,
+    required String? timeIn,
+    required String? timeOut,
+    required int nowMinutes,
+  }) {
     final int? start = HomeController.minutesOfDay(scheduleIn);
     final int? end = HomeController.minutesOfDay(scheduleOut);
 
@@ -49,15 +73,27 @@ class ShiftTrack extends StatelessWidget {
     // merusak `Align`.
     if (span == 0) return null;
 
-    final int? nowRef = timeOut == null
-        ? HomeController.nowMinutes()
-        : HomeController.minutesOfDay(timeOut);
-
-    if (nowRef == null) return null;
+    final int nowRef = timeOut == null
+        ? nowMinutes
+        : (HomeController.minutesOfDay(timeOut) ?? nowMinutes);
 
     final int elapsed = HomeController.wrapMinutes(nowRef - start);
 
-    return (elapsed / span).clamp(0.0, 1.0);
+    if (elapsed <= span) return elapsed / span;
+
+    // Outside the shift (HOME-01). Before the start, the wrap made "30 minutes
+    // early" read as "a day in" and the rail drew full every morning.
+    //
+    // Not clocked in: today's shift has not begun, whichever edge is nearer —
+    // a night shift at 10:00 is this evening's, not last night's.
+    if (timeIn == null) return 0.0;
+
+    // Clocked in: the nearer edge decides. Early for the start is "not begun",
+    // past the end is "over".
+    final int offShift = Duration.minutesPerDay - span;
+    final int sinceEnd = elapsed - span;
+
+    return sinceEnd > offShift / 2 ? 0.0 : 1.0;
   }
 
   @override

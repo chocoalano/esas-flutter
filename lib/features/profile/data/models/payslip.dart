@@ -41,6 +41,17 @@ class Payslip {
   String get runLabel => asString(period['run_label']) ?? 'Gaji bulanan';
   String get statusLabel =>
       period['status'] == 'paid' ? 'Dibayar' : 'Disetujui';
+
+  /// The dates the slip covers, or null when it names none (PROF-12). A THR
+  /// or other off-cycle run has no start and end date, and printing the map
+  /// lookups read "null – null".
+  String? get periodLabel {
+    final start = asString(period['start_date']);
+    final end = asString(period['end_date']);
+
+    if (start == null || end == null) return start ?? end;
+    return start == end ? start : '$start – $end';
+  }
 }
 
 class PayslipPage {

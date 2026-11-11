@@ -1,12 +1,15 @@
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 
 import 'app/bindings/initial_binding.dart';
+import 'core/services/app_version_service.dart';
 import 'core/boot/boot_pipeline.dart';
 import 'core/config/server_config.dart';
+import 'core/storage/install_identity.dart';
 import 'core/storage/local_storage.dart';
 import 'core/storage/secure_store.dart';
 import 'core/storage/token_storage.dart';
@@ -43,7 +46,38 @@ import 'utils/notification/notification_services.dart';
 /// can open and say what is missing instead of failing silently the way the old
 /// `try { Firebase.initializeApp() } catch { debugPrint }` did.
 Future<BootReport> bootstrap() async {
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Material(
+      color: Colors.transparent,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 32, color: Colors.grey),
+              const SizedBox(height: 8),
+              const Text(
+                'Terjadi kesalahan',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  };
+
   final pipeline = BootPipeline();
+
+  // ── TLS ──────────────────────────────────────────────────────────────────
+  // First, before any HTTP client exists (UAT review C2). `ApiClient` builds
+  // its main `HttpClient` when `InitialBinding` registers it, and an override
+  // installed after that never reached it. Strict TLS in release builds;
+  // development hosts are trusted only in debug, via the assert-scoped
+  // installDevHttpOverrides().
+  installDevHttpOverrides();
 
   // ── Local storage ────────────────────────────────────────────────────────
   // Fatal. The theme, the session and the cached user all live here; an app
@@ -65,6 +99,15 @@ Future<BootReport> bootstrap() async {
   final secureStore = KeychainSecureStore();
   final serverConfig = ServerConfig(store: secureStore);
   final tenantContext = TenantContext(store: secureStore);
+
+  // ── Install identity ─────────────────────────────────────────────────────
+  // Before anything is restored from the keychain. On iOS the keychain
+  // outlives an uninstall, so a reinstall would otherwise come up signed in as
+  // whoever used the phone before it was handed on (CORE-02).
+  await pipeline.optional(
+    'install-identity',
+    () => InstallIdentity(local: localStorage, secure: secureStore).reconcile(),
+  );
 
   // ── Server address and workspace ─────────────────────────────────────────
   // Optional, and deliberately: both fall back to the compiled-in seed, and a
@@ -140,18 +183,17 @@ Future<BootReport> bootstrap() async {
     );
   }
 
+  // ── App version ──────────────────────────────────────────────────────────
+  // Non-fatal: shown in the profile footer. If this fails (e.g. during tests
+  // where PackageInfo has no native host), the footer simply stays blank.
+  await pipeline.optional('app-version', AppVersionService.load);
+
   // ── Presentation chrome ──────────────────────────────────────────────────
   await pipeline.optional('system-ui', () async {
     applySystemUiOverlayStyle(
       isDarkMode: Get.find<ThemeController>().isDarkMode,
     );
   });
-
-  // ── TLS ──────────────────────────────────────────────────────────────────
-  // Enforces strict TLS validation in release builds. Development hosts
-  // (IP literals and local test domains) are supported only in debug mode
-  // via assert-scoped installDevHttpOverrides().
-  installDevHttpOverrides();
 
   final report = pipeline.report;
 

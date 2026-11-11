@@ -17,7 +17,5 @@ class InboxRepository {
     required String taskId,
     required String decision,
     String? note,
-  }) =>
-      _api.decide(taskId: taskId, decision: decision, note: note);
+  }) => _api.decide(taskId: taskId, decision: decision, note: note);
 }
-

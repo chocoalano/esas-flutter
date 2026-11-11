@@ -8,7 +8,7 @@ import '../../data/repositories/itms_repository.dart';
 
 class ItmsDashboardController extends GetxController {
   ItmsDashboardController({required ItmsRepository repository})
-      : _repository = repository;
+    : _repository = repository;
 
   final ItmsRepository _repository;
 
@@ -18,6 +18,14 @@ class ItmsDashboardController extends GetxController {
   final RxList<ItmsTicket> tickets = <ItmsTicket>[].obs;
   final RxList<ItmsService> services = <ItmsService>[].obs;
   final RxList<ItmsKnowledgeArticle> articles = <ItmsKnowledgeArticle>[].obs;
+
+  /// The rows one page of tickets holds — what the API is asked for.
+  static const int pageSize = 20;
+
+  /// Tickets still waiting on somebody (ITMS-01). "Aktif" used to count the
+  /// resolved and closed ones too.
+  List<ItmsTicket> get activeTickets =>
+      tickets.where((ticket) => !ticket.isClosed).toList();
 
   @override
   void onInit() {
@@ -47,4 +55,3 @@ class ItmsDashboardController extends GetxController {
     }
   }
 }
-

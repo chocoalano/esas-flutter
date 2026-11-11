@@ -59,6 +59,8 @@ class AttendanceListItem extends StatelessWidget {
       timeOut: attendance.timeOut,
       datePresence: attendance.datePresence,
       hasSchedule: attendance.hasSchedule,
+      crossesMidnight: attendance.crossesMidnight,
+      shiftOut: attendance.shiftOut,
     );
 
     final String? meta = _metaLine(attendance);

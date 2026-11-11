@@ -36,12 +36,24 @@ abstract class ProfileSectionController extends GetxController {
       userInfo.value = await _repository.currentUser(refresh: refresh);
       onProfileLoaded(userInfo.value);
     } on ApiException catch (error) {
-      errorMessage.value = error.isTransportFailure
-          ? 'Tidak dapat terhubung ke server.'
-          : 'Data pengguna tidak ditemukan.';
+      errorMessage.value = describe(error);
+    } catch (error) {
+      // A reply that did not parse. It used to escape this method and leave
+      // the tab spinning (PROF-06).
+      errorMessage.value =
+          'Data profil tidak dapat dibaca. Coba lagi beberapa saat lagi.';
     } finally {
       isLoading.value = false;
     }
+  }
+
+  /// Say what actually went wrong (PROF-06). Only a 404 is "not found"; any
+  /// other refusal carries the server's own words, which `ApiClient` already
+  /// made readable.
+  static String describe(ApiException error) {
+    if (error.isTransportFailure) return 'Tidak dapat terhubung ke server.';
+    if (error.status == 404) return 'Data pengguna tidak ditemukan.';
+    return error.message;
   }
 
   /// Hook for a tab that derives lists from the record.

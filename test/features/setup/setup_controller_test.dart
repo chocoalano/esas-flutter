@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:esas/core/config/env.dart';
 import 'package:esas/core/config/server_config.dart';
 import 'package:esas/core/network/api_exception.dart';
@@ -7,6 +9,7 @@ import 'package:esas/features/setup/data/repositories/workspace_repository.dart'
 import 'package:esas/features/setup/data/services/workspace_api_service.dart';
 import 'package:esas/features/setup/presentation/controllers/setup_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:get/get.dart';
 
 Future<SetupController> _controller() async {
   final store = InMemorySecureStore();
@@ -174,6 +177,142 @@ void main() {
       // Left standing over an edited field, the confirmation would offer a way
       // onward for an address nothing has ever reached.
       expect(controller.confirmedName.value, isNull);
+    });
+  });
+
+  group('remediasi setup', () {
+    late InMemorySecureStore store;
+    late WorkspaceRepository repository;
+    late Completer<({int? status, Object? body})> answer;
+    late SetupController setup;
+
+    setUp(() async {
+      Get.testMode = true;
+      store = InMemorySecureStore();
+      final serverConfig = ServerConfig(store: store);
+      final tenantContext = TenantContext(store: store);
+      await serverConfig.restore();
+      await tenantContext.restore();
+      answer = Completer();
+      repository = WorkspaceRepository(
+        serverConfig: serverConfig,
+        tenantContext: tenantContext,
+        api: WorkspaceApiService(probe: (url, headers) => answer.future),
+      );
+      setup = SetupController(repository: repository)..onInit();
+      setup.domainController.text = 'hrms.example.com';
+      setup.workspaceController.text = 'acme';
+    });
+
+    tearDown(() => setup.onClose());
+
+    const found = (
+      status: 200,
+      body: {'subdomain': 'acme', 'name': 'PT Acme Nusantara'},
+    );
+
+    // SETUP-01. The workspace was saved the moment the server answered — before
+    // the screen asked "is this your company?". A typo that reached another
+    // real company locked the handset to it, with no way back from login.
+    test('nothing is saved until the person goes on', () async {
+      final checked = setup.check();
+      answer.complete(found);
+      await checked;
+
+      expect(setup.confirmedName.value, 'PT Acme Nusantara');
+      expect(repository.isConfigured, isFalse);
+
+      await setup.proceed();
+
+      expect(repository.isConfigured, isTrue);
+      expect(repository.workspace, 'acme');
+    });
+
+    // UAT review C1. A start with no connection opens the login screen with the
+    // stored session kept (CORE-04), and that screen links to Setup. Adopting
+    // another workspace there left the old workspace's bearer token in place,
+    // to be sent to the new server with the next request.
+    test('moving to another workspace ends the session first', () async {
+      final serverConfig = ServerConfig(store: store);
+      final tenantContext = TenantContext(store: store);
+      await serverConfig.save(
+        domain: 'https://globex.example.com',
+        subdomainMode: false,
+      );
+      await tenantContext.remember('globex');
+      repository = WorkspaceRepository(
+        serverConfig: serverConfig,
+        tenantContext: tenantContext,
+        api: WorkspaceApiService(probe: (url, headers) => answer.future),
+      );
+      String? workspaceWhenEnded;
+      var ended = 0;
+      setup.onClose();
+      setup = SetupController(
+        repository: repository,
+        endSession: () async {
+          ended++;
+          workspaceWhenEnded = repository.workspace;
+        },
+      )..onInit();
+      setup.domainController.text = 'hrms.example.com';
+      setup.workspaceController.text = 'acme';
+
+      final checked = setup.check();
+      answer.complete(found);
+      await checked;
+      await setup.proceed();
+
+      expect(ended, 1);
+      // Ended while the old workspace was still the configured one, so the
+      // sign-out reaches the server that issued the token.
+      expect(workspaceWhenEnded, 'globex');
+      expect(repository.workspace, 'acme');
+    });
+
+    test('confirming the same workspace again keeps the session', () async {
+      var ended = 0;
+      setup.onClose();
+      setup = SetupController(
+        repository: repository,
+        endSession: () async => ended++,
+      )..onInit();
+      setup.domainController.text = 'hrms.example.com';
+      setup.workspaceController.text = 'acme';
+      var checked = setup.check();
+      answer.complete(found);
+      await checked;
+      await setup.proceed();
+      expect(ended, 1, reason: 'first setup: nothing to keep, nothing lost');
+
+      ended = 0;
+      answer = Completer();
+      setup.workspaceController.text = 'acme ';
+      setup.workspaceController.text = 'acme';
+      checked = setup.check();
+      answer.complete(found);
+      await checked;
+      await setup.proceed();
+
+      expect(ended, 0);
+    });
+
+    // SETUP-02. Auto-capitalisation typed "Acme", refused before the
+    // lower-casing that the save applies anyway.
+    test('a capitalised workspace is accepted as the label it is', () {
+      expect(setup.validateWorkspace('Acme'), isNull);
+      expect(setup.validateWorkspace(' acme '), isNull);
+    });
+
+    // SETUP-03. An answer for values since edited must not land.
+    test('an answer for values since edited is dropped', () async {
+      final checked = setup.check();
+      setup.workspaceController.text = 'acne';
+      answer.complete(found);
+      await checked;
+
+      expect(setup.confirmedName.value, isNull);
+      expect(repository.isConfigured, isFalse);
     });
   });
 }

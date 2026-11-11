@@ -256,6 +256,26 @@ class FirebaseMessagingService extends GetxService {
     Get.find<NotificationSyncService>().open(data);
   }
 
+  /// Matikan token push perangkat ini (AUTH-02).
+  ///
+  /// Dipanggil setiap kali sesi berakhir, bagaimanapun berakhirnya. Token
+  /// yang dihapus di perangkat menjadi token mati di server, jadi notifikasi
+  /// karyawan sebelumnya berhenti mendarat di handset yang dipakai bergantian
+  /// — juga ketika `POST /auth/logout` tidak pernah sampai.
+  ///
+  /// Token pengganti yang diterbitkan Firebase sesudahnya tidak didaftarkan
+  /// atas nama siapa pun: [setupToken] menolak bekerja tanpa sesi, dan sesi
+  /// berikutnya mendaftarkannya lewat [ensurePushRegistered].
+  Future<void> discardToken() async {
+    _fcmToken.value = '';
+
+    try {
+      await _firebaseMessaging.deleteToken();
+    } on Object catch (error) {
+      AppLogger.warning('Could not delete the FCM token: $error');
+    }
+  }
+
   // Metode opsional untuk mengambil token FCM saat ini dari luar service
   Future<String?> getFCMToken() async {
     return await _firebaseMessaging.getToken();

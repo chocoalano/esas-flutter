@@ -23,6 +23,7 @@ Future<T?> showAppBottomSheet<T>(
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: isScrollControlled,
+    useSafeArea: true,
     // Sheet yang memuat input harus naik bersama papan ketik; tanpa ini kolom
     // catatan penolakan tertutup oleh keyboard di layar kecil.
     builder: (context) => Padding(

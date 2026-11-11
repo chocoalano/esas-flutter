@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io' as io;
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
@@ -73,14 +76,12 @@ class ApiClient extends GetConnect {
     Duration timeout = const Duration(seconds: 30),
     Duration scoringTimeout = defaultScoringTimeout,
     Future<void> Function()? onUnauthorized,
-    Future<void> Function()? onConnectionLost,
   }) : _serverConfig = serverConfig,
        _tenantContext = tenantContext,
        _auth = authInterceptor,
        _timeout = timeout,
        _scoringTimeout = scoringTimeout,
-       _onUnauthorized = onUnauthorized,
-       _onConnectionLost = onConnectionLost;
+       _onUnauthorized = onUnauthorized;
 
   final ServerConfig _serverConfig;
   final TenantContext _tenantContext;
@@ -114,10 +115,11 @@ class ApiClient extends GetConnect {
   ///
   /// Deliberately **authenticated requests only**. A 401 from `login` means the
   /// credentials were wrong, not that a session died.
+  ///
+  /// There is no counterpart for a connection failure, and that is deliberate:
+  /// a timeout or an unreachable server says nothing about the credential
+  /// (CORE-04).
   final Future<void> Function()? _onUnauthorized;
-
-  /// End an authenticated session when its required server connection fails.
-  final Future<void> Function()? _onConnectionLost;
 
   @override
   void onInit() {
@@ -216,6 +218,70 @@ class ApiClient extends GetConnect {
     });
   }
 
+  /// Download a file the server keeps private, as bytes (PRMT-03).
+  ///
+  /// Its own transport, because GetConnect decodes every body as UTF-8 text on
+  /// the way in — which corrupts a PDF or a photograph, or throws on it. The
+  /// destination and headers are the ones every other request gets: the
+  /// tenant origin, the credential, `X-Tenant`. Nothing goes in the URL, so
+  /// there is no address that works without the session.
+  ///
+  /// Authenticated only. Refusals arrive as [ApiException] with the server's
+  /// sentence, and a 401 ends the session exactly as it does elsewhere.
+  Future<Uint8List> getBytes(String path) {
+    return _guardSession(true, () async {
+      final origin = _serverConfig.originFor(_tenantContext.tenant);
+
+      if (origin == null) {
+        throw const ApiException(
+          'Alamat server belum diatur.',
+          code: 'server_not_configured',
+        );
+      }
+
+      final url = rebase(Uri.parse('$placeholderBaseUrl$path'), origin);
+      final http = io.HttpClient()..connectionTimeout = _timeout;
+
+      try {
+        final request = await http.getUrl(url).timeout(_timeout);
+        _auth
+            .headersFor(authenticated: true)
+            .forEach((name, value) => request.headers.set(name, value));
+
+        final response = await request.close().timeout(_timeout);
+        final bytes = BytesBuilder(copy: false);
+
+        await for (final chunk in response.timeout(_timeout)) {
+          bytes.add(chunk);
+        }
+
+        final body = bytes.takeBytes();
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          return body;
+        }
+
+        Object? decoded;
+        try {
+          decoded = jsonDecode(utf8.decode(body));
+        } on FormatException {
+          decoded = null;
+        }
+
+        throw ApiErrorMapper.fromResponse(
+          status: response.statusCode,
+          body: decoded,
+        );
+      } on ApiException {
+        rethrow;
+      } on Object catch (error) {
+        throw ApiErrorMapper.fromTransportError(error);
+      } finally {
+        http.close(force: true);
+      }
+    });
+  }
+
   Future<List<dynamic>> getList(
     String path, {
     Map<String, dynamic>? query,
@@ -238,24 +304,37 @@ class ApiClient extends GetConnect {
     });
   }
 
+  /// Post a JSON body.
+  ///
+  /// [awaitsModel] is for the AI chat turns, whose answer waits on a language
+  /// model: the server bounds a turn at about 29 s, which leaves the ordinary
+  /// 30 s deadline a second or two for the network (AI-02). They are given the
+  /// longer deadline [postForm] gives face scoring, for the same reason — the
+  /// backend is known to be waiting too.
   Future<Map<String, dynamic>> postObject(
     String path,
     Object? body, {
     Map<String, dynamic>? query,
     bool authenticated = true,
     Map<String, String>? headers,
+    bool awaitsModel = false,
   }) async {
+    final requestHeaders = _auth.headersFor(
+      authenticated: authenticated,
+      extra: headers,
+    );
+    final requestQuery = _stringifyQuery(query);
+
     return _guardSession(authenticated, () async {
       final response = await _send(
-        () => post(
-          path,
-          body,
-          query: _stringifyQuery(query),
-          headers: _auth.headersFor(
-            authenticated: authenticated,
-            extra: headers,
-          ),
-        ),
+        () => awaitsModel
+            ? _scoring.post<dynamic>(
+                path,
+                body: body,
+                query: requestQuery,
+                headers: requestHeaders,
+              )
+            : post(path, body, query: requestQuery, headers: requestHeaders),
       );
 
       return _asObject(response);
@@ -429,14 +508,17 @@ class ApiClient extends GetConnect {
       return await run();
     } on ApiException catch (error) {
       // A reply to a previous account must never end a newly signed-in session.
+      //
+      // Only the server's own verdict ends a session. A timeout, a missing
+      // route or a radio that has not woken up says nothing about whether the
+      // credential is good — and treating it as if it did signed people out
+      // from background refreshes and from attendance the server had already
+      // recorded (CORE-04). The caller still receives the exception.
       if (credential != null &&
           credential ==
-              _auth.headersFor(authenticated: true)['Authorization']) {
-        if (error.isUnauthenticated) {
-          await _onUnauthorized?.call();
-        } else if (error.isConnectionFailure) {
-          await _onConnectionLost?.call();
-        }
+              _auth.headersFor(authenticated: true)['Authorization'] &&
+          error.isUnauthenticated) {
+        await _onUnauthorized?.call();
       }
 
       rethrow;
@@ -525,9 +607,33 @@ class ApiClient extends GetConnect {
       // try again" for a dead socket, "it may have been recorded, check first"
       // for an answer that never came. Without this every timeout was the
       // former.
-      if ((response.statusText ?? '').startsWith('TimeoutException')) {
+      final String reason = response.statusText ?? '';
+
+      if (reason.startsWith('TimeoutException')) {
         throw ApiErrorMapper.fromTransportError(
           TimeoutException(response.statusText),
+        );
+      }
+
+      // Nor is every other exception the network (CORE-05). An untrusted
+      // certificate and a malformed address used to read "Tidak ada koneksi
+      // internet" and send people to check a Wi-Fi that was working.
+      if (reason.startsWith('HandshakeException') ||
+          reason.startsWith('TlsException') ||
+          reason.contains('CERTIFICATE_VERIFY_FAILED')) {
+        throw const ApiException(
+          'Koneksi aman ke server tidak dapat diverifikasi. Hubungi '
+          'administrator.',
+          code: 'tls_failure',
+        );
+      }
+
+      if (reason.startsWith('FormatException') ||
+          reason.startsWith('Invalid argument') ||
+          reason.startsWith('ArgumentError')) {
+        throw const ApiException(
+          'Alamat server tidak valid. Periksa pengaturan server.',
+          code: 'client_error',
         );
       }
 

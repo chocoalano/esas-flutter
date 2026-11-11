@@ -2,27 +2,56 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import '../network/idempotency_key.dart';
+import '../storage/secure_store.dart';
+import '../storage/storage_keys.dart';
 import '../utils/app_logger.dart';
 
-/// A stable per-installation identifier for this handset.
+/// The identifier this handset is bound to for attendance (CORE-03).
 ///
-/// Lifted out of `LoginController`, which built it inline and swallowed both
-/// failure paths into `print`. The backend records it as `device_info` on the
-/// account, so a value that silently degrades to `'device_info_error'` is a
-/// device record that means nothing — worth logging properly rather than
-/// printing.
+/// The backend binds an account to the first `device_id` it signs in with and
+/// refuses attendance from any other, which is what stops one employee
+/// clocking in for another. So the value has to be **unique per handset** and
+/// **stable** across updates.
+///
+/// It was neither. On Android it was `AndroidDeviceInfo.id`, which is
+/// `Build.ID` — a firmware label like `TP1A.220624.014`, identical on every
+/// phone running that build and different after every OS update. And every
+/// platform failure answered the constant `'device_info_error'`, shared by
+/// every handset that failed.
+///
+/// Now:
+///
+/// * **Android** — `Settings.Secure.ANDROID_ID`, read through a method channel
+///   in `MainActivity`: unique per handset and signing key, and it survives an
+///   OS update and a reinstall.
+/// * **iOS** — `identifierForVendor`, unchanged, so iOS bindings need no
+///   migration.
+/// * **Otherwise** — a random identifier minted once and kept in the keychain.
+///   Never a constant.
+///
+/// [legacyDeviceId] carries the old Android value at sign-in, once, so the
+/// server can move an existing binding onto the new identifier instead of
+/// treating every updated handset as a stranger.
 class DeviceInfoService {
-  DeviceInfoService([DeviceInfoPlugin? plugin])
-    : _plugin = plugin ?? DeviceInfoPlugin();
+  DeviceInfoService({
+    required SecureStore store,
+    Future<String?> Function()? platformId,
+    Future<String?> Function()? legacyId,
+  }) : _store = store,
+       _platformId = platformId ?? _defaultPlatformId,
+       _legacyId = legacyId ?? _defaultLegacyId;
 
-  final DeviceInfoPlugin _plugin;
+  final SecureStore _store;
+  final Future<String?> Function() _platformId;
+  final Future<String?> Function() _legacyId;
+
+  static const _channel = MethodChannel('esas/device');
 
   String? _cached;
 
-  /// The identifier, or a marked fallback if the platform will not give one.
-  ///
-  /// Never throws: failing to identify a handset must not be what stops
-  /// somebody signing in.
+  /// The identifier. Never throws, and never answers a value another handset
+  /// could also answer.
   Future<String> deviceId() async {
     final cached = _cached;
 
@@ -30,34 +59,81 @@ class DeviceInfoService {
       return cached;
     }
 
-    final id = await _resolve();
+    // A fallback, once minted, is this handset's name for good (UAT review
+    // C4). The server may already have bound the account to it; preferring
+    // the platform id on a later launch made the same phone a stranger.
+    final id =
+        await _store.read(StorageKeys.secure.deviceInstallId) ??
+        await _attempt(_platformId) ??
+        await _installId();
     _cached = id;
 
     return id;
   }
 
-  Future<String> _resolve() async {
+  /// What older builds sent as `device_id`, when it is not [deviceId].
+  ///
+  /// Null when there is nothing to migrate from: on iOS, where the value is
+  /// unchanged, or when the platform will not say.
+  Future<String?> legacyDeviceId() async {
+    final legacy = await _attempt(_legacyId);
+
+    if (legacy == null || legacy == await deviceId()) {
+      return null;
+    }
+
+    return legacy;
+  }
+
+  Future<String?> _attempt(Future<String?> Function() read) async {
     try {
-      if (GetPlatform.isAndroid) {
-        return (await _plugin.androidInfo).id;
-      }
+      final value = (await read())?.trim();
 
-      if (GetPlatform.isIOS) {
-        return (await _plugin.iosInfo).identifierForVendor ??
-            'unknown_ios_device';
-      }
-
-      return 'unknown_platform_device';
+      return value == null || value.isEmpty ? null : value;
     } on PlatformException catch (error) {
       AppLogger.warning('Could not read device info: ${error.code}');
-      return 'device_info_error';
+      return null;
     } catch (error, stackTrace) {
       AppLogger.error(
         'Unexpected failure reading device info',
         error: error,
         stackTrace: stackTrace,
       );
-      return 'device_info_general_error';
+      return null;
     }
+  }
+
+  Future<String> _installId() async {
+    final key = StorageKeys.secure.deviceInstallId;
+    final stored = await _store.read(key);
+
+    if (stored != null) {
+      return stored;
+    }
+
+    final minted = 'install-${IdempotencyKey.mint()}';
+    await _store.write(key, minted);
+
+    return minted;
+  }
+
+  static Future<String?> _defaultPlatformId() async {
+    if (GetPlatform.isAndroid) {
+      return _channel.invokeMethod<String>('androidId');
+    }
+
+    if (GetPlatform.isIOS) {
+      return (await DeviceInfoPlugin().iosInfo).identifierForVendor;
+    }
+
+    return null;
+  }
+
+  static Future<String?> _defaultLegacyId() async {
+    if (GetPlatform.isAndroid) {
+      return (await DeviceInfoPlugin().androidInfo).id;
+    }
+
+    return null;
   }
 }

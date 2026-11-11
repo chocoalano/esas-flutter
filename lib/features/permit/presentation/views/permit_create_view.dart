@@ -394,6 +394,14 @@ class PermitCreateView extends GetView<PermitCreateController> {
       // bentuk yang paling sering diajukan. Aturan lama menuntut "setelah",
       // padahal memilih jadwal mengisi kedua tanggal dengan hari yang sama:
       // formulir terbuka dalam keadaan yang tidak mungkin dikirim.
+      // The start date names the roster row the request is tied to. A day
+      // with none is refused here rather than sent with another day's
+      // schedule (PRMT-16).
+      if (notBeforeDate == null) {
+        final noSchedule = this.controller.scheduleErrorFor(value);
+        if (noSchedule != null) return noSchedule;
+      }
+
       final beforeRaw = notBeforeDate?.text.trim();
       if (beforeRaw != null &&
           beforeRaw.isNotEmpty &&
@@ -443,7 +451,9 @@ class PermitCreateView extends GetView<PermitCreateController> {
           ? null
           : PermitCreateController.minutesOfDay(otherRaw);
 
+      // A shift past midnight legitimately ends earlier on the clock (PRMT-11).
       if (other != null &&
+          !this.controller.selectedShiftCrossesMidnight &&
           (!sameDayOnly || this.controller.isSingleDay) &&
           minutes <= other) {
         return 'Harus setelah ${PermitCreateController.canonicalTime(otherRaw)}';

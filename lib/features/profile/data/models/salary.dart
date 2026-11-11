@@ -3,7 +3,8 @@ import '../../../../core/utils/json_parsers.dart';
 class Salaries {
   int? id;
   int? userId;
-  int? basicSalary;
+  /// A decimal: `decimal:2` arrives as `"5000000.00"` (PROF-03).
+  num? basicSalary;
   String? paymentType;
   dynamic createdAt;
   dynamic updatedAt;
@@ -23,7 +24,9 @@ class Salaries {
     // anything after the decimal point.
     id: asInt(json["id"]),
     userId: asInt(json["user_id"]),
-    basicSalary: asInt(json["basic_salary"]),
+    // `asDouble`, not `asInt`: Laravel's `decimal:2` sends a string such as
+    // "5000000.00", which `int.tryParse` reads as nothing (PROF-03).
+    basicSalary: asDouble(json["basic_salary"]),
     paymentType: asString(json["payment_type"]),
     createdAt: json["created_at"],
     updatedAt: json["updated_at"],

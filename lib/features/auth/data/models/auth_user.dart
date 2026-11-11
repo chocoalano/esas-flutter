@@ -125,12 +125,117 @@ class AuthUser {
   /// two have been observed to differ.
   int? get employeeUserId => asInt(dig(raw, ['employee', 'user_id']));
 
-  String? get jobPosition =>
-      asString(dig(raw, ['employee', 'job_position', 'name']));
+  /// The job title, as whichever payload sent it (PROF-02).
+  ///
+  /// Login and `/auth/me` send `job_position` flat, as a string; `/profile`
+  /// sends it on `employee`, also as a name. Only an older backend nested it
+  /// as `{name}` — the one shape this used to read, so it read nothing.
+  String? get jobPosition {
+    for (final candidate in [
+      raw['job_position'],
+      dig(raw, ['employee', 'job_position']),
+      dig(raw, ['employee', 'job_position', 'name']),
+    ]) {
+      if (candidate is String && candidate.trim().isNotEmpty) {
+        return candidate.trim();
+      }
+    }
+
+    return null;
+  }
 
   DateTime? get signDate => asDate(dig(raw, ['employee', 'sign_date']));
 
   Map<String, dynamic> toJson() => raw;
+
+  /// What of the session may be written to the device (PROF-01).
+  ///
+  /// The cached user lives in GetStorage: a plaintext JSON file in the
+  /// documents directory, included in device backups. It used to receive the
+  /// whole `/profile` reply — basic salary, bank account, NIK, family, date of
+  /// birth — because the profile screens merged it in to keep the dashboard in
+  /// step. Only what the getters above read is allowed through; everything
+  /// else stays in memory with the screen that fetched it.
+  ///
+  /// An allow-list rather than a deny-list: a field the server adds tomorrow is
+  /// kept off the disk until somebody decides it belongs there.
+  Map<String, dynamic> toSessionJson() => sessionSafe(raw);
+
+  static const _sessionKeys = <String>{
+    'id',
+    'tenant_id',
+    'name',
+    'nip',
+    'email',
+    'avatar',
+    'status',
+    'company_id',
+    'departement',
+    'job_position',
+    'attendance_enabled',
+    'face_enrolled',
+    'can_record_attendance',
+    'is_registered_device',
+    'device',
+    'abilities',
+    'active_modules',
+    'is_approver',
+    'timezone',
+    'server_time',
+    'unread_notification_count',
+    'notification_count',
+  };
+
+  static const _companyKeys = <String>{
+    'id',
+    'name',
+    'latitude',
+    'longitude',
+    'radius',
+  };
+
+  static const _employeeKeys = <String>{
+    'user_id',
+    'departement_id',
+    'departement',
+    'job_position',
+    'job_level',
+    'join_date',
+    'sign_date',
+  };
+
+  /// [raw] reduced to what [toSessionJson] allows.
+  static Map<String, dynamic> sessionSafe(Map<dynamic, dynamic> raw) {
+    final safe = <String, dynamic>{};
+
+    for (final entry in raw.entries) {
+      final key = '${entry.key}';
+      if (_sessionKeys.contains(key)) safe[key] = entry.value;
+    }
+
+    // Login sends `company` as a name, `/profile` as an object.
+    final company = raw['company'];
+    if (company is Map) {
+      safe['company'] = _pick(company, _companyKeys);
+    } else if (company != null) {
+      safe['company'] = company;
+    }
+
+    final employee = raw['employee'];
+    if (employee is Map) {
+      safe['employee'] = _pick(employee, _employeeKeys);
+    }
+
+    return safe;
+  }
+
+  static Map<String, dynamic> _pick(
+    Map<dynamic, dynamic> from,
+    Set<String> keys,
+  ) => {
+    for (final entry in from.entries)
+      if (keys.contains('${entry.key}')) '${entry.key}': entry.value,
+  };
 
   AuthUser copyWith({String? name, String? avatar}) {
     final next = Map<String, dynamic>.from(raw);
@@ -149,7 +254,8 @@ class AuthUser {
 
 /// What a session restore concluded.
 ///
-/// Connection loss clears this online session; HTTP errors remain distinct.
+/// Only the server's 401 ends a session. Not reaching the server says nothing
+/// about the credential, so it is kept (CORE-04).
 enum SessionState {
   /// No credential stored. Show login.
   absent,
@@ -160,7 +266,13 @@ enum SessionState {
   /// The server rejected the token. Clear it and show login.
   expired,
 
-  /// The required server connection failed. Clear the session and explain why.
+  /// The server could not be reached, and there is a cached user to show.
+  /// Keep the credential and open the app on what it already knows; the next
+  /// request that does reach the server settles the question.
+  unverified,
+
+  /// The server could not be reached and nothing is cached to show. Keep the
+  /// credential and explain that a connection is needed.
   connectionLost,
 
   /// Verification failed with an HTTP or data error. Keep the credential.

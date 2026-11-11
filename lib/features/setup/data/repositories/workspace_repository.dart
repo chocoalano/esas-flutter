@@ -50,7 +50,11 @@ class WorkspaceRepository {
   /// configuration first — as the sibling app does — leaves a handset pointed at
   /// an address nothing has answered for as long as the request takes, and
   /// permanently if the process dies in between.
-  Future<Workspace> connect({
+  /// Ask the server whether this address and workspace exist — and store
+  /// nothing (SETUP-01). Saving at this point committed the handset before
+  /// the screen had asked "is this your company?"; a typo that reached
+  /// another real workspace locked it there.
+  Future<WorkspaceCandidate> probe({
     required String domain,
     required String workspace,
     required bool subdomainMode,
@@ -84,12 +88,49 @@ class WorkspaceRepository {
 
     final found = await _api.check(origin: origin, workspace: code);
 
-    await _serverConfig.save(domain: address, subdomainMode: subdomainMode);
-    await _tenantContext.remember(code);
+    return WorkspaceCandidate(
+      workspace: found,
+      address: address,
+      code: code,
+      subdomainMode: subdomainMode,
+    );
+  }
 
-    AppLogger.info('Workspace configured: ${found.subdomain} at $address.');
+  /// Store a workspace the person has confirmed is theirs (SETUP-01).
+  /// Whether [candidate] is the workspace this handset is already set to.
+  bool isCurrent(WorkspaceCandidate candidate) =>
+      _serverConfig.domain == candidate.address &&
+      _tenantContext.tenant == candidate.code &&
+      _serverConfig.subdomainMode == candidate.subdomainMode;
 
-    return found;
+  Future<void> adopt(WorkspaceCandidate candidate) async {
+    await _serverConfig.save(
+      domain: candidate.address,
+      subdomainMode: candidate.subdomainMode,
+    );
+    await _tenantContext.remember(candidate.code);
+
+    AppLogger.info(
+      'Workspace configured: ${candidate.workspace.subdomain} at '
+      '${candidate.address}.',
+    );
+  }
+
+  /// Probe and store in one step, for a caller with nobody to ask.
+  Future<Workspace> connect({
+    required String domain,
+    required String workspace,
+    required bool subdomainMode,
+  }) async {
+    final candidate = await probe(
+      domain: domain,
+      workspace: workspace,
+      subdomainMode: subdomainMode,
+    );
+
+    await adopt(candidate);
+
+    return candidate.workspace;
   }
 
   /// Forget the workspace, so this handset can be handed to another company.
@@ -103,4 +144,19 @@ class WorkspaceRepository {
 
     AppLogger.info('Workspace forgotten; this handset needs setting up again.');
   }
+}
+
+/// A workspace the server confirmed exists, not yet adopted by this handset.
+class WorkspaceCandidate {
+  const WorkspaceCandidate({
+    required this.workspace,
+    required this.address,
+    required this.code,
+    required this.subdomainMode,
+  });
+
+  final Workspace workspace;
+  final String address;
+  final String code;
+  final bool subdomainMode;
 }

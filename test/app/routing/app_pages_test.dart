@@ -1,4 +1,8 @@
 import 'package:esas/app/routing/app_pages.dart';
+import 'package:esas/features/ai_chat/presentation/routes/ai_chat_routes.dart';
+import 'package:esas/features/gams/presentation/routes/gams_routes.dart';
+import 'package:esas/features/inbox/presentation/routes/inbox_routes.dart';
+import 'package:esas/features/itms/presentation/routes/itms_routes.dart';
 import 'package:esas/features/attendance/presentation/routes/attendance_routes.dart';
 import 'package:esas/features/auth/presentation/routes/auth_routes.dart';
 import 'package:esas/features/home/presentation/routes/home_routes.dart';
@@ -59,6 +63,25 @@ void main() {
         '/profile/payroll',
         '/profile/change-password',
         '/profile/bug-report',
+        // Added with the module registry and the self-service extensions.
+        // Each one is a page a tile, a notification or a deep link opens;
+        // `registry_routes_test.dart` pins that every advertised tile is here.
+        '/schedule',
+        '/overtime',
+        '/profile/financial',
+        '/ai/chat',
+        '/gams',
+        '/gams/service-requests',
+        '/gams/space-reservations',
+        '/gams/vehicle-bookings',
+        '/gams/visitor-passes',
+        '/itms',
+        '/itms/tickets',
+        '/itms/catalog',
+        '/itms/knowledge',
+        // ITMS-01: "Lapor" had nowhere to go but the dashboard it sat on.
+        '/itms/tickets/create',
+        '/inbox/approvals',
       });
     });
 
@@ -89,6 +112,21 @@ void main() {
         ProfileRoutes.payroll,
         ProfileRoutes.changePassword,
         ProfileRoutes.bugReport,
+        ProfileRoutes.financial,
+        HomeRoutes.schedule,
+        AttendanceRoutes.overtime,
+        AiChatRoutes.chat,
+        GamsRoutes.gams,
+        GamsRoutes.serviceRequests,
+        GamsRoutes.spaceReservations,
+        GamsRoutes.vehicleBookings,
+        GamsRoutes.visitorPasses,
+        ItmsRoutes.itms,
+        ItmsRoutes.tickets,
+        ItmsRoutes.catalog,
+        ItmsRoutes.knowledge,
+        ItmsRoutes.ticketCreate,
+        InboxRoutes.inbox,
       ]) {
         expect(paths, contains(constant));
       }

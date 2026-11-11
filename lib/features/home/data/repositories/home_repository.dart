@@ -195,11 +195,12 @@ class LeaveBalance {
   /// Nama yang dikirim server bila ada. Bisa sama dengan [code].
   final String label;
 
-  final int remaining;
+  /// Hari, dan bisa setengah hari (HOME-08).
+  final num remaining;
 
   /// Jatah setahun, bila server mengirimkannya. Sebuah sisa tanpa jatah adalah
   /// angka tanpa skala.
-  final int? quota;
+  final num? quota;
 }
 
 /// Ringkasan kehadiran satu bulan berjalan.
@@ -404,7 +405,7 @@ class HomeRepository {
         'permit_type',
         'type',
       ]);
-      final int? remaining = _number(json, const [
+      final num? remaining = _number(json, const [
         'remaining',
         'balance',
         'sisa',
@@ -458,14 +459,20 @@ class HomeRepository {
     return null;
   }
 
-  static int? _number(Map<String, dynamic> json, List<String> keys) {
+  /// A number of days, as sent (HOME-08).
+  ///
+  /// `asDouble`, not `asInt`: a DECIMAL column arrives as "8.00", which
+  /// `int.tryParse` reads as nothing — the row was dropped and the panel said
+  /// there was no balance — and a half day, 2.5, was truncated to 2. Whole
+  /// values come back as `int` so they print without a ".0".
+  static num? _number(Map<String, dynamic> json, List<String> keys) {
     for (final key in keys) {
       final Object? value = json[key];
 
       if (value is num || value is String) {
-        final parsed = asInt(value);
+        final parsed = asDouble(value);
         if (parsed != null) {
-          return parsed;
+          return parsed == parsed.roundToDouble() ? parsed.toInt() : parsed;
         }
       }
     }

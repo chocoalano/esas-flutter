@@ -29,6 +29,24 @@ class _SecureKeys {
   String get tenant => 'esas.tenant';
   String get serverDomain => 'esas.server_domain';
   String get serverSubdomainMode => 'esas.server_subdomain_mode';
+
+  /// The handset's own identifier when the platform gives none (CORE-03).
+  ///
+  /// Deliberately **not** in [installScoped]: it names the phone, not the
+  /// person, and a reinstall on the same iPhone is still the same handset.
+  String get deviceInstallId => 'esas.device_install_id';
+
+  /// What a fresh install must not inherit from a previous one.
+  ///
+  /// The iOS keychain survives an uninstall, so without this list a reinstall
+  /// on a handed-over iPhone restores the previous employee's session and
+  /// workspace (CORE-02). See `InstallIdentity`.
+  List<String> get installScoped => [
+    token,
+    tenant,
+    serverDomain,
+    serverSubdomainMode,
+  ];
 }
 
 class _LocalKeys {
@@ -36,6 +54,10 @@ class _LocalKeys {
 
   String get isDarkMode => 'isDarkMode';
   String get onboardingCompleted => 'onboarding_completed';
+
+  /// Written once per install. Its absence alongside an empty store is how a
+  /// fresh install tells itself apart from a keychain left by a previous one.
+  String get installMarker => 'install_marker';
   String get userJson => 'auth_user_json';
   String get userName => 'auth_user_name';
   String get userId => 'auth_user_id';

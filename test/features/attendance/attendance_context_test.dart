@@ -389,19 +389,22 @@ void main() {
       expect(shift.crossesMidnight, isTrue);
     });
 
-    test('falls back to the older key for a deployment without the new one', () {
-      final shift = AttendanceShift.fromJson(<String, dynamic>{
-        'shift': 'Shift 3',
-        'in': '23:00',
-        'out': '07:00',
-        'crosses_midnight': true,
-      })!;
+    test(
+      'falls back to the older key for a deployment without the new one',
+      () {
+        final shift = AttendanceShift.fromJson(<String, dynamic>{
+          'shift': 'Shift 3',
+          'in': '23:00',
+          'out': '07:00',
+          'crosses_midnight': true,
+        })!;
 
-      expect(shift.crossesMidnight, isTrue);
-      // And nothing is invented for the fields it does not send.
-      expect(shift.startsAt, isNull);
-      expect(shift.code, isNull);
-    });
+        expect(shift.crossesMidnight, isTrue);
+        // And nothing is invented for the fields it does not send.
+        expect(shift.startsAt, isNull);
+        expect(shift.code, isNull);
+      },
+    );
 
     test('never guesses the crossing from end < start', () {
       // `06:00` before `23:00` looks like a night shift to a string compare.

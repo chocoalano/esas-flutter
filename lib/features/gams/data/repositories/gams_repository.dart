@@ -15,21 +15,26 @@ class GamsRepository {
   final GamsApiService _api;
 
   // ── Service Requests ──
-  Future<({List<GamsServiceDefinition> definitions, List<GamsFacility> facilities})> definitions() async {
+  Future<
+    ({List<GamsServiceDefinition> definitions, List<GamsFacility> facilities})
+  >
+  definitions() async {
     final response = await _api.serviceDefinitions();
-    final defs = asList(response['definitions'])
-        .map((item) => GamsServiceDefinition.fromJson(asObject(item)))
-        .toList();
-    final facs = asList(response['facilities'])
-        .map((item) => GamsFacility.fromJson(asObject(item)))
-        .toList();
+    final defs = asList(
+      response['definitions'],
+    ).map((item) => GamsServiceDefinition.fromJson(asObject(item))).toList();
+    final facs = asList(
+      response['facilities'],
+    ).map((item) => GamsFacility.fromJson(asObject(item))).toList();
     return (definitions: defs, facilities: facs);
   }
 
   Future<List<GamsServiceRequest>> serviceRequests({int page = 1}) async {
     final response = await _api.serviceRequests(page: page);
     final data = asList(response['data']);
-    return data.map((item) => GamsServiceRequest.fromJson(asObject(item))).toList();
+    return data
+        .map((item) => GamsServiceRequest.fromJson(asObject(item)))
+        .toList();
   }
 
   Future<void> createServiceRequest({
@@ -60,7 +65,9 @@ class GamsRepository {
   Future<List<GamsSpaceReservation>> spaceReservations({int page = 1}) async {
     final response = await _api.spaceReservations(page: page);
     final data = asList(response['data']);
-    return data.map((item) => GamsSpaceReservation.fromJson(asObject(item))).toList();
+    return data
+        .map((item) => GamsSpaceReservation.fromJson(asObject(item)))
+        .toList();
   }
 
   Future<void> createSpaceReservation({
@@ -90,7 +97,9 @@ class GamsRepository {
   Future<List<GamsVehicleBooking>> vehicleBookings({int page = 1}) async {
     final response = await _api.vehicleBookings(page: page);
     final data = asList(response['data']);
-    return data.map((item) => GamsVehicleBooking.fromJson(asObject(item))).toList();
+    return data
+        .map((item) => GamsVehicleBooking.fromJson(asObject(item)))
+        .toList();
   }
 
   Future<void> createVehicleBooking({
@@ -98,13 +107,12 @@ class GamsRepository {
     required String purpose,
     required String startsAt,
     required String endsAt,
-  }) =>
-      _api.createVehicleBooking(
-        vehicleId: vehicleId,
-        purpose: purpose,
-        startsAt: startsAt,
-        endsAt: endsAt,
-      );
+  }) => _api.createVehicleBooking(
+    vehicleId: vehicleId,
+    purpose: purpose,
+    startsAt: startsAt,
+    endsAt: endsAt,
+  );
 
   Future<void> cancelVehicleBooking(int id, {String? reason}) =>
       _api.cancelVehicleBooking(id, reason: reason);
@@ -113,7 +121,9 @@ class GamsRepository {
   Future<List<GamsVisitorPass>> visits({int page = 1}) async {
     final response = await _api.visits(page: page);
     final data = asList(response['data']);
-    return data.map((item) => GamsVisitorPass.fromJson(asObject(item))).toList();
+    return data
+        .map((item) => GamsVisitorPass.fromJson(asObject(item)))
+        .toList();
   }
 
   Future<void> createVisit({
@@ -123,15 +133,14 @@ class GamsRepository {
     String? visitorCompany,
     String? visitorIdNumber,
     required String purpose,
-  }) =>
-      _api.createVisit(
-        facilityId: facilityId,
-        visitorName: visitorName,
-        visitorPhone: visitorPhone,
-        visitorCompany: visitorCompany,
-        visitorIdNumber: visitorIdNumber,
-        purpose: purpose,
-      );
+  }) => _api.createVisit(
+    facilityId: facilityId,
+    visitorName: visitorName,
+    visitorPhone: visitorPhone,
+    visitorCompany: visitorCompany,
+    visitorIdNumber: visitorIdNumber,
+    purpose: purpose,
+  );
 
   // ── Packages ──
   Future<List<GamsPackage>> packages({int page = 1}) async {
@@ -150,8 +159,7 @@ class GamsRepository {
   Future<void> createGatePass({
     required int facilityId,
     required List<Map<String, dynamic>> items,
-  }) =>
-      _api.createGatePass(facilityId: facilityId, items: items);
+  }) => _api.createGatePass(facilityId: facilityId, items: items);
 
   // ── Parking Permits ──
   Future<List<ParkingPermit>> parkingPermits({int page = 1}) async {
@@ -163,29 +171,29 @@ class GamsRepository {
   Future<void> createParkingPermit({
     required int parkingAreaId,
     required String licensePlate,
-  }) =>
-      _api.createParkingPermit(
-        parkingAreaId: parkingAreaId,
-        licensePlate: licensePlate,
-      );
+  }) => _api.createParkingPermit(
+    parkingAreaId: parkingAreaId,
+    licensePlate: licensePlate,
+  );
 
   // ── Inventory Requests ──
   Future<List<InventoryRequest>> inventoryRequests({int page = 1}) async {
     final response = await _api.inventoryRequests(page: page);
     final data = asList(response['data']);
-    return data.map((item) => InventoryRequest.fromJson(asObject(item))).toList();
+    return data
+        .map((item) => InventoryRequest.fromJson(asObject(item)))
+        .toList();
   }
 
   Future<void> createInventoryRequest({
     required int itemId,
     required int locationId,
     required int quantity,
-  }) =>
-      _api.createInventoryRequest(
-        itemId: itemId,
-        locationId: locationId,
-        quantity: quantity,
-      );
+  }) => _api.createInventoryRequest(
+    itemId: itemId,
+    locationId: locationId,
+    quantity: quantity,
+  );
 
   // ── Security Incidents ──
   Future<void> createSecurityIncident({
@@ -193,12 +201,10 @@ class GamsRepository {
     required String title,
     required String description,
     required String occurredAt,
-  }) =>
-      _api.createSecurityIncident(
-        facilityId: facilityId,
-        title: title,
-        description: description,
-        occurredAt: occurredAt,
-      );
+  }) => _api.createSecurityIncident(
+    facilityId: facilityId,
+    title: title,
+    description: description,
+    occurredAt: occurredAt,
+  );
 }
-

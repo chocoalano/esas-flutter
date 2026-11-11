@@ -5,6 +5,7 @@ import 'package:esas/core/ui/components/app_empty_state.dart';
 import 'package:esas/core/ui/components/app_error_state.dart';
 import 'package:esas/core/ui/components/app_record_field.dart';
 import 'package:esas/core/ui/components/app_skeleton.dart';
+import 'package:esas/core/utils/string_guard.dart';
 import 'package:esas/features/profile/data/models/family.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -113,11 +114,11 @@ class _FamilyCard extends StatelessWidget {
             ),
             second: AppRecordField(
               label: 'Status pernikahan',
-              value: family.maritalStatus ?? '',
+              value: family.maritalStatus.orPlaceholder(),
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          AppRecordField(label: 'Pekerjaan', value: family.job ?? ''),
+          AppRecordField(label: 'Pekerjaan', value: family.job.orPlaceholder()),
         ],
       ),
     );

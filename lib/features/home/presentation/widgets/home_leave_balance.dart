@@ -114,7 +114,10 @@ class HomeLeaveBalance extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton(
-              onPressed: onOpen,
+              // The balances themselves, not the permit tab (HOME-14): that
+              // screen shows no balance, so the ones promised here were not
+              // anywhere to be seen.
+              onPressed: () => _showAll(context),
               style: TextButton.styleFrom(
                 minimumSize: const Size(0, 44),
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
@@ -124,6 +127,59 @@ class HomeLeaveBalance extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+extension on HomeLeaveBalance {
+  Future<void> _showAll(BuildContext context) {
+    return showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.7,
+          ),
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              0,
+              AppSpacing.lg,
+              AppSpacing.lg,
+            ),
+            children: <Widget>[
+              Text('Sisa cuti', style: theme.textTheme.titleMedium),
+              const SizedBox(height: AppSpacing.sm),
+              for (final LeaveBalance balance in balances)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(leaveTypeLabel(balance)),
+                  subtitle: balance.quota == null
+                      ? null
+                      : Text('dari ${leaveDaysLabel(balance.quota!)} hari'),
+                  trailing: Text(
+                    '${leaveDaysLabel(balance.remaining)} hari',
+                    style: theme.textTheme.titleSmall,
+                  ),
+                ),
+              const SizedBox(height: AppSpacing.sm),
+              FilledButton(
+                onPressed: () {
+                  Navigator.of(sheetContext).pop();
+                  onOpen();
+                },
+                child: const Text('Ajukan izin'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -151,9 +207,9 @@ class _BalanceTile extends StatelessWidget {
     final ThemeData theme = Theme.of(context);
     final AppPalette palette = theme.palette;
 
-    final int? quota = balance.quota;
+    final num? quota = balance.quota;
     final bool hasQuota = quota != null && quota > 0;
-    final int used = hasQuota ? (quota - balance.remaining).clamp(0, quota) : 0;
+    final num used = hasQuota ? (quota - balance.remaining).clamp(0, quota) : 0;
 
     return AppCard(
       onTap: onTap,
@@ -163,7 +219,7 @@ class _BalanceTile extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           HomeMetric(
-            value: '${balance.remaining}',
+            value: leaveDaysLabel(balance.remaining),
             unit: 'hari',
             label: leaveTypeLabel(balance),
             // Saldo yang tersisa adalah kabar baik selama masih ada; nol
@@ -174,13 +230,14 @@ class _BalanceTile extends StatelessWidget {
           if (hasQuota) ...<Widget>[
             SizedBox(height: wide ? AppSpacing.lg : AppSpacing.md),
             HomeSplitBar(
-              primary: used,
-              secondary: balance.remaining,
+              // In half days, so a half day still moves the bar.
+              primary: (used * 2).round(),
+              secondary: (balance.remaining * 2).round(),
               primaryTone: palette.neutral,
               secondaryTone: palette.success,
               semanticsLabel:
-                  '$used dari $quota hari terpakai, '
-                  '${balance.remaining} hari tersisa',
+                  '${leaveDaysLabel(used)} dari ${leaveDaysLabel(quota)} hari '
+                  'terpakai, ${leaveDaysLabel(balance.remaining)} hari tersisa',
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
@@ -361,4 +418,11 @@ String leaveTypeLabel(LeaveBalance balance) {
   }
 
   return raw;
+}
+
+/// A number of leave days the Indonesian way: `8`, `2,5` (HOME-08).
+String leaveDaysLabel(num days) {
+  if (days == days.roundToDouble()) return '${days.toInt()}';
+
+  return days.toString().replaceAll('.', ',');
 }

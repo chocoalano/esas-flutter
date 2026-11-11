@@ -61,11 +61,23 @@ class ProfileRepository {
 
     // Keep the session's copy in step, so the dashboard and attendance read the
     // same record the profile screens just loaded.
+    //
+    // Identity, company and employment only. The rest of this reply — salary,
+    // bank account, NIK, family — belongs to the screen that asked for it and
+    // stays in `_cached`; the session is written to plain storage (PROF-01).
     final identity = asObject(body['user']);
 
     if (identity.isNotEmpty) {
+      final company = asObject(body['company']);
+      final employee = asObject(body['employee']);
+
       await _session.updateUser(
-        AuthUser.fromJson({...?_session.user?.raw, ...identity, ...body}),
+        AuthUser.fromJson({
+          ...?_session.user?.raw,
+          ...identity,
+          if (company.isNotEmpty) 'company': company,
+          if (employee.isNotEmpty) 'employee': employee,
+        }),
       );
     }
 
@@ -157,7 +169,14 @@ class ProfileRepository {
 
   /// Upload a new avatar and return its new path.
   Future<String?> uploadAvatar(File image) async {
+    // The same guard `_fetch` has (PROF-04): an answer that arrives after a
+    // change of session belongs to the session that asked. Without it, A
+    // signing out mid-upload and B signing in left B with A's photograph.
+    final token = _session.token;
     final body = await _api.uploadAvatar(image);
+    if (token != _session.token) {
+      throw const ApiException('Sesi berubah. Unggah ulang foto profil.');
+    }
     final avatar = asString(body['avatar']);
 
     if (avatar != null) {
@@ -182,12 +201,14 @@ class ProfileRepository {
     required String message,
     required String platform,
     File? screenshot,
+    String? idempotencyKey,
   }) {
     return _api.submitBugReport(
       title: title,
       message: message,
       platform: platform,
       screenshot: screenshot,
+      idempotencyKey: idempotencyKey,
     );
   }
 }

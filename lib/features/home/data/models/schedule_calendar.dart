@@ -13,12 +13,12 @@ class ScheduleCalendar {
     return ScheduleCalendar(
       from: asString(json['from']) ?? '',
       to: asString(json['to']) ?? '',
-      holidays: asList(json['holidays'])
-          .map((item) => ScheduleHoliday.fromJson(asObject(item)))
-          .toList(),
-      schedule: asList(json['schedule'])
-          .map((item) => ScheduleCalendarItem.fromJson(asObject(item)))
-          .toList(),
+      holidays: asList(
+        json['holidays'],
+      ).map((item) => ScheduleHoliday.fromJson(asObject(item))).toList(),
+      schedule: asList(
+        json['schedule'],
+      ).map((item) => ScheduleCalendarItem.fromJson(asObject(item))).toList(),
     );
   }
 
@@ -54,9 +54,23 @@ class ScheduleCalendarItem {
   final String? endsAt;
   final String dayType;
 
-  bool get isDayOff => dayType == 'day_off' || dayType == 'off';
-  bool get isHoliday => dayType == 'holiday' || dayType == 'public_holiday';
-  bool get isWorkday => !isDayOff && !isHoliday;
+  /// `day_type` as compared: trimmed, lower case (HOME-11). Only two exact
+  /// spellings used to be known, and anything else was drawn as a workday.
+  String get _type => dayType.trim().toLowerCase();
+
+  bool get isDayOff =>
+      const {'day_off', 'off', 'rest', 'rest_day'}.contains(_type);
+
+  bool get isHoliday =>
+      const {'holiday', 'public_holiday', 'national_holiday'}.contains(_type);
+
+  bool get isLeave => const {'leave', 'cuti', 'on_leave'}.contains(_type);
+
+  /// A working day only when the server says so — an unknown kind is not
+  /// claimed to be one.
+  bool get isWorkday =>
+      // `working` is what the server sends (DayType) — UAT review H5.
+      const {'working', 'workday', 'work', 'working_day', ''}.contains(_type);
 }
 
 /// Hari libur kalender kerja perusahaan.
@@ -79,4 +93,3 @@ class ScheduleHoliday {
   final String name;
   final String type;
 }
-

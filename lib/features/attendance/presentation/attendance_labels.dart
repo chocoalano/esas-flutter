@@ -117,9 +117,36 @@ String? attendanceStatusCodeLabel(String? raw) {
     'LEAVE',
     'SICK',
     'HOLIDAY',
+    // Labelled by [attendanceStatusLabel] all along; missing here, the home
+    // timeline printed the raw code (ATTP-19).
+    'UNLATE',
   };
 
   return known.contains(key) ? attendanceStatusLabel(key) : null;
+}
+
+/// The calendar days the seven-day strip draws, oldest first: up to [maxDays]
+/// ending on [anchor], never before [windowStart] (ATTP-20).
+List<DateTime> attendanceStripDays({
+  required DateTime anchor,
+  required DateTime windowStart,
+  required int maxDays,
+}) {
+  // Calendar arithmetic, not durations: across a DST change a day is 23 or 25
+  // hours, and `subtract(Duration(days: n))` lands on 23:00 of the day before.
+  final int span =
+      DateTime.utc(anchor.year, anchor.month, anchor.day)
+          .difference(
+            DateTime.utc(windowStart.year, windowStart.month, windowStart.day),
+          )
+          .inDays +
+      1;
+  final int days = span < maxDays ? span : maxDays;
+
+  return [
+    for (int offset = days - 1; offset >= 0; offset--)
+      DateTime(anchor.year, anchor.month, anchor.day - offset),
+  ];
 }
 
 /// Nada semantik sebuah status kehadiran.
@@ -264,12 +291,37 @@ AttendanceGap? attendanceGapOf({
   required String? timeIn,
   required String? timeOut,
   required String? datePresence,
+  bool crossesMidnight = false,
+  String? shiftOut,
 }) {
   if (attendanceHasClock(timeIn) && attendanceHasClock(timeOut)) return null;
 
-  return attendanceIsToday(datePresence)
-      ? AttendanceGap.running
-      : AttendanceGap.missing;
+  if (attendanceIsToday(datePresence)) return AttendanceGap.running;
+
+  // A night shift dated yesterday is still under way this morning, until its
+  // end (ATTP-16). It used to read "Belum lengkap" from midnight on.
+  if (crossesMidnight && _isYesterday(datePresence)) {
+    final end = attendanceMinuteOfDay(shiftOut);
+    final now = WorkspaceClock.current.now();
+
+    if (end != null && now.hour * 60 + now.minute < end) {
+      return AttendanceGap.running;
+    }
+  }
+
+  return AttendanceGap.missing;
+}
+
+bool _isYesterday(String? rawDate) {
+  final date = attendanceDate(rawDate);
+  if (date == null) return false;
+
+  final now = WorkspaceClock.current.now();
+  final yesterday = DateTime(now.year, now.month, now.day - 1);
+
+  return date.year == yesterday.year &&
+      date.month == yesterday.month &&
+      date.day == yesterday.day;
 }
 
 /// `yyyy-MM-dd` menjadi tanggal, atau null bila tidak terbaca.
@@ -626,6 +678,8 @@ AttendanceVerdict attendanceVerdictOf({
   required String? timeOut,
   required String? datePresence,
   required bool hasSchedule,
+  bool crossesMidnight = false,
+  String? shiftOut,
 }) {
   final String normalisedIn = (statusIn ?? '').trim().toUpperCase();
   final String normalisedOut = (statusOut ?? '').trim().toUpperCase();
@@ -635,6 +689,8 @@ AttendanceVerdict attendanceVerdictOf({
     timeIn: timeIn,
     timeOut: timeOut,
     datePresence: datePresence,
+    crossesMidnight: crossesMidnight,
+    shiftOut: shiftOut,
   );
 
   if (gap == AttendanceGap.running) {

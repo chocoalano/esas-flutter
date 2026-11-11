@@ -34,6 +34,31 @@ import 'package:flutter/material.dart';
 /// riwayat — jadi layar pertama aplikasi absensi tidak punya satu pun cara untuk
 /// mengabsen, dan setiap pagi dimulai dengan satu ketukan ke tab lain.
 class TodayWorkCard extends StatefulWidget {
+  /// Minutes worked between [timeIn] and [timeOut], or [now] while still
+  /// working.
+  ///
+  /// The clock-in is the server's time and "now" the handset's. A phone a few
+  /// minutes slow made the difference slightly negative, and the wrap that
+  /// handles night shifts turned it into "23j 58m" (HOME-12). A small negative
+  /// while still working is read as just started.
+  static int? workedMinutes({
+    required String? timeIn,
+    required String? timeOut,
+    required int now,
+  }) {
+    final int? start = HomeController.minutesOfDay(timeIn);
+    if (start == null) return null;
+
+    final int end = timeOut == null
+        ? now
+        : (HomeController.minutesOfDay(timeOut) ?? now);
+    final int diff = end - start;
+
+    if (timeOut == null && diff < 0 && diff > -60) return 0;
+
+    return HomeController.wrapMinutes(diff);
+  }
+
   const TodayWorkCard({
     super.key,
     required this.state,
@@ -170,7 +195,11 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
 
     if (end == null) return null;
 
-    return HomeController.wrapMinutes(end - start);
+    return TodayWorkCard.workedMinutes(
+      timeIn: widget.timeIn,
+      timeOut: widget.timeOut,
+      now: end,
+    );
   }
 
   @override

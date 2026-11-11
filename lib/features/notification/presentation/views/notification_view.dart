@@ -40,14 +40,17 @@ class NotificationView extends GetView<NotificationController> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (didPop) return;
-        confirmExitApp(context);
-      },
-      child: Scaffold(
-        appBar: AppBar(title: const Text('Notifikasi')),
+    return Title(
+      title: 'Notifikasi – Absensas',
+      color: Colors.black,
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (bool didPop, Object? result) {
+          if (didPop) return;
+          confirmExitApp(context);
+        },
+        child: Scaffold(
+          appBar: AppBar(title: const Text('Notifikasi')),
         body: Column(
           children: [
             const _InboxStrip(),
@@ -58,6 +61,7 @@ class NotificationView extends GetView<NotificationController> {
           () => CustomBottomNavBar(notificationCount: controller.unreadCount),
         ),
       ),
+    ),
     );
   }
 
@@ -121,7 +125,9 @@ class NotificationView extends GetView<NotificationController> {
 
     return RefreshIndicator(
       onRefresh: controller.refreshNotifications,
-      child: ListView.builder(
+      child: Scrollbar(
+        controller: controller.scrollController,
+        child: ListView.builder(
         controller: controller.scrollController,
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.page,
@@ -168,6 +174,7 @@ class NotificationView extends GetView<NotificationController> {
                   if (Get.isRegistered<NotificationSyncService>()) {
                     Get.find<NotificationSyncService>().open(
                       notification.data.payload,
+                      refresh: false,
                     );
                   }
                 },
@@ -175,6 +182,7 @@ class NotificationView extends GetView<NotificationController> {
             ),
           };
         },
+        ),
       ),
     );
   }

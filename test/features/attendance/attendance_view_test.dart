@@ -332,6 +332,26 @@ void main() {
       expect(find.text('Tersimpan di server.'), findsOneWidget);
     });
 
+    // W4-FACE-202.
+    testWidgets('a verification awaiting an officer is not shown as done', (
+      tester,
+    ) async {
+      final controller = await pump(tester);
+
+      controller.receipt.value = const AttendanceReceipt(
+        direction: PresenceDirection.clockIn,
+        message:
+            'Absensi Anda tercatat dan menunggu konfirmasi petugas sebelum '
+            'berlaku untuk penggajian.',
+        pendingReview: true,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('berhasil'), findsNothing);
+      expect(find.text('Absen masuk menunggu konfirmasi'), findsOneWidget);
+      expect(find.byIcon(Icons.check_rounded), findsNothing);
+    });
+
     testWidgets('an unanswered request offers no retry', (tester) async {
       final controller = await pump(tester);
 
@@ -442,6 +462,64 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('Absensi'), findsWidgets);
       expect(find.byType(AttendanceCameraViewport), findsOneWidget);
+    });
+  });
+
+  group('remediasi wave 4 — layar', () {
+    // ATTP-13. Face switched off, QR on: the note named the wrong method.
+    testWidgets('the note names the method that is switched off', (
+      tester,
+    ) async {
+      when(() => repository.context()).thenAnswer(
+        (_) async => const AttendanceContext(
+          attendanceEnabled: true,
+          qrEnabled: true,
+          faceEnabled: false,
+        ),
+      );
+
+      await pump(tester);
+
+      expect(
+        find.textContaining('Absensi wajah tidak diaktifkan'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Absensi QR tidak diaktifkan'), findsNothing);
+    });
+
+    // ATTP-09. A permanently refused camera on the face method left the start
+    // card as it was, and every tap did nothing.
+    testWidgets('a permanently refused camera points to the settings', (
+      tester,
+    ) async {
+      when(() => repository.context()).thenAnswer(
+        (_) async => const AttendanceContext(
+          attendanceEnabled: true,
+          faceEnrolled: true,
+        ),
+      );
+      final controller = await pump(tester);
+      await controller.switchTo(AttendanceMethod.face);
+      controller.faceCameraPermission.value =
+          CameraPermission.permanentlyDenied;
+      await tester.pumpAndSettle();
+
+      expect(find.text('Buka pengaturan'), findsOneWidget);
+      expect(find.text('Mulai verifikasi'), findsNothing);
+    });
+
+    // ATTP-12.
+    testWidgets('an unloaded status offers to load it again', (tester) async {
+      final controller = await pump(tester);
+      controller.stage.value = CaptureStage.refused;
+      controller.refusal.value = const AttendanceRefusal(
+        kind: RefusalKind.transient,
+        message: 'Status absensi belum dimuat.',
+        code: 'context_unavailable',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Muat ulang'), findsOneWidget);
     });
   });
 }

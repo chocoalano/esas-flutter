@@ -402,6 +402,13 @@ class LivenessGestureMachine {
 
   final Map<String, double> _discarded = {};
 
+  /// The axes [_refuseBaseline] found without headroom, last time it ran
+  /// (ATTD-02). A retake is judged on these alone.
+  final Set<GestureAxis> _saturated = {};
+
+  /// The axes the current retake is for.
+  final Set<GestureAxis> _retaken = {};
+
   List<String> get unknownActions => List.unmodifiable(_unknown);
 
   /// The gesture being looked for, or null before and after the sequence.
@@ -516,12 +523,18 @@ class LivenessGestureMachine {
     if (refusal != null) {
       baselineAttempts++;
 
+      // Only a saturated MOUTH is retaken: a held smile is a pose that stops.
+      // A saturated eye axis is refused outright, as documented above.
       if (baselineAttempts < maxBaselineAttempts &&
           refusal == 'axis_saturated' &&
-          _specs.any((spec) => spec.axis == GestureAxis.mouth)) {
+          _saturated.isNotEmpty &&
+          _saturated.every((axis) => axis == GestureAxis.mouth)) {
         _discarded
           ..clear()
           ..addAll(_resting);
+        _retaken
+          ..clear()
+          ..addAll(_saturated);
         _baseline.clear();
         _resting.clear();
 
@@ -542,7 +555,13 @@ class LivenessGestureMachine {
         final was = _discarded[spec.axis.name];
         final now = _resting[spec.axis.name];
 
-        if (was == null || now == null || !spec.isBounded) {
+        // Only the axis that was saturated has to have moved (ATTD-02). Eyes
+        // resting at 0.9 cannot open by another 0.15, and demanding it refused
+        // every retaken smile-and-blink challenge.
+        if (was == null ||
+            now == null ||
+            !spec.isBounded ||
+            !_retaken.contains(spec.axis)) {
           continue;
         }
 
@@ -560,6 +579,8 @@ class LivenessGestureMachine {
 
   /// Whether the resting pose that was just measured can carry the challenge.
   String? _refuseBaseline() {
+    _saturated.clear();
+
     for (final spec in _specs) {
       final baseline = _resting[spec.axis.name];
 
@@ -570,9 +591,11 @@ class LivenessGestureMachine {
       final headroom = spec.headroomFrom(baseline);
 
       if (headroom != null && headroom < spec.delta + saturationMargin) {
-        return 'axis_saturated';
+        _saturated.add(spec.axis);
       }
     }
+
+    if (_saturated.isNotEmpty) return 'axis_saturated';
 
     return null;
   }

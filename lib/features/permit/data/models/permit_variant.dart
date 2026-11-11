@@ -105,10 +105,20 @@ enum PermitVariant {
   /// 2. `code` — perusahaan sudah mengisi kodenya, server belum diperbarui.
   /// 3. Id 15/16 — peninggalan, dan hanya untuk perusahaan yang belum
   ///    mengisi kode sama sekali.
+  ///
+  /// `general` dari server tanpa kode **bukan** keputusan (PRMT-02): backend
+  /// menjawab `PermitVariant::fromCode(null)` dengan `general`, jadi untuk
+  /// tenant yang belum mengisi kode, `variant` selalu `general` — dan
+  /// membacanya sebagai final mematikan langkah 3 untuk persis tenant yang
+  /// membutuhkannya.
   static PermitVariant resolve({String? variant, String? code, int? id}) {
     final fromServer = fromWire(variant);
+    final hasCode = (code ?? '').trim().isNotEmpty;
 
-    if (fromServer != null) return fromServer;
+    if (fromServer != null &&
+        (fromServer != PermitVariant.general || hasCode)) {
+      return fromServer;
+    }
 
     final fromBusinessCode = fromCode(code);
 

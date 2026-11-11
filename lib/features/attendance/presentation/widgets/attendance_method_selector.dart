@@ -148,9 +148,13 @@ class _Segment extends StatelessWidget {
 /// colour: nothing is broken, the employee did nothing wrong, and there is
 /// nothing for them to retry — the next step is HR's.
 class AttendanceMethodNote extends StatelessWidget {
-  const AttendanceMethodNote({super.key, required this.status});
+  const AttendanceMethodNote({super.key, required this.status, this.method});
 
   final MethodStatus status;
+
+  /// Which method [status] is about — the sentence for a switched-off method
+  /// has to name it (ATTP-13).
+  final AttendanceMethod? method;
 
   @override
   Widget build(BuildContext context) {
@@ -170,7 +174,9 @@ class AttendanceMethodNote extends StatelessWidget {
       ),
       MethodStatus.methodDisabled => (
         Icons.info_outline_rounded,
-        'Absensi QR tidak diaktifkan untuk perusahaan Anda.',
+        method == AttendanceMethod.face
+            ? 'Absensi wajah tidak diaktifkan untuk perusahaan Anda.'
+            : 'Absensi QR tidak diaktifkan untuk perusahaan Anda.',
       ),
       MethodStatus.available => (Icons.info_outline_rounded, ''),
     };

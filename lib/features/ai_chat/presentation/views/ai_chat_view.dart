@@ -17,7 +17,8 @@ class AiChatView extends GetView<AiChatController> {
     return Scaffold(
       appBar: AppBar(
         title: Obx(() {
-          final title = controller.chatContext.value?.assistantName ?? 'ESAS Copilot';
+          final title =
+              controller.chatContext.value?.assistantName ?? 'ESAS Copilot';
           return Text(title);
         }),
         leading: IconButton(
@@ -31,17 +32,24 @@ class AiChatView extends GetView<AiChatController> {
             Expanded(
               child: Obx(() {
                 if (controller.isLoading.value) {
-                  return const Center(child: CircularProgressIndicator.adaptive());
+                  return const Center(
+                    child: CircularProgressIndicator.adaptive(),
+                  );
                 }
 
-                if (controller.error.value != null && controller.messages.isEmpty) {
+                if (controller.error.value != null &&
+                    controller.messages.isEmpty) {
                   return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(AppSpacing.lg),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.error_outline, size: 48, color: palette.danger.foreground),
+                          Icon(
+                            Icons.error_outline,
+                            size: 48,
+                            color: palette.danger.foreground,
+                          ),
                           const SizedBox(height: AppSpacing.md),
                           Text(
                             controller.error.value!.message,
@@ -66,14 +74,30 @@ class AiChatView extends GetView<AiChatController> {
                     vertical: AppSpacing.md,
                   ),
                   children: [
-                    for (final msg in controller.messages) _MessageBubble(message: msg),
+                    for (final msg in controller.messages)
+                      _MessageBubble(message: msg),
+                    // The answer may have been written even though it never
+                    // arrived; sending it again is the same request (AI-02).
+                    if (controller.canRetry.value &&
+                        !controller.isSending.value)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: controller.retryLastMessage,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Kirim ulang'),
+                        ),
+                      ),
                     if (controller.isSending.value)
                       Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.md),
                         child: Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
                               decoration: BoxDecoration(
                                 color: palette.surfaceSubtle,
                                 borderRadius: AppRadii.lgAll,
@@ -93,7 +117,9 @@ class AiChatView extends GetView<AiChatController> {
                                   const SizedBox(width: AppSpacing.sm),
                                   Text(
                                     'Mengetik...',
-                                    style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: palette.textMuted,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -108,32 +134,47 @@ class AiChatView extends GetView<AiChatController> {
 
             // Suggestions bar
             Obx(() {
-              final suggestions = controller.chatContext.value?.suggestions ?? [];
+              final suggestions =
+                  controller.chatContext.value?.suggestions ?? [];
               if (suggestions.isEmpty || controller.isSending.value) {
                 return const SizedBox.shrink();
               }
 
-              return Container(
-                height: 40,
-                margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                  itemCount: suggestions.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
-                  itemBuilder: (context, index) {
-                    final suggestion = suggestions[index];
-                    return ActionChip(
-                      label: Text(suggestion),
-                      labelStyle: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      backgroundColor: palette.brandSubtle,
-                      side: BorderSide(color: palette.borderSubtle),
-                      onPressed: () => controller.sendUserMessage(suggestion),
-                    );
-                  },
+              return ShaderMask(
+                shaderCallback: (Rect bounds) {
+                  return const LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [Colors.white, Colors.white, Colors.transparent],
+                    stops: [0.0, 0.8, 1.0],
+                  ).createShader(bounds);
+                },
+                blendMode: BlendMode.dstIn,
+                child: Container(
+                  height: 40,
+                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                    ),
+                    itemCount: suggestions.length,
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(width: AppSpacing.xs),
+                    itemBuilder: (context, index) {
+                      final suggestion = suggestions[index];
+                      return ActionChip(
+                        label: Text(suggestion),
+                        labelStyle: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        backgroundColor: palette.brandSubtle,
+                        side: BorderSide(color: palette.borderSubtle),
+                        onPressed: () => controller.sendUserMessage(suggestion),
+                      );
+                    },
+                  ),
                 ),
               );
             }),
@@ -157,7 +198,9 @@ class AiChatView extends GetView<AiChatController> {
                       maxLines: 4,
                       decoration: InputDecoration(
                         hintText: 'Tanyakan sesuatu pada asisten...',
-                        hintStyle: theme.textTheme.bodyMedium?.copyWith(color: palette.textMuted),
+                        hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                          color: palette.textMuted,
+                        ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.md,
                           vertical: AppSpacing.sm,
@@ -172,7 +215,9 @@ class AiChatView extends GetView<AiChatController> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: AppRadii.xlAll,
-                          borderSide: BorderSide(color: theme.colorScheme.primary),
+                          borderSide: BorderSide(
+                            color: theme.colorScheme.primary,
+                          ),
                         ),
                       ),
                       onSubmitted: (_) => controller.sendUserMessage(),
@@ -181,7 +226,9 @@ class AiChatView extends GetView<AiChatController> {
                   const SizedBox(width: AppSpacing.sm),
                   Obx(
                     () => IconButton.filled(
-                      onPressed: controller.isSending.value ? null : () => controller.sendUserMessage(),
+                      onPressed: controller.isSending.value
+                          ? null
+                          : () => controller.sendUserMessage(),
                       icon: const Icon(Icons.send_rounded),
                     ),
                   ),
@@ -209,7 +256,9 @@ class _MessageBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isUser
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isUser) ...[
@@ -233,7 +282,9 @@ class _MessageBubble extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: isUser ? theme.colorScheme.primary : palette.surfaceSubtle,
+                color: isUser
+                    ? theme.colorScheme.primary
+                    : palette.surfaceSubtle,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),
@@ -243,12 +294,16 @@ class _MessageBubble extends StatelessWidget {
                 border: isUser ? null : Border.all(color: palette.borderSubtle),
               ),
               child: Column(
-                crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                crossAxisAlignment: isUser
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
                 children: [
                   Text(
                     message.text,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: isUser ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
+                      color: isUser
+                          ? theme.colorScheme.onPrimary
+                          : theme.colorScheme.onSurface,
                     ),
                   ),
                   if (message.sources.isNotEmpty) ...[
@@ -258,7 +313,10 @@ class _MessageBubble extends StatelessWidget {
                       children: [
                         for (final src in message.sources)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: palette.brandSubtle,
                               borderRadius: AppRadii.smAll,
@@ -284,4 +342,3 @@ class _MessageBubble extends StatelessWidget {
     );
   }
 }
-

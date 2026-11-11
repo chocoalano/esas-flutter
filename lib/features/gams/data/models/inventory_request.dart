@@ -37,4 +37,3 @@ class InventoryRequest {
   final String statusLabel;
   final String? createdAt;
 }
-

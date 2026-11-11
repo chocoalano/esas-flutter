@@ -28,4 +28,3 @@ class AiChatMessage {
   bool get isUser => role.toLowerCase() == 'user';
   bool get isAssistant => !isUser;
 }
-

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../../../../core/config/api_routes.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/idempotency_key.dart';
@@ -107,4 +109,8 @@ class PermitApiService {
       ),
     );
   }
+
+  /// The attachment's bytes, from the authenticated endpoint (PRMT-03).
+  Future<Uint8List> attachment(Object permitId) =>
+      _client.getBytes(ApiRoutes.permitFile(permitId));
 }

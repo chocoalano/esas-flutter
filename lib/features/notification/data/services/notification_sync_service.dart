@@ -119,13 +119,20 @@ class NotificationSyncService extends GetxService with WidgetsBindingObserver {
     } while (_refreshAgain && _session.isAuthenticated);
   }
 
-  void open(Map<String, dynamic> data) {
+  /// Go where a notification points.
+  ///
+  /// [refresh] asks the server for a fresh count first — right for a push
+  /// tapped in the system tray, which may be news. A row opened from the list
+  /// is not (NOTIF-02): the refresh bumps the session's revision, the list
+  /// answers by reloading page one, and the pages below and the scroll
+  /// position were lost.
+  void open(Map<String, dynamic> data, {bool refresh = true}) {
     _pending = Map<String, dynamic>.from(data);
-    onSessionReady();
+    onSessionReady(refresh: refresh);
   }
 
-  void onSessionReady() {
-    unawaited(refresh());
+  void onSessionReady({bool refresh = true}) {
+    if (refresh) unawaited(this.refresh());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final data = _pending;
       if (data == null ||
@@ -136,6 +143,18 @@ class NotificationSyncService extends GetxService with WidgetsBindingObserver {
       _pending = null;
       if (!accepts(data)) return;
       final destination = NotificationDestination.fromData(data);
+
+      // The Notifikasi tab is a tab, and tabs are reached with `offAllNamed`
+      // across this app (NOTIF-03). Pushed on top of another page, its Back
+      // offered to leave the app with that page still underneath.
+      if (destination.route == NotificationRoutes.notification &&
+          destination.arguments == null) {
+        if (Get.currentRoute != destination.route) {
+          Get.offAllNamed(destination.route);
+        }
+        return;
+      }
+
       if (Get.currentRoute != destination.route ||
           destination.arguments != null) {
         Get.toNamed(

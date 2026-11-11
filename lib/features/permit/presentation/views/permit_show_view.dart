@@ -1,4 +1,4 @@
-import 'package:esas/core/config/env.dart';
+import 'package:esas/core/tenancy/workspace_clock.dart';
 import 'package:esas/core/theme/app_dimens.dart';
 import 'package:esas/core/theme/app_palette.dart';
 import 'package:esas/core/theme/app_typography.dart';
@@ -13,10 +13,10 @@ import 'package:esas/features/permit/data/models/leave_list.dart';
 import 'package:esas/features/permit/data/models/permit_variant.dart';
 import 'package:esas/features/permit/presentation/routes/permit_routes.dart';
 import 'package:esas/features/permit/presentation/widgets/permit_status.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../controllers/permit_show_controller.dart';
 
@@ -36,14 +36,36 @@ import '../controllers/permit_show_controller.dart';
 /// layar ini datang untuk memutuskan; keputusannya tidak seharusnya bersembunyi
 /// di bawah lampiran.
 class PermitShowView extends GetView<PermitShowController> {
-  const PermitShowView({super.key});
+  const PermitShowView({super.key, this.controllerTag});
+
+  /// Which permit's controller this screen reads (PRMT-09). Null finds the
+  /// untagged one, which is what a screen built outside the route table uses.
+  final String? controllerTag;
+
+  @override
+  String? get tag => controllerTag;
 
   @override
   Widget build(BuildContext context) {
-    void back() => Get.offAllNamed(
-      PermitRoutes.list,
-      arguments: controller.permitType.value,
-    );
+    // Back to where the detail was opened from (PRMT-10). Only a detail that
+    // is the whole stack — opened from a notification — goes to a list, and
+    // then to the list of this permit's own kind rather than an empty one.
+    // `Navigator.pop`, not `Get.back`: the latter closes a showing snackbar
+    // instead of the page.
+    void back() {
+      final navigator = Navigator.of(context);
+
+      if (navigator.canPop()) {
+        navigator.pop();
+        return;
+      }
+
+      Get.offAllNamed(
+        PermitRoutes.list,
+        arguments:
+            controller.permitType.value ?? controller.permit.value?.permitType,
+      );
+    }
 
     return PopScope(
       canPop: false,
@@ -84,7 +106,7 @@ class PermitShowView extends GetView<PermitShowController> {
             );
           }
 
-          return _PermitDetail(permit: permit);
+          return _PermitDetail(permit: permit, controller: controller);
         }),
         bottomNavigationBar: Obx(() {
           if (controller.permit.value == null) return const SizedBox.shrink();
@@ -106,7 +128,9 @@ class PermitShowView extends GetView<PermitShowController> {
 }
 
 class _PermitDetail extends StatelessWidget {
-  const _PermitDetail({required this.permit});
+  const _PermitDetail({required this.permit, required this.controller});
+
+  final PermitShowController controller;
 
   final Permit permit;
 
@@ -260,7 +284,7 @@ class _PermitDetail extends StatelessWidget {
         if ((permit.file ?? '').isNotEmpty) ...[
           const SizedBox(height: AppSpacing.xxl),
           const AppSectionHeader(title: 'Lampiran'),
-          _AttachmentCard(file: permit.file!),
+          _AttachmentCard(file: permit.file!, controller: controller),
         ],
       ],
     );
@@ -500,68 +524,109 @@ class _ApprovalStep extends StatelessWidget {
   /// Kapan keputusan itu diambil. Kolom ini sudah diurai model sejak dulu dan
   /// tidak pernah sekali pun digambar, sehingga "sudah berapa lama pengajuan
   /// ini mengendap" adalah pertanyaan yang layar rincian tidak bisa jawab.
+  ///
+  /// On the workspace clock (PRMT-12): `updated_at` is an instant, and
+  /// formatting the parsed UTC value drew a decision at 06:30 WIB as 23:30
+  /// the day before.
   static String? _stamp(DateTime? at) {
     if (at == null) return null;
-    return DateFormat('d MMM yyyy · HH:mm', 'id').format(at);
+    return DateFormat(
+      'd MMM yyyy · HH:mm',
+      'id',
+    ).format(WorkspaceClock.current.wallClock(at));
   }
 }
 
 /// Kartu lampiran: nama berkas dan satu tindakan.
+///
+/// Berkasnya diambil lewat sesi, bukan dibuka dari alamat publik (PRMT-03):
+/// lampiran disimpan privat per tenant, dan hanya pengaju serta penyetujunya
+/// yang boleh membacanya. Foto ditampilkan di dalam aplikasi; dokumen lain
+/// ditawarkan untuk disimpan, seperti slip gaji.
 class _AttachmentCard extends StatelessWidget {
-  const _AttachmentCard({required this.file});
+  const _AttachmentCard({required this.file, required this.controller});
 
   final String file;
+  final PermitShowController controller;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = theme.palette;
 
-    return AppCard(
-      onTap: () => _open(),
-      child: Row(
-        children: [
-          const AppIconBox(icon: Icons.description_outlined, size: 36),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  file.split('/').last,
-                  style: theme.textTheme.titleSmall,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Ketuk untuk membuka di aplikasi lain',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: palette.textMuted,
+    return Obx(() {
+      final busy = controller.isDownloading.value;
+
+      return AppCard(
+        onTap: busy ? null : () => _open(context),
+        child: Row(
+          children: [
+            const AppIconBox(icon: Icons.description_outlined, size: 36),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    file.split('/').last,
+                    style: theme.textTheme.titleSmall,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
+                  const SizedBox(height: 2),
+                  Text(
+                    busy ? 'Mengambil lampiran…' : 'Ketuk untuk membuka',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Icon(
-            Icons.open_in_new_rounded,
-            size: AppIconSizes.md,
-            color: palette.textMuted,
-          ),
-        ],
-      ),
-    );
+            if (busy)
+              const SizedBox.square(
+                dimension: AppIconSizes.md,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              Icon(
+                Icons.open_in_new_rounded,
+                size: AppIconSizes.md,
+                color: palette.textMuted,
+              ),
+          ],
+        ),
+      );
+    });
   }
 
-  Future<void> _open() async {
-    final Uri uri = Uri.parse('${Env.assetBaseUrl}/$file');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      showErrorSnackbar(
-        'Tidak dapat membuka dokumen. Tautan tidak valid atau tidak ada '
-        'aplikasi yang bisa membukanya.',
+  Future<void> _open(BuildContext context) async {
+    final attachment = await controller.downloadAttachment();
+
+    if (attachment == null || !context.mounted) return;
+
+    if (attachment.isImage) {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => Dialog(
+          clipBehavior: Clip.antiAlias,
+          child: InteractiveViewer(
+            child: Image.memory(attachment.bytes, fit: BoxFit.contain),
+          ),
+        ),
       );
+      return;
+    }
+
+    try {
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: 'Simpan lampiran',
+        fileName: attachment.filename,
+        bytes: attachment.bytes,
+      );
+      if (path != null) showSuccessSnackbar('Lampiran tersimpan.');
+    } on Object {
+      showErrorSnackbar('Lampiran tidak dapat disimpan. Silakan coba lagi.');
     }
   }
 }
@@ -586,42 +651,55 @@ class _ApprovalBar extends StatelessWidget {
         top: false,
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 46,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _askReason(context),
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      size: AppIconSizes.lg,
-                    ),
-                    label: const Text('Tolak'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: palette.danger.foreground,
-                      side: BorderSide(color: palette.danger.border),
+          // Both buttons wait while a decision is in flight: a second tap used
+          // to send a second decision (PRMT-01).
+          child: Obx(() {
+            final busy = controller.isSubmitting.value;
+
+            return Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 46,
+                    child: OutlinedButton.icon(
+                      onPressed: busy ? null : () => _askReason(context),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        size: AppIconSizes.lg,
+                      ),
+                      label: const Text('Tolak'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: palette.danger.foreground,
+                        side: BorderSide(color: palette.danger.border),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                flex: 2,
-                child: SizedBox(
-                  height: 46,
-                  child: FilledButton.icon(
-                    onPressed: () => controller.submitApproval(approve: true),
-                    icon: const Icon(
-                      Icons.check_rounded,
-                      size: AppIconSizes.lg,
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  flex: 2,
+                  child: SizedBox(
+                    height: 46,
+                    child: FilledButton.icon(
+                      onPressed: busy
+                          ? null
+                          : () => controller.submitApproval(approve: true),
+                      icon: busy
+                          ? const SizedBox.square(
+                              dimension: AppIconSizes.lg,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(
+                              Icons.check_rounded,
+                              size: AppIconSizes.lg,
+                            ),
+                      label: const Text('Setujui'),
                     ),
-                    label: const Text('Setujui'),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            );
+          }),
         ),
       ),
     );

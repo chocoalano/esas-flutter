@@ -16,7 +16,7 @@ void main() {
   tearDown(Get.reset);
 
   testWidgets(
-    'logout for connection loss opens login with the required internet alert',
+    'an unreachable server at start explains that a connection is needed',
     (tester) async {
       await tester.pumpWidget(
         GetMaterialApp(
@@ -47,9 +47,10 @@ void main() {
 
       expect(find.text('Halaman masuk'), findsOneWidget);
       expect(find.text('Koneksi internet diperlukan'), findsOneWidget);
-      expect(find.textContaining('Anda otomatis keluar'), findsOneWidget);
+      // CORE-04: nobody was signed out, so the dialog must not say so.
+      expect(find.textContaining('otomatis keluar'), findsNothing);
       expect(
-        find.textContaining('wajib terhubung ke internet'),
+        find.textContaining('Server belum dapat dihubungi'),
         findsOneWidget,
       );
       await tester.tap(find.text('Mengerti'));

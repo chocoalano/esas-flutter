@@ -27,13 +27,19 @@ class AnnouncementDetailView extends GetView<AnnouncementDetailController> {
     final theme = Theme.of(context);
     final palette = theme.palette;
 
+    // `canPop: true` on the root route bubbles the pop to the system, which
+    // closes the app — the fallback below never ran (HOME-02).
     return PopScope(
-      canPop: true,
+      canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (didPop) {
-          return;
+        if (didPop) return;
+
+        final navigator = Navigator.of(context);
+        if (navigator.canPop()) {
+          navigator.pop();
+        } else {
+          Get.offAllNamed(HomeRoutes.home);
         }
-        Get.offAllNamed(HomeRoutes.home);
       },
       child: Scaffold(
         appBar: AppBar(

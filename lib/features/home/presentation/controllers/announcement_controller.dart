@@ -36,66 +36,94 @@ class AnnouncementController extends GetxController {
     super.onClose();
   }
 
+  /// Why the last load failed, or null — not an empty list (HOME-15).
+  final Rxn<ApiException> loadError = Rxn<ApiException>();
+
+  /// Bumped by every reset; an answer to an older one is dropped (HOME-16).
+  int _generation = 0;
+
   void _onScroll() {
-    if (!scrollController.hasClients || isLoadMore.value || !hasMore.value) {
+    if (!scrollController.hasClients ||
+        isLoadMore.value ||
+        !hasMore.value ||
+        loadError.value != null) {
       return;
     }
 
     final position = scrollController.position;
 
     if (position.pixels >= position.maxScrollExtent * 0.9) {
-      _loadMore();
+      loadMore();
     }
   }
 
   Future<void> resetAndFetch() async {
+    final generation = ++_generation;
+
     page.value = 1;
     hasMore.value = true;
     isLoading.value = true;
 
     try {
-      lists.assignAll(await _fetch());
+      final rows = await _fetch(1);
+      if (generation != _generation) return;
+
+      hasMore.value = rows.length == _perPage;
+      lists.assignAll(rows);
+      loadError.value = null;
+    } on ApiException catch (error) {
+      if (generation != _generation) return;
+
+      // What was on screen stays, and the failure is said (HOME-15).
+      loadError.value = error;
+      showErrorSnackbar('Gagal memuat pengumuman: ${error.message}');
     } finally {
-      isLoading.value = false;
+      if (generation == _generation) isLoading.value = false;
     }
   }
 
-  Future<void> _loadMore() async {
-    if (isLoadMore.value || !hasMore.value) {
+  Future<void> loadMore() async {
+    if (isLoadMore.value || !hasMore.value || isLoading.value) {
       return;
     }
 
+    final generation = _generation;
+    final next = page.value + 1;
+
     isLoadMore.value = true;
-    page.value += 1;
 
     try {
-      final rows = await _fetch();
+      final rows = await _fetch(next);
+      // A page from before a refresh belongs to a list that no longer exists
+      // (HOME-16).
+      if (generation != _generation) return;
 
-      if (rows.isEmpty) {
-        page.value -= 1;
-      } else {
+      // Set after the generation check, not inside `_fetch`: a stale page
+      // answering after a refresh switched paging off (UAT review H6).
+      hasMore.value = rows.length == _perPage;
+
+      if (rows.isNotEmpty) {
+        page.value = next;
         lists.addAll(rows);
+      }
+    } on ApiException catch (error) {
+      // A failed page is retried by the next scroll; paging is not switched
+      // off for good over a dropped connection (HOME-15).
+      if (generation == _generation) {
+        showErrorSnackbar('Gagal memuat pengumuman: ${error.message}');
       }
     } finally {
       isLoadMore.value = false;
     }
   }
 
-  Future<List<Announcement>> _fetch() async {
-    try {
-      final rows = await _repository.announcements(
-        page: page.value,
-        perPage: _perPage,
-      );
+  /// One page. Throws [ApiException].
+  Future<List<Announcement>> _fetch(int pageNumber) async {
+    final rows = await _repository.announcements(
+      page: pageNumber,
+      perPage: _perPage,
+    );
 
-      hasMore.value = rows.length == _perPage;
-
-      return rows;
-    } on ApiException catch (error) {
-      hasMore.value = false;
-      showErrorSnackbar('Gagal memuat pengumuman: ${error.message}');
-
-      return const [];
-    }
+    return rows;
   }
 }

@@ -18,10 +18,16 @@ import '../../data/repositories/workspace_repository.dart';
 /// live configuration to be tested. `WorkspaceRepository.connect` composes it,
 /// asks, and stores only what the server confirmed.
 class SetupController extends GetxController {
-  SetupController({required WorkspaceRepository repository})
-    : _repository = repository;
+  SetupController({
+    required WorkspaceRepository repository,
+    Future<void> Function()? endSession,
+  }) : _repository = repository,
+       _endSession = endSession;
 
   final WorkspaceRepository _repository;
+
+  /// Ends whatever session is stored, against the server that issued it.
+  final Future<void> Function()? _endSession;
 
   final formKey = GlobalKey<FormState>();
   final domainController = TextEditingController();
@@ -140,13 +146,19 @@ class SetupController extends GetxController {
       return 'Kode workspace wajib diisi.';
     }
 
-    return ServerConfig.isValidWorkspace(value)
+    // Normalised first, as it is when saved (SETUP-02): a keyboard that
+    // capitalised "Acme" was refused over a difference the save erases.
+    return ServerConfig.isValidWorkspace(value!.trim().toLowerCase())
         ? null
         : 'Gunakan huruf kecil, angka dan tanda hubung saja. Contoh: acme';
   }
 
-  /// Ask the server to confirm what is typed, and store it only if it does.
+  /// Ask the server to confirm what is typed. Nothing is stored here: the
+  /// screen asks "is this your company?" first, and [proceed] stores it
+  /// (SETUP-01).
   Future<void> check() async {
+    if (isChecking.value) return;
+
     // Paints the messages under the fields when there is a form on screen. The
     // values are checked again below regardless: a controller that refuses bad
     // input only while a widget happens to be mounted is one whose refusal
@@ -159,13 +171,17 @@ class SetupController extends GetxController {
     }
 
     final workspace = workspaceController.text.trim().toLowerCase();
+    // The answer is about these values. Edited while it is on its way, it no
+    // longer is, and it must not land over them (SETUP-03).
+    final asked = edits.value;
 
     isChecking.value = true;
     checkError.value = null;
     confirmedName.value = null;
+    _candidate = null;
 
     try {
-      final found = await _repository.connect(
+      final candidate = await _repository.probe(
         domain: domainController.text,
         workspace: workspace,
         // What the address permits, not what the switch was left on: storing
@@ -173,17 +189,34 @@ class SetupController extends GetxController {
         subdomainMode: usesSubdomain,
       );
 
-      confirmedName.value = found.name;
+      if (edits.value != asked) return;
+
+      _candidate = candidate;
+      confirmedName.value = candidate.workspace.name;
     } on ApiException catch (error) {
+      if (edits.value != asked) return;
       checkError.value = explain(error, workspace);
     } finally {
       isChecking.value = false;
     }
   }
 
-  /// Move on to signing in, offered only once the server has confirmed the
-  /// workspace.
-  void proceed() {
+  /// The workspace the server confirmed, held until the person goes on.
+  WorkspaceCandidate? _candidate;
+
+  /// Adopt the confirmed workspace, then move on to signing in to it.
+  Future<void> proceed() async {
+    final candidate = _candidate;
+    if (candidate == null) return;
+
+    // A token belongs to the workspace that issued it (UAT review C1). The
+    // login screen links here while a session may still be stored — a start
+    // with no connection keeps it (CORE-04) — and adopting another workspace
+    // used to leave it in place, to be sent to the new server next. Ended
+    // before the switch, so the sign-out still reaches the old server.
+    if (!_repository.isCurrent(candidate)) await _endSession?.call();
+
+    await _repository.adopt(candidate);
     Get.offAllNamed(AuthRoutes.login);
   }
 
@@ -213,6 +246,10 @@ class SetupController extends GetxController {
   /// sign-in screen threw that distinction away.
   @visibleForTesting
   static String explain(ApiException error, String workspace) {
+    // Before the transport check: a certificate problem is the server's
+    // address being wrong or misconfigured, not the person's signal.
+    if (error.isTlsFailure) return error.message;
+
     if (error.isTransportFailure) {
       return 'Server tidak dapat dihubungi. Periksa alamat server dan koneksi Anda.';
     }

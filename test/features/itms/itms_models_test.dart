@@ -10,7 +10,7 @@ void main() {
         'id': 301,
         'service_id': 12,
         'service_name': 'VPN & Remote Access',
-        'service_code' : 'IT-SVC-012',
+        'service_code': 'IT-SVC-012',
         'subject': 'Gagal konek VPN kantor dari rumah',
         'description': 'Muncul error TLS handshake',
         'status': 'triaged',
@@ -57,4 +57,3 @@ void main() {
     });
   });
 }
-

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/ui/dialogs/app_snackbar.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/network/idempotency_key.dart';
 import '../../../../core/utils/app_logger.dart';
 import '../../data/repositories/profile_repository.dart';
 
@@ -25,7 +26,6 @@ class ProfileBugReportController extends GetxController {
   final TextEditingController messageController = TextEditingController();
 
   final RxString selectedPlatform = 'android'.obs;
-  final RxBool status = true.obs;
   final RxBool isLoading = false.obs;
   final Rx<File?> pickedImage = Rx<File?>(null);
 
@@ -41,12 +41,6 @@ class ProfileBugReportController extends GetxController {
   void onPlatformChanged(String? value) {
     if (value != null) {
       selectedPlatform.value = value;
-    }
-  }
-
-  void onStatusChanged(bool? value) {
-    if (value != null) {
-      status.value = value;
     }
   }
 
@@ -100,10 +94,15 @@ class ProfileBugReportController extends GetxController {
       return;
     }
 
-    if (!(bugReportFormKey.currentState?.validate() ?? false)) {
+    // Paints the messages when the form is on screen; the values are checked
+    // again regardless, so the refusal does not depend on a mounted widget.
+    bugReportFormKey.currentState?.validate();
+    if (validateTitle(titleController.text) != null ||
+        validateMessage(messageController.text) != null) {
       return;
     }
 
+    if (isLoading.value) return;
     isLoading.value = true;
 
     try {
@@ -112,15 +111,55 @@ class ProfileBugReportController extends GetxController {
         message: messageController.text,
         platform: selectedPlatform.value,
         screenshot: pickedImage.value,
+        idempotencyKey: _keyFor(_fingerprint()),
       );
 
+      _attemptKey = null;
+      _attemptFingerprint = null;
       showSuccessSnackbar('Laporan bug berhasil dikirim!');
       _clearForm();
     } on ApiException catch (error) {
+      // A refusal ends the attempt; no answer does not — the report may have
+      // been filed, and the retry must be recognisable as the same one.
+      if (!_outcomeUnknown(error)) {
+        _attemptKey = null;
+        _attemptFingerprint = null;
+      }
       showErrorSnackbar(error.firstFieldError ?? error.message);
     } finally {
       isLoading.value = false;
     }
+  }
+
+  /// One key per report, not per tap (PROF-08). It used to be minted inside
+  /// the API call, so "Kirim" again after a timeout filed the report twice.
+  String? _attemptKey;
+  String? _attemptFingerprint;
+
+  String _keyFor(String fingerprint) {
+    if (_attemptKey == null || _attemptFingerprint != fingerprint) {
+      _attemptKey = IdempotencyKey.mint();
+      _attemptFingerprint = fingerprint;
+    }
+    return _attemptKey!;
+  }
+
+  String _fingerprint() => [
+    titleController.text,
+    messageController.text,
+    selectedPlatform.value,
+    pickedImage.value?.path ?? '',
+  ].join('\u0000');
+
+  /// Whether the report may have been filed although no answer said so — the
+  /// same reading the leave form uses.
+  static bool _outcomeUnknown(ApiException error) {
+    final status = error.status;
+
+    return status == null ||
+        status >= 500 ||
+        status == 429 ||
+        error.code == 'idempotency_in_progress';
   }
 
   void _clearForm() {
@@ -128,6 +167,5 @@ class ProfileBugReportController extends GetxController {
     messageController.clear();
     pickedImage.value = null;
     selectedPlatform.value = 'android';
-    status.value = true;
   }
 }

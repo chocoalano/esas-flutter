@@ -195,25 +195,45 @@ void main() {
       expect(local.hasData('auth_user_json'), isFalse);
     });
 
-    test('connection loss clears the stored session', () async {
+    // CORE-04. An unreachable server says nothing about the credential. The
+    // session is kept and the app opens on what it already knows.
+    test('an unreachable server keeps the session, unverified', () async {
       when(() => api.currentUser()).thenThrow(
         ApiErrorMapper.fromTransportError(const SocketException('no route')),
       );
 
-      expect(await auth.restoreSession(), SessionState.connectionLost);
-      expect(session.token, isNull);
-      expect(session.user, isNull);
-      expect(local.hasData('auth_user_json'), isFalse);
+      expect(await auth.restoreSession(), SessionState.unverified);
+      expect(session.token, 'abc');
+      expect(session.user?.name, 'Budi');
+      expect(local.hasData('auth_user_json'), isTrue);
     });
 
-    test('a connection timeout clears the session', () async {
+    test('so does a timeout', () async {
       when(
         () => api.currentUser(),
       ).thenThrow(const ApiException('slow', code: 'timeout'));
 
-      expect(await auth.restoreSession(), SessionState.connectionLost);
-      expect(session.token, isNull);
+      expect(await auth.restoreSession(), SessionState.unverified);
+      expect(session.token, 'abc');
     });
+
+    test(
+      'unreachable with nothing cached to show keeps the credential',
+      () async {
+        await local.remove('auth_user_json');
+        final bare = SessionRepository(
+          tokenStorage: InMemoryTokenStorage('abc'),
+          localStorage: local,
+        );
+        final repo = AuthRepository(api: api, session: bare);
+        when(
+          () => api.currentUser(),
+        ).thenThrow(const ApiException('slow', code: 'timeout'));
+
+        expect(await repo.restoreSession(), SessionState.connectionLost);
+        expect(bare.token, 'abc');
+      },
+    );
 
     test('offline on a 5xx — a broken server is not a dead session', () async {
       when(
@@ -328,23 +348,6 @@ void main() {
 
     expect(auth.isAuthenticated, isFalse);
   });
-
-  test(
-    'disconnectSession cleans up once without calling server logout',
-    () async {
-      await session.save(token: 'abc', user: AuthUser.fromJson(userJson));
-
-      final ended = await Future.wait([
-        auth.disconnectSession(),
-        auth.disconnectSession(),
-      ]);
-
-      expect(ended, [true, false]);
-      expect(session.token, isNull);
-      expect(session.user, isNull);
-      verifyNever(() => api.logout(fcmToken: any(named: 'fcmToken')));
-    },
-  );
 
   group('loginWithGoogle', () {
     late _MockIdentity identity;

@@ -63,10 +63,7 @@ class EnterpriseServicesGrid extends StatelessWidget {
 }
 
 class _EnterpriseServiceTile extends StatefulWidget {
-  const _EnterpriseServiceTile({
-    required this.service,
-    required this.onTap,
-  });
+  const _EnterpriseServiceTile({required this.service, required this.onTap});
 
   final EnterpriseServiceItem service;
   final VoidCallback onTap;
@@ -146,4 +143,3 @@ class _EnterpriseServiceTileState extends State<_EnterpriseServiceTile> {
     );
   }
 }
-

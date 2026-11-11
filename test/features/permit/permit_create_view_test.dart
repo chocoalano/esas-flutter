@@ -223,6 +223,61 @@ void main() {
       expect(fields['end_date'], '2026-09-03');
     });
 
+    // PRMT-11. A night shift ends on a smaller clock time than it starts. The
+    // validator demanded end > start whenever the dates were equal — and
+    // choosing a schedule always fills both dates with its work day.
+    group('shift malam', () {
+      setUp(() {
+        when(
+          () => repository.formData(
+            from: any(named: 'from'),
+            to: any(named: 'to'),
+          ),
+        ).thenAnswer(
+          (_) async => PermitFormData(
+            schedules: [
+              Schedule.fromJson({
+                'id': 10,
+                'work_day': '2026-09-04',
+                'shift': 'Malam',
+                'in': '23:00:00',
+                'out': '07:00:00',
+              }),
+            ],
+            from: DateTime(2026, 9, 2),
+            to: DateTime(2026, 10, 2),
+          ),
+        );
+      });
+
+      testWidgets('izin satu shift malam 23:00–07:00 diterima', (
+        tester,
+      ) async {
+        await pumpForm(tester, type: _type(id: 4, code: 'ANNUAL'));
+        controller.startTimeC.text = '23:00';
+        controller.endTimeC.text = '07:00';
+
+        await submit(tester);
+
+        expect(lastFields()['end_time'], '07:00');
+      });
+
+      testWidgets('penyesuaian jam 23:00–07:00 diterima', (tester) async {
+        await pumpForm(
+          tester,
+          type: _type(id: 52, code: 'TIME_ADJUSTMENT'),
+        );
+        controller.startTimeC.text = '23:00';
+        controller.endTimeC.text = '07:00';
+        controller.timeinAdjustC.text = '23:00';
+        controller.timeoutAdjustC.text = '07:00';
+
+        await submit(tester);
+
+        expect(lastFields()['timeout_adjust'], '07:00');
+      });
+    });
+
     testWidgets('pada izin sehari, jam selesai harus setelah jam mulai', (
       tester,
     ) async {
@@ -267,6 +322,31 @@ void main() {
       await submit(tester);
       expect(find.textContaining('Di luar jadwal kerja Anda'), findsWidgets);
 
+      verifyNever(
+        () => repository.create(
+          fields: any(named: 'fields'),
+          attachment: any(named: 'attachment'),
+          idempotencyKey: any(named: 'idempotencyKey'),
+        ),
+      );
+    });
+
+    // PRMT-16.
+    testWidgets('tanggal mulai tanpa jadwal kerja ditahan di field', (
+      tester,
+    ) async {
+      await pumpForm(tester, type: _type(id: 4, code: 'ANNUAL'));
+      controller.startTimeC.text = '08:00';
+      controller.endTimeC.text = '17:00';
+
+      controller.startDateC.text = '2026-09-06';
+      controller.endDateC.text = '2026-09-06';
+      await submit(tester);
+
+      expect(
+        find.text('Tidak ada jadwal kerja pada tanggal ini.'),
+        findsOneWidget,
+      );
       verifyNever(
         () => repository.create(
           fields: any(named: 'fields'),
@@ -527,6 +607,120 @@ void main() {
 
       expect(keys, hasLength(2));
       expect(keys.first, isNot(keys.last));
+    });
+
+    // PRMT-08. 409 `idempotency_in_progress` means the first request is still
+    // running and will most likely be recorded; 429 means nothing was looked
+    // at. Neither is the server saying "not recorded".
+    for (final refusal in const [
+      ApiException(
+        'Permintaan sebelumnya masih diproses.',
+        status: 409,
+        code: 'idempotency_in_progress',
+      ),
+      ApiException('Terlalu banyak permintaan.', status: 429),
+    ]) {
+      testWidgets('${refusal.status} ${refusal.code ?? ''} memegang kuncinya', (
+        tester,
+      ) async {
+        var attempt = 0;
+
+        when(
+          () => repository.create(
+            fields: any(named: 'fields'),
+            attachment: any(named: 'attachment'),
+            idempotencyKey: any(named: 'idempotencyKey'),
+          ),
+        ).thenAnswer((_) async {
+          attempt += 1;
+          if (attempt == 1) throw refusal;
+          return true;
+        });
+
+        await pumpForm(tester, type: _type(id: 4, code: 'ANNUAL'));
+        controller.startTimeC.text = '08:00';
+        controller.endTimeC.text = '17:00';
+
+        await submit(tester);
+        await submit(tester);
+
+        final keys = verify(
+          () => repository.create(
+            fields: any(named: 'fields'),
+            attachment: any(named: 'attachment'),
+            idempotencyKey: captureAny(named: 'idempotencyKey'),
+          ),
+        ).captured;
+
+        expect(keys.first, keys.last);
+      });
+    }
+
+    // PRMT-07. The key belongs to what was sent. After an attempt whose
+    // outcome is unknown, a changed form is a different request — but the
+    // first may already be recorded, so the person is asked before a second
+    // one is filed.
+    group('isi berubah setelah hasil belum pasti', () {
+      setUp(() {
+        var attempt = 0;
+        when(
+          () => repository.create(
+            fields: any(named: 'fields'),
+            attachment: any(named: 'attachment'),
+            idempotencyKey: any(named: 'idempotencyKey'),
+          ),
+        ).thenAnswer((_) async {
+          attempt += 1;
+          if (attempt == 1) {
+            throw const ApiException('Tidak ada jawaban dari server.');
+          }
+          return true;
+        });
+      });
+
+      Future<void> sendThenEdit(WidgetTester tester) async {
+        await pumpForm(tester, type: _type(id: 4, code: 'ANNUAL'));
+        controller.startTimeC.text = '08:00';
+        controller.endTimeC.text = '17:00';
+        await submit(tester);
+        controller.notesC.text = 'Catatan diperbaiki';
+      }
+
+      List<dynamic> keysSent() => verify(
+        () => repository.create(
+          fields: any(named: 'fields'),
+          attachment: any(named: 'attachment'),
+          idempotencyKey: captureAny(named: 'idempotencyKey'),
+        ),
+      ).captured;
+
+      testWidgets('tidak langsung mengirim, dan bertanya dulu', (tester) async {
+        await sendThenEdit(tester);
+
+        await tester.tap(find.text('Kirim pengajuan'));
+        await tester.pumpAndSettle();
+
+        expect(find.textContaining('mungkin sudah tercatat'), findsOneWidget);
+        expect(keysSent(), hasLength(1));
+      });
+
+      testWidgets('mengirim sebagai pengajuan baru bila dipilih', (
+        tester,
+      ) async {
+        await sendThenEdit(tester);
+
+        await tester.tap(find.text('Kirim pengajuan'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Kirim sebagai baru'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+        Get.closeAllSnackbars();
+        await tester.pumpAndSettle();
+
+        final keys = keysSent();
+        expect(keys, hasLength(2));
+        expect(keys.first, isNot(keys.last));
+      });
     });
   });
 }

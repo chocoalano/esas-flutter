@@ -12,6 +12,7 @@ import '../../features/notification/presentation/routes/notification_pages.dart'
 import '../../features/permit/presentation/routes/permit_pages.dart';
 import '../../features/profile/presentation/routes/profile_pages.dart';
 import '../../features/setup/presentation/routes/setup_pages.dart';
+import 'not_found_view.dart';
 
 /// The application's route table — an aggregator, and nothing else.
 ///
@@ -28,6 +29,13 @@ class AppPages {
   const AppPages._();
 
   static const initial = AuthRoutes.splash;
+
+  /// Where an unregistered route lands, instead of a null-check inside GetX
+  /// (CORE-06).
+  static final GetPage unknownRoute = GetPage(
+    name: '/not-found',
+    page: () => const NotFoundView(),
+  );
 
   static final List<GetPage> routes = [
     ...AuthPages.pages,

@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import '../bindings/permit_bindings.dart';
+import '../controllers/permit_show_controller.dart';
 import '../views/permit_create_view.dart';
 import '../views/permit_list_view.dart';
 import '../views/permit_show_view.dart';
@@ -26,7 +27,9 @@ class PermitPages {
     ),
     GetPage(
       name: PermitRoutes.show,
-      page: () => const PermitShowView(),
+      page: () => PermitShowView(
+        controllerTag: PermitShowController.tagFor(Get.arguments),
+      ),
       binding: PermitShowBinding(),
       transition: Transition.noTransition,
     ),

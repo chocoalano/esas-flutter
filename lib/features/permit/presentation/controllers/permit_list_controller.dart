@@ -59,64 +59,93 @@ class PermitListController extends GetxController {
     }
   }
 
+  /// Why the last load failed, or null. Distinct from an empty list
+  /// (PRMT-14): an offline refresh used to replace the history with nothing
+  /// and call it "Belum ada pengajuan".
+  final Rxn<ApiException> loadError = Rxn<ApiException>();
+
+  /// Bumped by every reset, so an answer to an older request is recognised
+  /// and dropped (PRMT-15).
+  int _generation = 0;
+
   Future<void> resetAndFetch() async {
+    final generation = ++_generation;
+
     page.value = 1;
     hasMore.value = true;
     isLoading.value = true;
 
     try {
-      permits.assignAll(await _fetch());
+      final rows = await _fetch(page: 1);
+      if (generation != _generation) return;
+
+      hasMore.value = rows.length == pageSize;
+      permits.assignAll(rows);
+      loadError.value = null;
+    } on ApiException catch (error) {
+      if (generation != _generation) return;
+
+      // What was on screen stays; the failure is said, not disguised as an
+      // empty history.
+      loadError.value = error;
+      hasMore.value = false;
+      showErrorSnackbar('Gagal memuat perizinan: ${error.message}');
     } finally {
-      isLoading.value = false;
+      if (generation == _generation) isLoading.value = false;
     }
   }
 
-  void loadMorePermits() => _loadMore();
+  Future<void> loadMorePermits() => _loadMore();
 
   Future<void> _loadMore() async {
-    if (isLoadMore.value || !hasMore.value) {
+    if (isLoadMore.value || !hasMore.value || isLoading.value) {
       return;
     }
 
+    final generation = _generation;
+    final next = page.value + 1;
+
     isLoadMore.value = true;
-    page.value += 1;
 
     try {
-      final rows = await _fetch();
+      final rows = await _fetch(page: next);
 
-      if (rows.isEmpty) {
-        page.value -= 1;
-      } else {
+      // A refresh started while this page was on its way: it belongs to a
+      // list that no longer exists.
+      if (generation != _generation) return;
+
+      // Set here, after the generation check, not inside `_fetch`: a stale
+      // page answering after a refresh switched paging off for the new list
+      // (UAT review A5).
+      hasMore.value = rows.length == pageSize;
+
+      // The page counter moves only once the page has actually arrived, so a
+      // failure is retried rather than skipped.
+      if (rows.isNotEmpty) {
+        page.value = next;
         permits.addAll(rows);
+      }
+    } on ApiException catch (error) {
+      if (generation == _generation) {
+        showErrorSnackbar('Gagal memuat perizinan: ${error.message}');
       }
     } finally {
       isLoadMore.value = false;
     }
   }
 
-  Future<List<Permit>> _fetch() async {
-    final typeId = permitType.value?.id;
+  /// One page. Throws [ApiException]; the caller decides what a failure means.
+  ///
+  /// With no type, every request of this person's (PRMT-05). The home screen
+  /// opens the list that way, and `GET /permits` without `type` is exactly
+  /// that list — this used to answer nothing instead.
+  Future<List<Permit>> _fetch({required int page}) async {
+    final rows = await _repository.list(
+      typeId: permitType.value?.id,
+      page: page,
+      perPage: pageSize,
+    );
 
-    if (typeId == null) {
-      hasMore.value = false;
-      return const [];
-    }
-
-    try {
-      final rows = await _repository.list(
-        typeId: typeId,
-        page: page.value,
-        perPage: pageSize,
-      );
-
-      hasMore.value = rows.length == pageSize;
-
-      return rows;
-    } on ApiException catch (error) {
-      hasMore.value = false;
-      showErrorSnackbar('Gagal memuat perizinan: ${error.message}');
-
-      return const [];
-    }
+    return rows;
   }
 }

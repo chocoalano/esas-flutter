@@ -291,6 +291,12 @@ class Approval {
   final DateTime? updatedAt;
   final String? status;
 
+  /// Whether this is the one tier the request is waiting on (PRMT-04).
+  ///
+  /// `null` when the server predates the field, which is different from
+  /// `false`: the controller then falls back to the first tier still waiting.
+  final bool? isCurrent;
+
   Approval({
     required this.id,
     required this.permitId,
@@ -301,6 +307,7 @@ class Approval {
     this.createdAt,
     this.updatedAt,
     this.status,
+    this.isCurrent,
   });
 
   factory Approval.fromJson(Map<String, dynamic> json) => Approval(
@@ -313,7 +320,10 @@ class Approval {
     createdAt: _asDate(json, 'created_at'),
     updatedAt: _asDate(json, 'updated_at'),
     status: _asStringN(json, 'status'),
+    isCurrent: json['is_current'] is bool ? json['is_current'] as bool : null,
   );
+
+  bool get isWaiting => userApprove?.toLowerCase() == 'w';
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -325,6 +335,7 @@ class Approval {
     if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
     if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
     if (status != null) 'status': status,
+    if (isCurrent != null) 'is_current': isCurrent,
   };
 }
 

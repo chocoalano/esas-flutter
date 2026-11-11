@@ -21,7 +21,8 @@ class ItmsDashboardView extends GetView<ItmsDashboardController> {
         title: const Text('IT Services (ITMS)'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Get.back(),
+          // The page, not an open snackbar (as GAMS-04).
+          onPressed: () => Navigator.of(context).maybePop(),
         ),
       ),
       body: SafeArea(
@@ -37,7 +38,11 @@ class ItmsDashboardView extends GetView<ItmsDashboardController> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.error_outline, size: 48, color: palette.danger.foreground),
+                    Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: palette.danger.foreground,
+                    ),
                     const SizedBox(height: AppSpacing.md),
                     Text(
                       controller.error.value!.message,
@@ -66,26 +71,42 @@ class ItmsDashboardView extends GetView<ItmsDashboardController> {
                 // ── Helpdesk Tickets ──
                 AppSectionHeader(
                   title: 'Tiket Bantuan IT',
-                  subtitle: '${controller.tickets.length} tiket kendala aktif',
+                  // Only open tickets, and "20+" when the one page read came
+                  // back full — more may be behind it (ITMS-01).
+                  subtitle:
+                      '${controller.activeTickets.length}${controller.tickets.length >= ItmsDashboardController.pageSize ? '+' : ''} tiket kendala aktif',
                   dense: true,
                   naturalCase: true,
                   trailing: TextButton.icon(
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text('Lapor'),
-                    onPressed: () => Get.toNamed(ItmsRoutes.tickets),
+                    // A form that files a ticket (ITMS-01); it used to open
+                    // this same dashboard again.
+                    onPressed: () async {
+                      // Untyped: a named GetPage route is `GetPageRoute<dynamic>`,
+                      // and `toNamed<bool>` fails the cast at runtime.
+                      final Object? filed = await Get.toNamed(
+                        ItmsRoutes.ticketCreate,
+                      );
+                      if (filed == true) await controller.loadDashboard();
+                    },
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                if (controller.tickets.isEmpty)
+                if (controller.activeTickets.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm,
+                    ),
                     child: Text(
                       'Tidak ada tiket kendala IT yang terbuka.',
-                      style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: palette.textMuted,
+                      ),
                     ),
                   )
                 else
-                  for (final ticket in controller.tickets.take(3))
+                  for (final ticket in controller.activeTickets.take(3))
                     Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                       child: AppCard(
@@ -99,7 +120,11 @@ class ItmsDashboardView extends GetView<ItmsDashboardController> {
                                 borderRadius: AppRadii.mdAll,
                               ),
                               alignment: Alignment.center,
-                              child: Icon(Icons.confirmation_number_outlined, size: 18, color: theme.colorScheme.primary),
+                              child: Icon(
+                                Icons.confirmation_number_outlined,
+                                size: 18,
+                                color: theme.colorScheme.primary,
+                              ),
                             ),
                             const SizedBox(width: AppSpacing.md),
                             Expanded(
@@ -108,11 +133,15 @@ class ItmsDashboardView extends GetView<ItmsDashboardController> {
                                 children: [
                                   Text(
                                     ticket.subject,
-                                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                   Text(
                                     '${ticket.serviceName ?? 'IT Helpdesk'} • ${ticket.statusLabel}',
-                                    style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: palette.textMuted,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -127,17 +156,22 @@ class ItmsDashboardView extends GetView<ItmsDashboardController> {
                 // ── Service Catalog ──
                 AppSectionHeader(
                   title: 'Katalog Layanan IT',
-                  subtitle: '${controller.services.length} layanan mandiri tersedia',
+                  subtitle:
+                      '${controller.services.length} layanan mandiri tersedia',
                   dense: true,
                   naturalCase: true,
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 if (controller.services.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm,
+                    ),
                     child: Text(
                       'Katalog layanan IT belum dikonfigurasi.',
-                      style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: palette.textMuted,
+                      ),
                     ),
                   )
                 else
@@ -155,7 +189,11 @@ class ItmsDashboardView extends GetView<ItmsDashboardController> {
                                 borderRadius: AppRadii.mdAll,
                               ),
                               alignment: Alignment.center,
-                              child: Icon(Icons.inventory_2_outlined, size: 18, color: theme.colorScheme.primary),
+                              child: Icon(
+                                Icons.inventory_2_outlined,
+                                size: 18,
+                                color: theme.colorScheme.primary,
+                              ),
                             ),
                             const SizedBox(width: AppSpacing.md),
                             Expanded(
@@ -164,11 +202,15 @@ class ItmsDashboardView extends GetView<ItmsDashboardController> {
                                 children: [
                                   Text(
                                     svc.name,
-                                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                   Text(
                                     svc.category ?? svc.code,
-                                    style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: palette.textMuted,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -190,10 +232,14 @@ class ItmsDashboardView extends GetView<ItmsDashboardController> {
                 const SizedBox(height: AppSpacing.sm),
                 if (controller.articles.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm,
+                    ),
                     child: Text(
                       'Belum ada artikel panduan kendala IT.',
-                      style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: palette.textMuted,
+                      ),
                     ),
                   )
                 else
@@ -211,7 +257,11 @@ class ItmsDashboardView extends GetView<ItmsDashboardController> {
                                 borderRadius: AppRadii.mdAll,
                               ),
                               alignment: Alignment.center,
-                              child: Icon(Icons.menu_book_outlined, size: 18, color: theme.colorScheme.primary),
+                              child: Icon(
+                                Icons.menu_book_outlined,
+                                size: 18,
+                                color: theme.colorScheme.primary,
+                              ),
                             ),
                             const SizedBox(width: AppSpacing.md),
                             Expanded(
@@ -220,14 +270,17 @@ class ItmsDashboardView extends GetView<ItmsDashboardController> {
                                 children: [
                                   Text(
                                     art.title,
-                                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                   if (art.summary != null)
                                     Text(
                                       art.summary!,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(color: palette.textMuted),
                                     ),
                                 ],
                               ),
@@ -244,4 +297,3 @@ class ItmsDashboardView extends GetView<ItmsDashboardController> {
     );
   }
 }
-

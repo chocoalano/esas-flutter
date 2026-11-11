@@ -27,15 +27,21 @@ class AuthApiService {
   /// against another handset still signs in here, and gets everything except
   /// the ability to clock. `device.can_record_attendance` is how the app knows
   /// to explain that instead of offering a button that answers 403.
+  ///
+  /// [legacyDeviceId] is what older builds sent as `device_id` (CORE-03). The
+  /// server moves an existing binding onto [deviceId] only when the account is
+  /// bound to exactly that legacy value; it is omitted when there is none.
   Future<Map<String, dynamic>> login({
     required String identifier,
     required String password,
     required String deviceId,
+    String? legacyDeviceId,
   }) {
     return _client.postObject(ApiRoutes.login, {
       'identifier': identifier,
       'password': password,
       'device_id': deviceId,
+      'legacy_device_id': ?legacyDeviceId,
     }, authenticated: false);
   }
 
@@ -49,10 +55,12 @@ class AuthApiService {
   Future<Map<String, dynamic>> loginWithFirebase({
     required String idToken,
     required String deviceId,
+    String? legacyDeviceId,
   }) {
     return _client.postObject(ApiRoutes.firebaseLogin, {
       'id_token': idToken,
       'device_id': deviceId,
+      'legacy_device_id': ?legacyDeviceId,
     }, authenticated: false);
   }
 

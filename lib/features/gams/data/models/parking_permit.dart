@@ -40,4 +40,3 @@ class ParkingPermit {
   final String? validUntil;
   final String? createdAt;
 }
-

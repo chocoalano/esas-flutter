@@ -9,7 +9,7 @@ import '../../data/repositories/gams_repository.dart';
 
 class GamsDashboardController extends GetxController {
   GamsDashboardController({required GamsRepository repository})
-      : _repository = repository;
+    : _repository = repository;
 
   final GamsRepository _repository;
 
@@ -17,7 +17,8 @@ class GamsDashboardController extends GetxController {
   final Rxn<ApiException> error = Rxn<ApiException>();
 
   final RxList<GamsServiceRequest> serviceRequests = <GamsServiceRequest>[].obs;
-  final RxList<GamsSpaceReservation> spaceReservations = <GamsSpaceReservation>[].obs;
+  final RxList<GamsSpaceReservation> spaceReservations =
+      <GamsSpaceReservation>[].obs;
   final RxList<GamsVehicleBooking> vehicleBookings = <GamsVehicleBooking>[].obs;
   final RxList<GamsVisitorPass> visitorPasses = <GamsVisitorPass>[].obs;
 
@@ -27,29 +28,76 @@ class GamsDashboardController extends GetxController {
     loadDashboard();
   }
 
+  /// The rows one page of each list holds — what the API is asked for.
+  static const int pageSize = 20;
+
+  /// Requests still waiting on somebody (GAMS-03). "Aktif" used to count the
+  /// resolved and closed ones too.
+  int get activeServiceRequests =>
+      serviceRequests.where((request) => !request.isClosed).length;
+
+  /// A count drawn from the first page only (GAMS-03).
+  ///
+  /// The dashboard reads one page of each list. When that page came back full
+  /// there may be more behind it, and "20" would be a total nobody counted —
+  /// so it says "20+".
+  static String countLabel(int count, {required int loaded}) =>
+      loaded >= pageSize ? '$count+' : '$count';
+
+  /// Why a section could not be loaded, by section (GAMS-02).
+  final RxMap<String, ApiException> sectionErrors =
+      <String, ApiException>{}.obs;
+
+  /// Load the four sections side by side, each failing on its own (GAMS-02).
+  ///
+  /// They used to run one after another in one `try`: a 403 on the visitor
+  /// book — somebody without access to it — hid the three that had loaded,
+  /// and trying again failed the same way. The screen-wide [error] is kept for
+  /// the case where nothing at all could be loaded.
   Future<void> loadDashboard() async {
     isLoading.value = true;
     error.value = null;
+    sectionErrors.clear();
+
+    Future<void> section<T>(
+      String key,
+      Future<List<T>> Function() load,
+      RxList<T> into,
+    ) async {
+      try {
+        into.assignAll(await load());
+      } on ApiException catch (e) {
+        sectionErrors[key] = e;
+      } catch (e) {
+        sectionErrors[key] = ApiException(e.toString());
+      }
+    }
 
     try {
-      final sr = await _repository.serviceRequests();
-      serviceRequests.assignAll(sr);
+      await Future.wait([
+        section(
+          'serviceRequests',
+          _repository.serviceRequests,
+          serviceRequests,
+        ),
+        section(
+          'spaceReservations',
+          _repository.spaceReservations,
+          spaceReservations,
+        ),
+        section(
+          'vehicleBookings',
+          _repository.vehicleBookings,
+          vehicleBookings,
+        ),
+        section('visits', _repository.visits, visitorPasses),
+      ]);
 
-      final srSpaces = await _repository.spaceReservations();
-      spaceReservations.assignAll(srSpaces);
-
-      final vb = await _repository.vehicleBookings();
-      vehicleBookings.assignAll(vb);
-
-      final vp = await _repository.visits();
-      visitorPasses.assignAll(vp);
-    } on ApiException catch (e) {
-      error.value = e;
-    } catch (e) {
-      error.value = ApiException(e.toString());
+      if (sectionErrors.length == 4) {
+        error.value = sectionErrors.values.first;
+      }
     } finally {
       isLoading.value = false;
     }
   }
 }
-

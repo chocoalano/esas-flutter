@@ -38,6 +38,8 @@ void showAttendanceDetailSheet(BuildContext context, Attendance attendance) {
     timeIn: attendance.timeIn,
     timeOut: attendance.timeOut,
     datePresence: attendance.datePresence,
+    crossesMidnight: attendance.crossesMidnight,
+    shiftOut: attendance.shiftOut,
   );
 
   final bool hasSchedule = attendance.hasSchedule;
@@ -51,6 +53,7 @@ void showAttendanceDetailSheet(BuildContext context, Attendance attendance) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     builder: (sheetContext) => DraggableScrollableSheet(
       initialChildSize: 0.62,
       minChildSize: 0.4,

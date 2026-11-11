@@ -24,57 +24,89 @@ class AnnouncementView extends GetView<AnnouncementController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          tooltip: 'Kembali',
-          onPressed: () => Get.offAllNamed(HomeRoutes.home),
-        ),
-        title: const Text('Pengumuman'),
-        titleSpacing: 0,
-      ),
-      body: Obx(() {
-        if (controller.isLoading.value && controller.lists.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.only(top: AppSpacing.lg),
-            child: AppSkeletonList(count: 4),
-          );
-        }
+    // Back to where it was opened from; home when it is the whole stack
+    // (HOME-02). As the root route with no PopScope, the system back button
+    // closed the app.
+    void back() {
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) {
+        navigator.pop();
+      } else {
+        Get.offAllNamed(HomeRoutes.home);
+      }
+    }
 
-        if (controller.lists.isEmpty) {
-          return const AppEmptyState(
-            icon: Icons.campaign_outlined,
-            title: 'Belum ada pengumuman',
-            message: 'Pengumuman dari perusahaan akan muncul di sini.',
-          );
-        }
-
-        return RefreshIndicator(
-          onRefresh: controller.resetAndFetch,
-          child: ListView.separated(
-            controller: controller.scrollController,
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.page,
-              AppSpacing.lg,
-              AppSpacing.page,
-              AppSpacing.bottomSafe,
-            ),
-            itemCount: controller.lists.length + 1,
-            separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
-            itemBuilder: (context, index) {
-              if (index < controller.lists.length) {
-                return _AnnouncementCard(item: controller.lists[index]);
-              }
-              return Obx(
-                () => controller.isLoadMore.value
-                    ? const AppSkeletonRow(showLeading: false)
-                    : const SizedBox.shrink(),
-              );
-            },
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (!didPop) back();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            tooltip: 'Kembali',
+            onPressed: back,
           ),
-        );
-      }),
+          title: const Text('Pengumuman'),
+          titleSpacing: 0,
+        ),
+        body: Obx(() {
+          if (controller.isLoading.value && controller.lists.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.only(top: AppSpacing.lg),
+              child: AppSkeletonList(count: 4),
+            );
+          }
+
+          if (controller.lists.isEmpty) {
+            // A failure is said as one, with a way to try again (HOME-15).
+            final error = controller.loadError.value;
+            if (error != null) {
+              return AppEmptyState(
+                icon: Icons.cloud_off_rounded,
+                title: 'Gagal memuat pengumuman',
+                message: error.message,
+                actionLabel: 'Coba lagi',
+                onAction: controller.resetAndFetch,
+              );
+            }
+
+            return AppEmptyState(
+              icon: Icons.campaign_outlined,
+              title: 'Belum ada pengumuman',
+              message: 'Pengumuman dari perusahaan akan muncul di sini.',
+              actionLabel: 'Muat ulang',
+              onAction: controller.resetAndFetch,
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: controller.resetAndFetch,
+            child: ListView.separated(
+              controller: controller.scrollController,
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.page,
+                AppSpacing.lg,
+                AppSpacing.page,
+                MediaQuery.viewPaddingOf(context).bottom + AppSpacing.lg,
+              ),
+              itemCount: controller.lists.length + 1,
+              separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
+              itemBuilder: (context, index) {
+                if (index < controller.lists.length) {
+                  return _AnnouncementCard(item: controller.lists[index]);
+                }
+                return Obx(
+                  () => controller.isLoadMore.value
+                      ? const AppSkeletonRow(showLeading: false)
+                      : const SizedBox.shrink(),
+                );
+              },
+            ),
+          );
+        }),
+      ),
     );
   }
 }

@@ -87,6 +87,7 @@ class AttendanceReceipt {
     required this.direction,
     required this.message,
     this.recordedAt,
+    this.pendingReview = false,
   });
 
   final PresenceDirection direction;
@@ -100,6 +101,13 @@ class AttendanceReceipt {
   /// substitute: a phone three minutes fast would print a time that disagrees
   /// with the payslip, on the one screen an employee would take a screenshot of.
   final String? recordedAt;
+
+  /// The server took the face verification but did not record a clock: the
+  /// score was below the workspace's auto-accept threshold
+  /// (`HRMS_FACE_AUTO_ACCEPT_SCORE_PERCENT`, 80% by default), so an officer
+  /// decides — 202 `face_pending_review` (W4-FACE-202). It must never be
+  /// presented as a clock that counts.
+  final bool pendingReview;
 }
 
 sealed class AttendanceOutcome {
@@ -370,15 +378,28 @@ class AttendanceRepository {
           direction ??
           PresenceDirection.clockIn;
 
+      // 202 `face_pending_review`: the verification is recorded, the clock is
+      // not — an officer decides (W4-FACE-202).
+      final pending = asString(body['code']) == 'face_pending_review';
+
       return AttendanceAccepted(
         AttendanceReceipt(
           direction: recorded,
-          message: asString(body['message']) ?? 'Absensi tercatat.',
-          recordedAt: asString(
-            recorded == PresenceDirection.clockIn
-                ? attendance['time_in']
-                : attendance['time_out'],
-          ),
+          message:
+              asString(body['message']) ??
+              (pending
+                  ? 'Verifikasi wajah menunggu konfirmasi petugas.'
+                  : 'Absensi tercatat.'),
+          // A verification awaiting review has no clock time yet; anything
+          // printed here would be read as one.
+          recordedAt: pending
+              ? null
+              : asString(
+                  recorded == PresenceDirection.clockIn
+                      ? attendance['time_in']
+                      : attendance['time_out'],
+                ),
+          pendingReview: pending,
         ),
       );
     } on ApiException catch (error) {
@@ -439,6 +460,25 @@ class AttendanceRepository {
             'Data absensi tidak diterima server. Perbarui aplikasi, dan '
             'laporkan ke tim IT bila berulang.',
         code: 'request_rejected',
+      );
+    }
+
+    // Not about the employee, so not "contact HR" (ATTD-05). The workspace's
+    // own state — suspended, not active yet, cancelled — arrives as a sentence
+    // written for a person, and a rate limit is simply a wait.
+    if (error.isWorkspaceUnavailable) {
+      return AttendanceRefusal(
+        kind: RefusalKind.transient,
+        message: error.message,
+        code: error.code ?? 'workspace_unavailable',
+      );
+    }
+
+    if (error.status == 429) {
+      return const AttendanceRefusal(
+        kind: RefusalKind.transient,
+        message: 'Terlalu banyak percobaan. Tunggu sebentar, lalu coba lagi.',
+        code: 'rate_limited',
       );
     }
 

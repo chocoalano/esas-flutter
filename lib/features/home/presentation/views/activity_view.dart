@@ -55,11 +55,11 @@ class ActivityView extends GetView<ActivityController> {
           onRefresh: controller.resetAndFetch,
           child: ListView.separated(
             controller: controller.scrollController,
-            padding: const EdgeInsets.fromLTRB(
+            padding: EdgeInsets.fromLTRB(
               AppSpacing.page,
               AppSpacing.lg,
               AppSpacing.page,
-              AppSpacing.bottomSafe,
+              MediaQuery.viewPaddingOf(context).bottom + AppSpacing.lg,
             ),
             itemCount: controller.lists.length + 1,
             separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),

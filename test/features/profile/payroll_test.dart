@@ -219,4 +219,64 @@ void main() {
       verify(() => repository.slip(7)).called(1);
     },
   );
+
+  // PROF-07. The download's snackbar went to the page's ScaffoldMessenger,
+  // under the open slip sheet where nobody could see it, and every failure
+  // read the same — the server's reason was dropped.
+  testWidgets('a failed download says why, above the open slip', (
+    tester,
+  ) async {
+    Get.testMode = true;
+    final repository = MockPayroll();
+    when(() => repository.page()).thenAnswer((_) async => page(7));
+    when(
+      () => repository.slip(7),
+    ).thenAnswer((_) async => Payslip.fromJson(slipJson(7)));
+    when(
+      () => repository.pdf(7),
+    ).thenThrow(const ApiException('Slip belum diterbitkan.', status: 409));
+    Get.put(ProfilePayrollController(repository: repository));
+    await tester.pumpWidget(const GetMaterialApp(home: ProfilePayrollView()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('2026-09'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Unduh PDF'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(
+      find.textContaining('Slip belum diterbitkan.').hitTestable(),
+      findsOneWidget,
+    );
+
+    await tester.pump(const Duration(seconds: 10));
+    await tester.pumpAndSettle();
+  });
+
+  // PROF-12. A slip that is not a monthly run — a THR — has no start or end
+  // date, and its period read "null – null".
+  test('a period with no dates is not shown as "null – null"', () {
+    Payslip slipWith(Map<String, dynamic> period) =>
+        Payslip.fromJson({...slipJson(7), 'period': period});
+
+    expect(
+      slipWith({'code': 'THR-2026', 'run_label': 'THR'}).periodLabel,
+      isNull,
+    );
+    expect(
+      slipWith({
+        'code': '2026-09',
+        'start_date': '2026-09-01',
+        'end_date': '2026-09-30',
+      }).periodLabel,
+      '2026-09-01 – 2026-09-30',
+    );
+    expect(
+      slipWith({'code': 'THR', 'end_date': '2026-03-20'}).periodLabel,
+      '2026-03-20',
+    );
+  });
 }

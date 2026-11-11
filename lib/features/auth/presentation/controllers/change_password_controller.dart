@@ -90,6 +90,11 @@ class ChangePasswordController extends GetxController {
   /// `{success: false, message: 'Password saat ini salah.'}`. That is why the
   /// result is read from `success` rather than from the status code.
   Future<void> changePassword() async {
+    // The keyboard's submit and the button both land here; the second tap
+    // while the first is in flight would be refused by the server with "wrong
+    // current password", because by then it has changed.
+    if (isLoading.value) return;
+
     if (!(changePasswordFormKey.currentState?.validate() ?? false)) {
       return;
     }
@@ -103,18 +108,13 @@ class ChangePasswordController extends GetxController {
         confirmation: confirmNewPasswordController.text,
       );
 
-      if (body['success'] == true) {
-        showSuccessSnackbar(
-          body['message']?.toString() ?? 'Kata sandi berhasil diubah!',
-        );
-        _clearForm();
-        return;
-      }
-
-      showErrorSnackbar(
-        body['message']?.toString() ?? 'Gagal mengubah kata sandi.',
-        title: 'Gagal',
+      // A 2xx IS the success (AUTH-01). The server answers
+      // `{message, other_devices_signed_out}` with no `success` key, and every
+      // refusal arrives as an [ApiException] below.
+      showSuccessSnackbar(
+        body['message']?.toString() ?? 'Kata sandi berhasil diubah!',
       );
+      _clearForm();
     } on ApiException catch (error) {
       showErrorSnackbar(error.firstFieldError ?? error.message);
     } finally {

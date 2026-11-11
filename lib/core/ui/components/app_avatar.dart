@@ -76,21 +76,23 @@ class AppAvatar extends StatelessWidget {
             Image.network(
               url,
               fit: BoxFit.cover,
+              // Width only (UI-03): both set means ResizeImagePolicy.exact,
+              // which squashed a portrait into a square before `cover` saw it.
+              // Employee photos are portraits; their width is the short side.
               cacheWidth: cacheEdge,
-              cacheHeight: cacheEdge,
-              // Ditelan dengan sengaja: inisial di bawahnya adalah cadangan,
-              // dan URL avatar yang rusak tidak layak menjadi sebuah galat bagi
-              // karyawan.
               errorBuilder: (_, _, _) => const SizedBox.shrink(),
-              // Foto baru muncul setelah bingkai pertamanya siap, supaya
-              // inisial tidak berkedip menjadi kotak kosong lebih dulu. Tidak
-              // ada `AnimatedOpacity` di sini lagi: yang sebelumnya berdiri di
-              // tempat ini opacity-nya konstan 1, jadi ia tidak pernah sekali
-              // pun beranimasi — ia hanya tampak seperti fade bagi yang membaca
-              // kodenya.
+              // Fade the photo in from transparent once its first frame is
+              // ready. `frame == null` means still downloading, so opacity 0.0
+              // leaves the initials visible beneath. When the frame arrives the
+              // AnimatedOpacity interpolates to 1.0.
               frameBuilder: (context, child, frame, wasSynchronous) {
-                if (wasSynchronous || frame != null) return child;
-                return const SizedBox.shrink();
+                if (wasSynchronous) return child;
+                return AnimatedOpacity(
+                  opacity: frame != null ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeIn,
+                  child: child,
+                );
               },
             ),
           if (onTap != null)

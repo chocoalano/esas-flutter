@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/network/api_exception.dart';
+import '../../../../core/ui/dialogs/app_snackbar.dart';
 import '../../data/models/payslip.dart';
 import '../controllers/profile_tab_controllers.dart';
 
@@ -75,7 +77,7 @@ class _ProfilePayrollViewState extends State<ProfilePayrollView> {
                 child: ListTile(
                   title: Text(slip.code),
                   subtitle: Text(
-                    '${slip.runLabel} · ${slip.period['start_date']} – ${slip.period['end_date']}\n${slip.statusLabel}',
+                    '${[slip.runLabel, ?slip.periodLabel].join(' · ')}\n${slip.statusLabel}',
                   ),
                   isThreeLine: true,
                   trailing: const Icon(Icons.chevron_right),
@@ -125,7 +127,7 @@ class _ProfilePayrollViewState extends State<ProfilePayrollView> {
               Text(slip.code, style: Theme.of(context).textTheme.headlineSmall),
               Text('${slip.employee['name'] ?? ''} · ${slip.statusLabel}'),
               Text(slip.runLabel),
-              Text('${slip.period['start_date']} – ${slip.period['end_date']}'),
+              if (slip.periodLabel case final period?) Text(period),
               const SizedBox(height: 20),
               Text(
                 'Gaji bersih',
@@ -203,19 +205,24 @@ class _ProfilePayrollViewState extends State<ProfilePayrollView> {
       if (path != null && !Platform.isAndroid && !Platform.isIOS) {
         await File(path).writeAsBytes(pdf.bytes, flush: true);
       }
-      if (path != null && context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Slip gaji tersimpan.')));
-      }
+      // The app's snackbars, not this page's ScaffoldMessenger: the slip sheet
+      // is open over the page, and a snackbar under it is one nobody sees
+      // (PROF-07).
+      if (path != null) showSuccessSnackbar('Slip gaji tersimpan.');
+    } on ApiException catch (error) {
+      // The server's reason — a slip not issued yet, a session that changed —
+      // is the one worth reading.
+      showErrorSnackbar(
+        error.isTransportFailure
+            ? 'Server tidak dapat dihubungi. Periksa koneksi lalu coba lagi.'
+            : error.message,
+        title: 'Slip gaji gagal diunduh',
+      );
     } on Object {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Slip gaji gagal diunduh. Silakan coba lagi.'),
-          ),
-        );
-      }
+      showErrorSnackbar(
+        'Slip gaji gagal diunduh. Silakan coba lagi.',
+        title: 'Slip gaji gagal diunduh',
+      );
     } finally {
       controller.isDownloading.value = false;
     }

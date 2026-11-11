@@ -1,4 +1,5 @@
 import 'package:esas/core/utils/app_logger.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Redaction is a backstop for a mistake, not a licence to log secrets. These
@@ -75,5 +76,42 @@ void main() {
       () => AppLogger.error('gagal', error: StateError('x')),
       returnsNormally,
     );
+  });
+
+  // CORE-07. `dart:developer.log` only reaches the VM service, which a release
+  // build does not have — so the "kept in release" levels wrote nothing, and a
+  // failed boot step (CORE-01) left no trace in logcat or Console.
+  group('warning and error reach a sink that exists in release', () {
+    late List<String> lines;
+    late DebugPrintCallback original;
+
+    setUp(() {
+      lines = [];
+      original = debugPrint;
+      debugPrint = (String? message, {int? wrapWidth}) {
+        if (message != null) lines.add(message);
+      };
+    });
+
+    tearDown(() => debugPrint = original);
+
+    test('warning is printed, redacted', () {
+      AppLogger.warning('boot step failed token=abc123');
+
+      expect(lines, hasLength(1));
+      expect(lines.single, contains('boot step failed'));
+      expect(lines.single, isNot(contains('abc123')));
+    });
+
+    test('error is printed with its cause, redacted', () {
+      AppLogger.error(
+        'push registration failed',
+        error: StateError('password=hunter2'),
+      );
+
+      expect(lines.join('\n'), contains('push registration failed'));
+      expect(lines.join('\n'), contains('Bad state'));
+      expect(lines.join('\n'), isNot(contains('hunter2')));
+    });
   });
 }

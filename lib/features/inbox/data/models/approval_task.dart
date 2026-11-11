@@ -13,6 +13,7 @@ class ApprovalTask {
     required this.status,
     this.createdAt,
     this.actionUrl,
+    this.canDecide = true,
   });
 
   factory ApprovalTask.fromJson(Map<String, dynamic> json) {
@@ -28,10 +29,17 @@ class ApprovalTask {
       status: asString(json['status']) ?? 'waiting',
       createdAt: asString(json['created_at']),
       actionUrl: asString(json['action_url']),
+      canDecide: asBool(json['can_decide']) ?? true,
     );
   }
 
   final String id;
+
+  /// Whether this task can be decided from the app (INBOX-02). The server
+  /// says no for an ITMS ticket, whose decision lives elsewhere; offering
+  /// Setujui/Tolak there always ended in a 400. Absent means yes, as before.
+  final bool canDecide;
+
   final String domain;
   final String domainLabel;
   final int itemId;
@@ -47,4 +55,3 @@ class ApprovalTask {
   bool get isGams => domain == 'gams';
   bool get isItms => domain == 'itms';
 }
-

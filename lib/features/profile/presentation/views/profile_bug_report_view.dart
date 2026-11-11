@@ -1,7 +1,6 @@
 import 'package:esas/core/theme/app_dimens.dart';
 import 'package:esas/core/theme/app_palette.dart';
 import 'package:esas/core/ui/components/app_button.dart';
-import 'package:esas/core/ui/components/app_card.dart';
 import 'package:esas/core/ui/components/app_input_decoration.dart';
 import 'package:esas/core/ui/components/app_section_header.dart';
 import 'package:flutter/material.dart';
@@ -28,6 +27,7 @@ class ProfileBugReportView extends GetView<ProfileBugReportController> {
     return Scaffold(
       appBar: AppBar(title: const Text('Laporkan Bug'), centerTitle: true),
       body: SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.page,
           AppSpacing.lg,
@@ -89,9 +89,9 @@ class ProfileBugReportView extends GetView<ProfileBugReportController> {
               _AttachmentSection(controller: controller),
               const SizedBox(height: AppSpacing.xl),
 
-              _StatusField(controller: controller),
-              const SizedBox(height: AppSpacing.xl),
-
+              // No "Bug Aktif" box (PROF-08): it was never sent, and the
+              // server sets a report's status itself — a reporter does not
+              // get to open or close their own report.
               Obx(
                 () => AppButton(
                   label: 'Kirim Laporan Bug',
@@ -250,41 +250,5 @@ class _AttachmentSection extends StatelessWidget {
         ],
       );
     });
-  }
-}
-
-class _StatusField extends StatelessWidget {
-  const _StatusField({required this.controller});
-
-  final ProfileBugReportController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Obx(
-      () => AppCard(
-        padding: EdgeInsets.zero,
-        child: Material(
-          type: MaterialType.transparency,
-          child: CheckboxListTile(
-            title: Text('Bug Aktif', style: theme.textTheme.titleSmall),
-            subtitle: Text(
-              'Centang jika bug ini masih terjadi dan perlu penanganan segera.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.palette.textMuted,
-              ),
-            ),
-            value: controller.status.value,
-            onChanged: controller.onStatusChanged,
-            controlAffinity: ListTileControlAffinity.leading,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.sm,
-              vertical: AppSpacing.xs,
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }

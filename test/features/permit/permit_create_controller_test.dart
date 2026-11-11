@@ -5,6 +5,7 @@ import 'package:esas/features/permit/data/repositories/permit_repository.dart';
 import 'package:esas/features/permit/presentation/controllers/permit_create_controller.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:esas/core/tenancy/workspace_clock.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -21,6 +22,8 @@ class _FakeFilePicker extends FilePicker {
 
   final FilePickerResult? answer;
 
+  bool? askedForData;
+
   @override
   Future<FilePickerResult?> pickFiles({
     String? dialogTitle,
@@ -36,7 +39,10 @@ class _FakeFilePicker extends FilePicker {
     bool lockParentWindow = false,
     bool readSequential = false,
     bool useLegacyPicker = false,
-  }) async => answer;
+  }) async {
+    askedForData = withData;
+    return answer;
+  }
 }
 
 LeaveType typeOf({
@@ -296,12 +302,45 @@ void main() {
       expect(controller.latestDate, DateTime(2026, 10, 2));
     });
 
-    test('tanpa jawaban server memakai bawaan server: hari ini sampai +30', () {
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
+    // PRMT-06. The server accepts a request for a day already lived — it is
+    // what a time adjustment IS, and how a sick day with yesterday's doctor's
+    // note is filed. Only the form's window kept those days out of reach.
+    test('tanpa jawaban server: 30 hari ke belakang sampai 30 ke depan', () {
+      final today = WorkspaceClock.current.today();
 
-      expect(controller.earliestDate, today);
-      expect(controller.latestDate, today.add(const Duration(days: 30)));
+      expect(
+        controller.earliestDate,
+        DateTime(today.year, today.month, today.day - 30),
+      );
+      expect(
+        controller.latestDate,
+        DateTime(today.year, today.month, today.day + 30),
+      );
+    });
+
+    test('meminta jadwal hari-hari yang sudah lewat juga', () async {
+      when(
+        () => repository.formData(
+          from: any(named: 'from'),
+          to: any(named: 'to'),
+        ),
+      ).thenAnswer((_) async => const PermitFormData());
+
+      controller.onInit();
+      await Future<void>.delayed(Duration.zero);
+
+      final today = WorkspaceClock.current.today();
+      String ymd(DateTime d) =>
+          '${d.year.toString().padLeft(4, '0')}-'
+          '${d.month.toString().padLeft(2, '0')}-'
+          '${d.day.toString().padLeft(2, '0')}';
+
+      verify(
+        () => repository.formData(
+          from: ymd(DateTime(today.year, today.month, today.day - 30)),
+          to: ymd(DateTime(today.year, today.month, today.day + 30)),
+        ),
+      ).called(1);
     });
   });
 
@@ -335,6 +374,55 @@ void main() {
       expect(controller.startDateC.text, '2026-09-02');
       expect(controller.endDateC.text, '2026-09-02');
       expect(controller.isSingleDay, isTrue);
+    });
+
+    // PRMT-16. The schedule says "the date below follows this choice" — but
+    // the date could be changed on its own while the schedule id stayed. The
+    // server trusts a named schedule over the date, so a request dated on a
+    // rest day slipped past `permit_no_schedule`, tied to another day's row.
+    group('tanggal yang diubah sendiri', () {
+      setUp(() async {
+        when(
+          () => repository.formData(
+            from: any(named: 'from'),
+            to: any(named: 'to'),
+          ),
+        ).thenAnswer(
+          (_) async => PermitFormData(
+            schedules: [
+              Schedule.fromJson({'id': 8, 'work_day': '2026-09-02'}),
+              Schedule.fromJson({'id': 9, 'work_day': '2026-09-03'}),
+            ],
+          ),
+        );
+        controller.onInit();
+        await Future<void>.delayed(Duration.zero);
+      });
+
+      test('mengikuti jadwal hari itu', () {
+        controller.startDateC.text = '2026-09-03';
+
+        expect(controller.selectedScheduleId.value, 9);
+        expect(
+          controller.buildFields()['user_timework_schedule_id'],
+          9,
+        );
+      });
+
+      test('tanpa jadwal di hari itu, tidak menamai jadwal lain', () {
+        controller.startDateC.text = '2026-09-06';
+
+        expect(
+          controller.buildFields()['user_timework_schedule_id'],
+          isNull,
+        );
+        // And says so at the field, before the server has to.
+        expect(
+          controller.scheduleErrorFor('2026-09-06'),
+          'Tidak ada jadwal kerja pada tanggal ini.',
+        );
+        expect(controller.scheduleErrorFor('2026-09-03'), isNull);
+      });
     });
   });
 
@@ -373,12 +461,42 @@ void main() {
     });
 
     test('berkas dari penyedia awan diterima lewat isinya', () async {
-      final cloud = chosen('awan.pdf', size: 3, bytes: [1, 2, 3]);
+      final cloud = PlatformFile(
+        name: 'awan.pdf',
+        size: 3,
+        readStream: Stream.value([1, 2, 3]),
+      );
       FilePicker.platform = _FakeFilePicker(FilePickerResult([cloud]));
       await controller.pickFile();
 
       expect(controller.selectedFile.value?.name, 'awan.pdf');
-      expect(controller.attachment()?.bytes, isNotNull);
+      expect(controller.attachment()?.bytes, [1, 2, 3]);
+    });
+
+    // PRMT-13. `withData: true` made the plugin copy and read the whole file
+    // into memory — and send it once more over the platform channel — before
+    // the 5 MB limit was looked at. A 300 MB scan was an out-of-memory crash on
+    // a low-end phone before the warning could appear.
+    test('isi berkas tidak dimuat sebelum ukurannya diperiksa', () async {
+      final picker = _FakeFilePicker(null);
+      FilePicker.platform = picker;
+
+      await controller.pickFile();
+
+      expect(picker.askedForData, isFalse);
+    });
+
+    test('berkas besar dari penyedia awan tidak pernah dibaca', () async {
+      final huge = PlatformFile(
+        name: 'pindaian.pdf',
+        size: 300 * 1024 * 1024,
+        readStream: Stream<List<int>>.error(StateError('must not be read')),
+      );
+      FilePicker.platform = _FakeFilePicker(FilePickerResult([huge]));
+
+      await controller.pickFile();
+
+      expect(controller.selectedFile.value, isNull);
     });
 
     test('berkas tanpa path maupun isi tidak pernah tampil terpilih', () async {

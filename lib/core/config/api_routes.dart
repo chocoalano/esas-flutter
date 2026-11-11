@@ -221,12 +221,17 @@ class ApiRoutes {
   /// answering out of turn is refused rather than recorded.
   static String permitApproval(Object id) => '/permits/$id/approval';
 
+  /// A permit's attachment, as bytes. Private to the tenant: the requester and
+  /// the approvers may read it, through this and nothing else (PRMT-03).
+  static String permitFile(Object id) => '/permits/$id/file';
+
   // ── AI Assistant / Copilot ───────────────────────────────────────────────
 
   static const String aiChatContext = '/ai/chat/context';
   static const String aiChatConversations = '/ai/chat/conversations';
   static String aiChatConversation(String id) => '/ai/chat/conversations/$id';
-  static String aiChatMessages(String id) => '/ai/chat/conversations/$id/messages';
+  static String aiChatMessages(String id) =>
+      '/ai/chat/conversations/$id/messages';
 
   // ── GAMS (General Affairs) ────────────────────────────────────────────────
   static const String gamsServiceDefinitions = '/gams/service-definitions';
@@ -234,7 +239,8 @@ class ApiRoutes {
   static String gamsServiceRequest(Object id) => '/gams/service-requests/$id';
   static const String gamsSpaces = '/gams/spaces';
   static const String gamsSpaceReservations = '/gams/space-reservations';
-  static String gamsSpaceReservation(Object id) => '/gams/space-reservations/$id';
+  static String gamsSpaceReservation(Object id) =>
+      '/gams/space-reservations/$id';
   static const String gamsVehicles = '/gams/vehicles';
   static const String gamsVehicleBookings = '/gams/vehicle-bookings';
   static String gamsVehicleBooking(Object id) => '/gams/vehicle-bookings/$id';
@@ -251,16 +257,19 @@ class ApiRoutes {
   static const String gamsSecurityIncidents = '/gams/security-incidents';
   static const String gamsKeyRegisters = '/gams/key-registers';
   static const String gamsMyWorkOrders = '/gams/my-work-orders';
-  static String gamsCompleteWorkOrder(Object id) => '/gams/my-work-orders/$id/complete';
+  static String gamsCompleteWorkOrder(Object id) =>
+      '/gams/my-work-orders/$id/complete';
 
   // ── ITMS (IT Service Management) ──────────────────────────────────────────
   static const String itmsServices = '/itms/services';
   static const String itmsTickets = '/itms/tickets';
   static String itmsTicket(Object id) => '/itms/tickets/$id';
   static const String itmsKnowledgeArticles = '/itms/knowledge-articles';
-  static String itmsKnowledgeArticle(Object id) => '/itms/knowledge-articles/$id';
+  static String itmsKnowledgeArticle(Object id) =>
+      '/itms/knowledge-articles/$id';
   static const String itmsMyAssets = '/itms/my-assets';
-  static String itmsAcknowledgeAsset(Object id) => '/itms/my-assets/$id/acknowledge';
+  static String itmsAcknowledgeAsset(Object id) =>
+      '/itms/my-assets/$id/acknowledge';
 
   // ── Unified Approval Inbox ────────────────────────────────────────────────
   static const String tasksInbox = '/tasks/inbox';

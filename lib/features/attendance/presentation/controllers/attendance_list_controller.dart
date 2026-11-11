@@ -96,7 +96,12 @@ class AttendanceListController extends GetxController {
   }
 
   void _onScroll() {
-    if (!scrollController.hasClients || isLoadMore.value || !hasMore.value) {
+    // An error stops the automatic loading (ATTP-03); the footer's retry is
+    // the way on. Scrolling past a failure used to ask for the page after it.
+    if (!scrollController.hasClients ||
+        isLoadMore.value ||
+        !hasMore.value ||
+        errorMessage.value != null) {
       return;
     }
 
@@ -107,11 +112,31 @@ class AttendanceListController extends GetxController {
     }
 
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 250), _loadMore);
+    _debounce = Timer(const Duration(milliseconds: 250), loadMore);
+  }
+
+  /// Bumped by every refresh, so an answer to an older filter is recognised
+  /// and dropped without touching anything (ATTP-10).
+  int _generation = 0;
+
+  /// The range the list on screen belongs to.
+  String? _loadedRange;
+
+  String get _rangeKey {
+    final range = effectiveRange;
+
+    return '${_dateFormat.format(range.start)}..${_dateFormat.format(range.end)}';
   }
 
   Future<void> refreshAttendance() async {
-    _page = 1;
+    final generation = ++_generation;
+
+    // A page queued for the old filter must not fire into the new one.
+    _debounce?.cancel();
+
+    // The page counter is wound back only when page 1 has arrived (UAT review
+    // A4): a refresh that fails keeps the rows on screen, and those rows are
+    // still the pages they were.
     hasMore.value = true;
     isLoading.value = true;
     errorMessage.value = null;
@@ -120,44 +145,89 @@ class AttendanceListController extends GetxController {
       // Halaman pertama melaporkan kegagalannya di dalam halaman, bukan lewat
       // toast: layarnya kosong dan justru layar itu yang harus menjelaskan
       // dirinya sendiri.
-      final rows = await _fetch(announce: false);
+      final key = _rangeKey;
+      final rows = await _fetch(
+        page: 1,
+        announce: false,
+        generation: generation,
+      );
+
+      if (generation != _generation) return;
+
+      if (rows == null) {
+        // Rows of another range are not this range's history.
+        if (_loadedRange != key) {
+          attendanceList.clear();
+          _page = 1;
+        }
+        return;
+      }
+
+      _loadedRange = key;
+      _page = 1;
       attendanceList.assignAll(rows);
     } finally {
-      isLoading.value = false;
+      if (generation == _generation) isLoading.value = false;
     }
   }
 
-  Future<void> _loadMore() async {
-    if (isLoadMore.value || !hasMore.value) {
+  Future<void> loadMore() async {
+    if (isLoadMore.value ||
+        !hasMore.value ||
+        isLoading.value ||
+        errorMessage.value != null) {
       return;
     }
+
+    await _loadNextPage(announce: true);
+  }
+
+  /// The page after the last one that arrived. The counter moves only once
+  /// it has (ATTP-03).
+  Future<void> _loadNextPage({required bool announce}) async {
+    final generation = _generation;
 
     isLoadMore.value = true;
 
     try {
+      final rows = await _fetch(
+        page: _page + 1,
+        announce: announce,
+        generation: generation,
+      );
+
+      if (generation != _generation || rows == null) return;
+
       _page += 1;
-      final rows = await _fetch(announce: true);
       attendanceList.addAll(rows);
     } finally {
       isLoadMore.value = false;
     }
   }
 
-  Future<List<Attendance>> _fetch({required bool announce}) async {
+  /// One page, or null when it failed or belongs to a superseded filter.
+  Future<List<Attendance>?> _fetch({
+    required int page,
+    required bool announce,
+    required int generation,
+  }) async {
     final range = effectiveRange;
 
     try {
-      final page = await _repository.history(
-        page: _page,
+      final result = await _repository.history(
+        page: page,
         perPage: _perPage,
         startDate: _dateFormat.format(range.start),
         endDate: _dateFormat.format(range.end),
       );
 
+      // Superseded while on its way: nothing of it is this filter's.
+      if (generation != _generation) return null;
+
       // Only when the server actually sent them. Null means "later page" or
       // "older deployment", and both mean keep what is already held rather than
       // wipe the figures the header is drawn from.
-      if (page.monthTotals case final totals?) {
+      if (result.monthTotals case final totals?) {
         monthTotals
           ..clear()
           ..addEntries(
@@ -170,11 +240,13 @@ class AttendanceListController extends GetxController {
           );
       }
 
-      hasMore.value = page.rows.length == _perPage;
+      hasMore.value = result.rows.length == _perPage;
       errorMessage.value = null;
 
-      return page.rows;
+      return result.rows;
     } on ApiException catch (error) {
+      if (generation != _generation) return null;
+
       // `hasMore` sengaja tidak disetel false: halaman berikutnya belum tentu
       // tidak ada, ia hanya belum sampai. Yang berhenti adalah pemuatan
       // otomatis, karena kaki daftar kini menawarkan tombol coba lagi.
@@ -184,23 +256,15 @@ class AttendanceListController extends GetxController {
         showErrorSnackbar('Gagal memuat data absensi: ${error.message}');
       }
 
-      return const [];
+      return null;
     }
   }
 
-  /// Mengulang halaman yang barusan gagal.
   Future<void> retryLoadMore() async {
     if (isLoadMore.value) return;
 
     errorMessage.value = null;
-    isLoadMore.value = true;
-
-    try {
-      final rows = await _fetch(announce: false);
-      attendanceList.addAll(rows);
-    } finally {
-      isLoadMore.value = false;
-    }
+    await _loadNextPage(announce: false);
   }
 
   /// The window every request actually asks about.
@@ -237,7 +301,16 @@ class AttendanceListController extends GetxController {
   /// turns "3 to 21 August" into a single day. Swapping here means the caption
   /// above the list, the seven-day strip's anchor and the request all describe
   /// the same window.
-  Future<void> applyDateRange(DateTime? start, DateTime? end) async {
+  Future<void> applyDateRange(DateTime? start, DateTime? end) =>
+      _applyRange(start, end, preset: null);
+
+  Future<void> _applyRange(
+    DateTime? start,
+    DateTime? end, {
+    required AttendanceRangePreset? preset,
+  }) async {
+    _preset.value = start == null || end == null ? null : preset;
+
     if (start != null && end != null && end.isBefore(start)) {
       startDate.value = end;
       endDate.value = start;
@@ -272,22 +345,14 @@ class AttendanceListController extends GetxController {
     };
   }
 
-  /// Preset yang sedang berlaku, bila rentang aktif kebetulan sama persis
-  /// dengan salah satunya.
-  AttendanceRangePreset? get activePreset {
-    final start = startDate.value;
-    final end = endDate.value;
-    if (start == null || end == null) return null;
+  /// Preset yang dipilih, persis seperti dipilih (ATTP-18).
+  ///
+  /// Bukan diturunkan dari tanggal: pada tanggal 30 "Bulan ini" dan "30 hari
+  /// terakhir" adalah dua tanggal yang sama, sehingga chip yang menyala salah
+  /// dan ketukan kedua tidak bisa melepasnya. Rentang kustom mengosongkannya.
+  final Rxn<AttendanceRangePreset> _preset = Rxn<AttendanceRangePreset>();
 
-    for (final preset in AttendanceRangePreset.values) {
-      final range = rangeOf(preset);
-      if (_sameDay(range.start, start) && _sameDay(range.end, end)) {
-        return preset;
-      }
-    }
-
-    return null;
-  }
+  AttendanceRangePreset? get activePreset => _preset.value;
 
   /// Menerapkan preset, atau melepasnya kembali ke seluruh tanggal bila preset
   /// yang sama diketuk dua kali.
@@ -298,10 +363,6 @@ class AttendanceListController extends GetxController {
 
     final range = rangeOf(preset);
 
-    return applyDateRange(range.start, range.end);
-  }
-
-  static bool _sameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
+    return _applyRange(range.start, range.end, preset: preset);
   }
 }

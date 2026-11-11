@@ -49,6 +49,7 @@ class ItmsTicket {
   final String? createdAt;
   final String? resolvedAt;
 
-  bool get isClosed => status == 'closed' || status == 'resolved';
+  // `cancelled` is finished too (backend ItmsTicketStatus) — UAT review H4.
+  bool get isClosed =>
+      status == 'closed' || status == 'resolved' || status == 'cancelled';
 }
-

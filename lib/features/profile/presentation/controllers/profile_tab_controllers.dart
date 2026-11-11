@@ -26,7 +26,6 @@ import 'profile_section_controller.dart';
 /// zona kepada sebuah tanggal justru cara ulang tahun bergeser satu hari.
 final _dayMonthYear = DateFormat('dd MMMM yyyy', 'id');
 final _year = DateFormat('yyyy', 'id');
-final _dayShortMonthYear = DateFormat('dd MMM yyyy', 'id');
 final _rupiah = NumberFormat.currency(
   locale: 'id_ID',
   symbol: 'Rp',
@@ -171,11 +170,11 @@ class ProfileExperienceController extends ProfileSectionController {
   Future<void> fetchWorkExperienceData() => loadProfile(refresh: true);
 
   String formatWorkPeriod(DateTime? startDate, DateTime? finishDate) {
-    final start = startDate == null ? '' : _dayShortMonthYear.format(startDate);
+    // To the year (PROF-05): the experience contract sends years, and the
+    // day and month `dd MMM yyyy` printed — "01 Jan 2014" — were invented.
+    final start = startDate == null ? '' : _year.format(startDate);
     // An open-ended role reads as "Sekarang", as it did before.
-    final finish = finishDate == null
-        ? 'Sekarang'
-        : _dayShortMonthYear.format(finishDate);
+    final finish = finishDate == null ? 'Sekarang' : _year.format(finishDate);
 
     if (start.isEmpty && finish.isEmpty) {
       return '-';

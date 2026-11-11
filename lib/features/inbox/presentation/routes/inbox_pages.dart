@@ -11,9 +11,8 @@ class InboxPages {
     GetPage(
       name: InboxRoutes.inbox,
       page: () => const UnifiedInboxView(),
-      binding: InboxBinding(),
+      binding: UnifiedInboxBinding(),
       transition: Transition.noTransition,
     ),
   ];
 }
-

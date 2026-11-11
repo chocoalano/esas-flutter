@@ -282,4 +282,11 @@ void main() {
       expect(ServerConfig.normalise('hrms example com'), isNull);
     });
   });
+
+  // CORE-09. `Uri.host` drops an IPv6 literal's brackets; the address was
+  // stored as `http://fd00::10:8000`, which nothing can parse back.
+  test('an IPv6 address keeps its brackets', () {
+    expect(ServerConfig.normalise('http://[fd00::10]:8000'), 'http://[fd00::10]:8000');
+    expect(Uri.tryParse(ServerConfig.normalise('[fd00::10]:8000')!)?.host, 'fd00::10');
+  });
 }

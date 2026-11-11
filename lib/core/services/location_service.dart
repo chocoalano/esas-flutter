@@ -57,10 +57,18 @@ class LocationService {
   /// `deprecated_member_use` findings that have been the entire content of
   /// `flutter analyze` since the baseline (P4-6). Accuracy and timeout are
   /// carried across unchanged.
+  /// Where the handset is.
+  ///
+  /// [mayAsk] false checks the permission without prompting (ATTP-04). The
+  /// system dialog itself sends the app through inactive → resumed, so a check
+  /// on resume that prompted again re-opened the dialog — and on Android 11+ a
+  /// second "deny" is permanent. A permission granted in Settings is still
+  /// found that way; only the prompt is left to a button.
   Future<LocationResult> currentPosition({
     Duration timeout = const Duration(seconds: 15),
     LocationAccuracy accuracy = LocationAccuracy.high,
     bool rejectMocked = true,
+    bool mayAsk = true,
   }) async {
     if (!await Geolocator.isLocationServiceEnabled()) {
       return const LocationRejected(LocationFailure.serviceDisabled);
@@ -68,7 +76,7 @@ class LocationService {
 
     var permission = await Geolocator.checkPermission();
 
-    if (permission == LocationPermission.denied) {
+    if (permission == LocationPermission.denied && mayAsk) {
       permission = await Geolocator.requestPermission();
     }
 

@@ -40,4 +40,3 @@ class GamsPackage {
   final String? collectedAt;
   final String? createdAt;
 }
-

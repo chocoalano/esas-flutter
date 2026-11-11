@@ -303,4 +303,37 @@ void main() {
       expect(machine.atRest(sample(faces: 2)), isFalse);
     });
   });
+
+  // ATTD-02. A smile held during the first baseline is retaken. The retake
+  // then demanded that EVERY bounded axis had moved by retakeMinShift — eyes
+  // included, which rest near 0.9 and cannot open by another 0.15. A
+  // smile-and-blink challenge was refused every time it was retaken.
+  group('a retaken baseline', () {
+    void baselineOf(LivenessGestureMachine machine, {required double smile}) {
+      for (var index = 0; index < 8; index++) {
+        machine.offer(sample(atMs: index * 100, smile: smile));
+      }
+    }
+
+    test('is judged on the axis that was saturated, not on every axis', () {
+      final machine = LivenessGestureMachine(actions: const ['smile', 'blink']);
+
+      baselineOf(machine, smile: 0.75); // posing for the camera
+      expect(machine.phase, GesturePhase.baseline);
+
+      baselineOf(machine, smile: 0.05); // relaxed, eyes unchanged at 0.9
+
+      expect(machine.baselineRefusal, isNull);
+      expect(machine.phase, GesturePhase.performing);
+    });
+
+    test('still refuses a smile that never relaxed', () {
+      final machine = LivenessGestureMachine(actions: const ['smile', 'blink']);
+
+      baselineOf(machine, smile: 0.75);
+      baselineOf(machine, smile: 0.72);
+
+      expect(machine.baselineRefusal, 'axis_saturated');
+    });
+  });
 }

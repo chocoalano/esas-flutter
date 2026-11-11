@@ -3,10 +3,20 @@
     <application
         android:label="Absensas"
         android:name="${applicationName}"
-        android:icon="@mipmap/launcher_icon">
+        android:icon="@mipmap/launcher_icon"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules">
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="esas_attendance" />
+        <!-- Ikon push yang digambar SDK FCM saat aplikasi di latar belakang.
+             Harus sama dengan NotificationService.androidIcon: Android hanya
+             memakai kanal alfa ikon kecil, jadi launcher_icon yang opak akan
+             tampil sebagai kotak putih. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_launcher_foreground" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

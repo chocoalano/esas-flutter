@@ -3,4 +3,3 @@ class InboxRoutes {
 
   static const inbox = '/inbox/approvals';
 }
-

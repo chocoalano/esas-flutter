@@ -187,8 +187,13 @@ class ServerConfig {
         : (isDevelopmentHost(uri.host) ? 'http' : 'https');
 
     final port = uri.hasPort ? ':${uri.port}' : '';
+    final host = uri.host.toLowerCase();
 
-    return '$scheme://${uri.host.toLowerCase()}$port';
+    // `Uri.host` gives an IPv6 literal without its brackets; written back
+    // without them the origin is unparseable (CORE-09).
+    final authority = host.contains(':') ? '[$host]' : host;
+
+    return '$scheme://$authority$port';
   }
 
   /// Whether a host could be resolved at all — a DNS name or an IP literal.

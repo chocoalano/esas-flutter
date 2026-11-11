@@ -96,37 +96,67 @@ class SessionRepository {
     final stored = _local.read<dynamic>(StorageKeys.legacy.userJson);
 
     if (stored is Map) {
-      _user = AuthUser.fromJson(Map<String, dynamic>.from(stored));
+      final safe = AuthUser.sessionSafe(stored);
+      _user = AuthUser.fromJson(safe);
       _publishClock();
       noteUnreadNotifications(_user?.unreadNotificationCount);
+
+      // An older version wrote the whole `/profile` reply here — salary, bank
+      // account, NIK. Rewriting the record is what removes it from devices
+      // that already carry it (PROF-01).
+      if (safe.length != stored.length || _hasNestedExtras(stored, safe)) {
+        await _local.write(StorageKeys.legacy.userJson, safe);
+        AppLogger.warning(
+          'Removed personal data an older version cached in plain storage.',
+        );
+      }
     }
 
     await _purgePlaintextPassword();
   }
 
+  bool _hasNestedExtras(
+    Map<dynamic, dynamic> stored,
+    Map<String, dynamic> safe,
+  ) {
+    for (final key in const ['company', 'employee']) {
+      final before = stored[key];
+      final after = safe[key];
+      if (before is Map && after is Map && before.length != after.length) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /// Persist a freshly established session.
+  ///
+  /// Only [AuthUser.toSessionJson] is kept, in memory as well as on disk, so
+  /// nothing reads a field from the session that would not survive a restart.
   Future<void> save({required String token, required AuthUser user}) async {
-    _user = user;
+    final safe = AuthUser.fromJson(user.toSessionJson());
+    _user = safe;
 
     _publishClock();
-    noteUnreadNotifications(user.unreadNotificationCount);
+    noteUnreadNotifications(safe.unreadNotificationCount);
 
     await _tokens.save(token);
-    await _local.write(StorageKeys.legacy.userJson, user.raw);
+    await _local.write(StorageKeys.legacy.userJson, safe.raw);
 
     if (legacyMirrorEnabled) {
-      await _mirrorToLegacy(token: token, user: user);
+      await _mirrorToLegacy(token: token, user: safe);
     }
   }
 
   /// Update the cached user without touching the credential.
   Future<void> updateUser(AuthUser user) async {
-    _user = user;
+    final safe = AuthUser.fromJson(user.toSessionJson());
+    _user = safe;
 
     _publishClock();
-    noteUnreadNotifications(user.unreadNotificationCount);
+    noteUnreadNotifications(safe.unreadNotificationCount);
 
-    await _local.write(StorageKeys.legacy.userJson, user.raw);
+    await _local.write(StorageKeys.legacy.userJson, safe.raw);
   }
 
   /// Put the workspace's clock where every screen reads it.

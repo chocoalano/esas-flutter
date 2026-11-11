@@ -69,4 +69,3 @@ class GamsVehicleBooking {
   bool get isBooking => status.toLowerCase() == 'booking';
   bool get isCancelled => status.toLowerCase() == 'cancelled';
 }
-

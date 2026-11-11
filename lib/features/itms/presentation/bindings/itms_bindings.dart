@@ -4,6 +4,7 @@ import '../../../../core/network/api_client.dart';
 import '../../data/repositories/itms_repository.dart';
 import '../../data/services/itms_api_service.dart';
 import '../controllers/itms_dashboard_controller.dart';
+import '../controllers/itms_ticket_create_controller.dart';
 
 ItmsRepository _itmsRepository() {
   if (Get.isRegistered<ItmsRepository>()) {
@@ -24,3 +25,11 @@ class ItmsDashboardBinding extends Bindings {
   }
 }
 
+class ItmsTicketCreateBinding extends Bindings {
+  @override
+  void dependencies() {
+    Get.lazyPut<ItmsTicketCreateController>(
+      () => ItmsTicketCreateController(repository: _itmsRepository()),
+    );
+  }
+}

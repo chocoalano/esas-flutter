@@ -1,12 +1,14 @@
 import 'package:get/get.dart';
 
+import '../../../../core/ui/dialogs/app_snackbar.dart';
+
 import '../../../../core/network/api_exception.dart';
 import '../../data/models/approval_task.dart';
 import '../../data/repositories/inbox_repository.dart';
 
 class UnifiedInboxController extends GetxController {
   UnifiedInboxController({required InboxRepository repository})
-      : _repository = repository;
+    : _repository = repository;
 
   final InboxRepository _repository;
 
@@ -43,6 +45,10 @@ class UnifiedInboxController extends GetxController {
     required String decision,
     String? note,
   }) async {
+    // One decision at a time (INBOX-01). A double tap sent two, and where the
+    // same person also held the next tier, the second answered that tier too.
+    if (isDeciding.value) return false;
+
     isDeciding.value = true;
     try {
       await _repository.decideTask(
@@ -51,19 +57,22 @@ class UnifiedInboxController extends GetxController {
         note: note,
       );
       tasks.removeWhere((t) => t.id == taskId);
-      Get.snackbar(
-        'Berhasil',
+      // The app's snackbar helpers, which guard against there being no overlay
+      // yet; a raw `Get.snackbar` null-checks one.
+      showSuccessSnackbar(
         decision == 'approved'
             ? 'Pengajuan berhasil disetujui.'
             : 'Pengajuan telah ditolak.',
-        snackPosition: SnackPosition.BOTTOM,
       );
       return true;
     } on ApiException catch (e) {
-      Get.snackbar('Gagal', e.message, snackPosition: SnackPosition.BOTTOM);
+      showErrorSnackbar(e.message, title: 'Gagal');
       return false;
     } catch (e) {
-      Get.snackbar('Gagal', e.toString(), snackPosition: SnackPosition.BOTTOM);
+      showErrorSnackbar(
+        'Keputusan belum dapat dikirim. Coba lagi.',
+        title: 'Gagal',
+      );
       return false;
     } finally {
       isDeciding.value = false;
@@ -77,4 +86,3 @@ class UnifiedInboxController extends GetxController {
     return tasks.where((t) => t.domain == selectedFilter.value).toList();
   }
 }
-

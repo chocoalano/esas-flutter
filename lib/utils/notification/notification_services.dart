@@ -8,6 +8,18 @@ import 'package:get/get.dart';
 
 class NotificationService extends GetxService {
   static const channelId = 'esas_attendance';
+
+  /// The Android small icon, as a resource reference.
+  ///
+  /// It must name a resource the APK actually ships: the plugin validates it
+  /// during `initialize()` and answers `invalid_icon` when the lookup fails,
+  /// which fails the boot step and leaves push unregistered.
+  ///
+  /// The adaptive icon's foreground, not the launcher icon: Android draws a
+  /// small icon from its alpha channel alone, so the opaque launcher square
+  /// would show as a white block while the transparent foreground shows the
+  /// logo's silhouette.
+  static const androidIcon = '@drawable/ic_launcher_foreground';
   int _nextNotificationId = DateTime.now().millisecondsSinceEpoch % 2147483647;
   static final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -27,7 +39,7 @@ class NotificationService extends GetxService {
   Future<void> initialize() async {
     // === Initialization Settings (Android + iOS WAJIB) ===
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings(androidIcon);
 
     // iOS (Darwin) init settings HARUS diset agar tidak error
     final DarwinInitializationSettings

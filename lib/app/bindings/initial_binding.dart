@@ -20,6 +20,7 @@ import '../../features/permit/presentation/routes/permit_routes.dart';
 import '../../features/profile/presentation/routes/profile_routes.dart';
 import '../../features/auth/data/repositories/auth_repository.dart';
 import '../../features/auth/presentation/routes/auth_routes.dart';
+import '../../features/setup/presentation/routes/setup_routes.dart';
 import '../../features/auth/data/repositories/firestore_user_repository.dart';
 import '../../features/auth/data/repositories/session_repository.dart';
 import '../../features/auth/data/services/auth_api_service.dart';
@@ -105,24 +106,16 @@ class InitialBinding extends Bindings {
         // client, so naming it here directly would be a cycle.
         onUnauthorized: () async {
           if (Get.isRegistered<AuthRepository>()) {
-            final auth = Get.find<AuthRepository>();
-            if (!auth.isAuthenticated) return;
-            await auth.expireSession();
-            if (Get.currentRoute != AuthRoutes.splash) {
+            // False when there was nothing to end, or when the 401 answered
+            // a sign-out that navigates on its own (AUTH-06).
+            final ended = await Get.find<AuthRepository>().expireSession();
+            if (ended && Get.currentRoute != AuthRoutes.splash) {
               Get.offAllNamed(AuthRoutes.login);
             }
           }
         },
-        onConnectionLost: () async {
-          if (!Get.isRegistered<AuthRepository>()) return;
-          final ended = await Get.find<AuthRepository>().disconnectSession();
-          if (ended && Get.currentRoute != AuthRoutes.splash) {
-            Get.offAllNamed(
-              AuthRoutes.login,
-              arguments: AuthRoutes.connectionLostArgument,
-            );
-          }
-        },
+        // No `onConnectionLost`: a failed connection is reported to the screen
+        // that made the request, and the session stays (CORE-04).
       ),
       fenix: true,
     );
@@ -168,11 +161,21 @@ class InitialBinding extends Bindings {
             Get.isRegistered<FirebaseMessagingService>()
             ? Get.find<FirebaseMessagingService>().fcmToken
             : null,
+        // Every way a session ends, not only a sign-out that reached the
+        // server (AUTH-02).
+        discardPushToken: () async {
+          if (Get.isRegistered<FirebaseMessagingService>()) {
+            await Get.find<FirebaseMessagingService>().discardToken();
+          }
+        },
       ),
       permanent: true,
     );
 
-    Get.put<DeviceInfoService>(DeviceInfoService(), permanent: true);
+    Get.put<DeviceInfoService>(
+      DeviceInfoService(store: secureStore),
+      permanent: true,
+    );
 
     // ── Presentation ───────────────────────────────────────────────────────
     Get.put(ThemeController(), permanent: true);
@@ -186,6 +189,11 @@ class InitialBinding extends Bindings {
           PermitRoutes.permit,
           NotificationRoutes.notification,
           ProfileRoutes.profile,
+        ],
+        resetRoutes: const [
+          AuthRoutes.login,
+          AuthRoutes.splash,
+          SetupRoutes.setup,
         ],
       ),
       permanent: true,

@@ -34,7 +34,7 @@ void main() {
         'role': 'assistant',
         'text': 'Halo! Saya asisten ESAS.',
         'sources': [
-          {'title': 'Buku Panduan SDM'}
+          {'title': 'Buku Panduan SDM'},
         ],
       });
       expect(assistantMsg.isAssistant, isTrue);
@@ -43,4 +43,3 @@ void main() {
     });
   });
 }
-

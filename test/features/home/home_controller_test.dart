@@ -1,3 +1,6 @@
+import 'package:esas/features/auth/data/repositories/session_repository.dart';
+import 'package:esas/core/storage/token_storage.dart';
+import 'package:esas/core/storage/local_storage.dart';
 import 'dart:async';
 
 import 'package:esas/core/network/api_exception.dart';
@@ -6,6 +9,8 @@ import 'package:esas/features/permit/data/models/leave_list.dart';
 import 'package:esas/features/home/data/repositories/home_repository.dart';
 import 'package:esas/features/home/presentation/controllers/home_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:get/get.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockHomeRepository extends Mock implements HomeRepository {}
@@ -51,6 +56,9 @@ void main() {
 
     return controller;
   }
+
+  // `refreshDashboard` formats the header date in Indonesian (HOME-04).
+  setUpAll(initializeDateFormatting);
 
   setUp(() {
     repository = _MockHomeRepository();
@@ -502,6 +510,87 @@ void main() {
       await first;
 
       expect(controller.attendanceError.value, isNull);
+    });
+  });
+
+  group('remediasi Beranda', () {
+    // HOME-05. Leave is its own fact about the day; a roster row is still
+    // there on a day of approved leave, and it used to win — "Belum absen".
+    test('cuti yang disetujui mengalahkan baris roster', () {
+      expect(
+        loaded(dayContext: const DayContext(type: HomeDayType.leave)).todayState,
+        HomeTodayState.onLeave,
+      );
+    });
+
+    test('libur nasional tetap kalah oleh jadwal', () {
+      expect(
+        loaded(dayContext: const DayContext(type: HomeDayType.holiday)).todayState,
+        HomeTodayState.notClockedIn,
+      );
+    });
+
+    // HOME-17. A clock-out with no clock-in read "Belum absen" while the
+    // timeline below said "Pulang 17:05".
+    test('pulang tanpa masuk tidak ditulis belum absen', () {
+      expect(loaded(timeOut: '17:05').todayState, HomeTodayState.done);
+    });
+
+    // HOME-06. Modules are compared as written by the server.
+    test('modul aktif dibandingkan tanpa peduli huruf dan spasi', () {
+      final controller = subject();
+      controller.activeModules.assignAll(const [' GAMS ', 'Itms']);
+
+      expect(controller.hasGams, isTrue);
+      expect(controller.hasItms, isTrue);
+    });
+  });
+
+  test('HOME-04: setiap penyegaran menulis ulang tanggal hari ini', () async {
+    final controller = subject();
+    controller.currentDate.value = 'Senin, 1 Januari 2001';
+
+    await controller.refreshDashboard();
+
+    expect(controller.currentDate.value, isNot('Senin, 1 Januari 2001'));
+    expect(controller.currentDate.value, isNotEmpty);
+  });
+
+  // HOME-03. Every notification revision forced a full reload past the
+  // caches — the cold start loaded twice, each resume five requests more.
+  group('HOME-03: revisi notifikasi', () {
+    late SessionRepository session;
+
+    setUp(() {
+      session = SessionRepository(
+        tokenStorage: InMemoryTokenStorage(),
+        localStorage: InMemoryLocalStorage(),
+      );
+      Get.put<SessionRepository>(session);
+    });
+
+    tearDown(Get.reset);
+
+    test('tidak memaksa melewati cache', () async {
+      final controller = subject()..onInit();
+      await pumpEventQueue();
+
+      session.notificationRevision.value++;
+      await pumpEventQueue();
+
+      verifyNever(() => repository.leaveBalances(refresh: true));
+      controller.onClose();
+    });
+
+    test('tidak menumpuk di atas penyegaran yang sedang berjalan', () async {
+      final controller = subject()..onInit();
+      expect(controller.isLoading.value, isTrue);
+
+      session.notificationRevision.value++;
+      await pumpEventQueue();
+
+      verify(() => repository.todayAttendance()).called(1);
+      controller.onClose();
     });
   });
 }

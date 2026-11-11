@@ -109,6 +109,16 @@ class SplashController extends GetxController {
           );
           _open(AuthRoutes.login);
 
+        case SessionState.unverified:
+          // The session is kept; the screens say what they could not load
+          // and offer to try again (CORE-04).
+          showWarningSnackbar(
+            'Tidak dapat terhubung ke server. Data yang tampil mungkin belum '
+            'terbaru.',
+            title: 'Sedang offline',
+          );
+          _open(HomeRoutes.home);
+
         case SessionState.connectionLost:
           _open(AuthRoutes.login, arguments: AuthRoutes.connectionLostArgument);
 

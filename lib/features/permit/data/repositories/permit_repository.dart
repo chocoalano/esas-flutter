@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../../../../core/network/upload.dart';
 import '../../../../core/utils/json_parsers.dart';
 import '../../../../features/auth/data/repositories/session_repository.dart';
@@ -141,5 +143,48 @@ class PermitRepository {
       notes: notes,
       idempotencyKey: idempotencyKey,
     );
+  }
+
+  /// A permit's attachment, downloaded with the session (PRMT-03).
+  ///
+  /// The file is private to the tenant; there is no public address for it.
+  Future<PermitAttachment> attachment({
+    required Object permitId,
+    required String file,
+  }) async {
+    final bytes = await _api.attachment(permitId);
+    final name = file.split('/').where((part) => part.isNotEmpty).lastOrNull;
+
+    return PermitAttachment(
+      filename: name ?? 'lampiran-$permitId',
+      bytes: bytes,
+    );
+  }
+}
+
+/// A downloaded attachment. Held in memory: nothing is written to disk unless
+/// the person chooses to save it.
+class PermitAttachment {
+  const PermitAttachment({required this.filename, required this.bytes});
+
+  final String filename;
+  final Uint8List bytes;
+
+  /// Whether the bytes are a photograph, by their signature rather than by
+  /// a file name the server may not have kept.
+  bool get isImage {
+    bool startsWith(List<int> magic) =>
+        bytes.length >= magic.length &&
+        Iterable.generate(magic.length).every((i) => bytes[i] == magic[i]);
+
+    return startsWith(const [0xff, 0xd8, 0xff]) || // JPEG
+        startsWith(const [0x89, 0x50, 0x4e, 0x47]) || // PNG
+        startsWith(const [0x47, 0x49, 0x46, 0x38]) || // GIF
+        (startsWith(const [0x52, 0x49, 0x46, 0x46]) &&
+            bytes.length > 11 &&
+            bytes[8] == 0x57 &&
+            bytes[9] == 0x45 &&
+            bytes[10] == 0x42 &&
+            bytes[11] == 0x50); // WEBP
   }
 }

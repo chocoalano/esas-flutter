@@ -69,6 +69,10 @@ HomeFailureKind homeFailureKindOf(ApiException? error) {
 
   // Urutannya penting: sebuah kegagalan transport tidak punya status sama
   // sekali, jadi ia harus diperiksa sebelum cabang mana pun yang membaca angka.
+  // A certificate the app will not trust is the server's fault, not the
+  // signal's (UAT review C3) — checked before the "no status" branch it
+  // would otherwise fall into.
+  if (error.isTlsFailure) return HomeFailureKind.server;
   if (error.isTransportFailure) return HomeFailureKind.network;
   if (error.isUnauthenticated) return HomeFailureKind.sessionExpired;
   if (error is AttendanceAccessException) {

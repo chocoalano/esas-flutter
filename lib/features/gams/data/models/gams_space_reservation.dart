@@ -69,4 +69,3 @@ class GamsSpaceReservation {
   bool get isCancelled => status.toLowerCase() == 'cancelled';
   bool get isConfirmed => status.toLowerCase() == 'confirmed';
 }
-

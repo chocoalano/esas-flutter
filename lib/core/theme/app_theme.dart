@@ -55,6 +55,12 @@ class AppTheme {
       splashColor: scheme.onSurface.withValues(alpha: 0.04),
       highlightColor: scheme.onSurface.withValues(alpha: 0.03),
 
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: scheme.primary,
+        selectionColor: scheme.primary.withValues(alpha: 0.2),
+        selectionHandleColor: scheme.primary,
+      ),
+
       appBarTheme: AppBarTheme(
         backgroundColor: canvas,
         surfaceTintColor: Colors.transparent,
@@ -209,6 +215,15 @@ class AppTheme {
         unselectedLabelStyle: textTheme.labelSmall?.copyWith(letterSpacing: 0),
       ),
 
+      scrollbarTheme: ScrollbarThemeData(
+        thumbColor: WidgetStateProperty.all(
+          scheme.onSurfaceVariant.withValues(alpha: 0.3),
+        ),
+        radius: const Radius.circular(2),
+        thickness: WidgetStateProperty.all(3),
+        thumbVisibility: WidgetStateProperty.all(false),
+      ),
+
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
@@ -284,6 +299,9 @@ class AppTheme {
         builders: <TargetPlatform, PageTransitionsBuilder>{
           TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
           TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.linux: _NoTransitionsBuilder(),
+          TargetPlatform.macOS: _NoTransitionsBuilder(),
+          TargetPlatform.windows: _NoTransitionsBuilder(),
         },
       ),
     );
@@ -397,4 +415,18 @@ class AppTheme {
     inversePrimary: AppColors.brand700,
     surfaceTint: Colors.transparent,
   );
+}
+
+/// Instant transition for web and desktop — no slide or fade between pages.
+class _NoTransitionsBuilder extends PageTransitionsBuilder {
+  const _NoTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) => child;
 }

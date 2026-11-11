@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
 
+import '../core/ui/controllers/bottom_nav_controller.dart';
+
 import '../core/theme/app_theme.dart';
 import '../core/theme/theme_controller.dart';
 import 'routing/app_pages.dart';
@@ -22,8 +24,22 @@ class EsasApp extends StatelessWidget {
       () => GetMaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Absensas',
+        // No global textScaler clamp. Key layouts (AppDataRow, AppRecordField,
+        // AnnouncementCarousel) already adapt individually when scale grows
+        // beyond their breakpoints, so a blanket cap is not needed and would
+        // prevent users from exercising their system accessibility settings.
+        builder: (context, child) => child!,
         initialRoute: AppPages.initial,
         getPages: AppPages.routes,
+        unknownRoute: AppPages.unknownRoute,
+        // The lit tab follows the route, however the route was reached
+        // (UI-01).
+        routingCallback: (routing) {
+          final current = routing?.current;
+          if (current != null && Get.isRegistered<BottomNavController>()) {
+            Get.find<BottomNavController>().syncWith(current);
+          }
+        },
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: themeController.isDarkMode

@@ -1,3 +1,4 @@
+import 'package:esas/features/profile/data/models/salary.dart';
 import 'package:esas/features/profile/data/models/user.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -150,5 +151,15 @@ void main() {
         expect(user.formalEducations!.single.id, 0);
       },
     );
+  });
+
+  // PROF-03. Laravel's `decimal:2` serialises `basic_salary` as a string, and
+  // `int.tryParse("5000000.00")` is null: the payroll tab said "Gaji pokok: -".
+  test('a basic salary sent as a decimal string is read', () {
+    expect(
+      Salaries.fromJson({'basic_salary': '5000000.00'}).basicSalary,
+      5000000,
+    );
+    expect(Salaries.fromJson({'basic_salary': 4750000.5}).basicSalary, 4750000.5);
   });
 }

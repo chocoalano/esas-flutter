@@ -36,7 +36,11 @@ class OvertimeListView extends GetView<OvertimeListController> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.error_outline, size: 48, color: palette.danger.foreground),
+                    Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: palette.danger.foreground,
+                    ),
                     const SizedBox(height: AppSpacing.md),
                     Text(
                       controller.error.value!.message,
@@ -58,7 +62,9 @@ class OvertimeListView extends GetView<OvertimeListController> {
             return Center(
               child: Text(
                 'Belum ada riwayat lembur yang tercatat.',
-                style: theme.textTheme.bodyMedium?.copyWith(color: palette.textMuted),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: palette.textMuted,
+                ),
               ),
             );
           }
@@ -71,7 +77,8 @@ class OvertimeListView extends GetView<OvertimeListController> {
                 vertical: AppSpacing.lg,
               ),
               itemCount: controller.items.length,
-              separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+              separatorBuilder: (_, __) =>
+                  const SizedBox(height: AppSpacing.sm),
               itemBuilder: (context, index) {
                 final item = controller.items[index];
                 return _OvertimeCard(item: item);
@@ -97,8 +104,8 @@ class _OvertimeCard extends StatelessWidget {
     final AppTone tone = item.isApproved
         ? palette.success
         : item.isRejected
-            ? palette.danger
-            : palette.warning;
+        ? palette.danger
+        : palette.warning;
 
     return AppCard(
       child: Column(
@@ -109,7 +116,9 @@ class _OvertimeCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   item.date,
-                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               Container(
@@ -134,7 +143,9 @@ class _OvertimeCard extends StatelessWidget {
             children: [
               Text(
                 'Disetujui: ${item.hoursApproved} jam',
-                style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: palette.textMuted,
+                ),
               ),
               if (item.hoursWorked != null) ...[
                 Text(
@@ -149,10 +160,7 @@ class _OvertimeCard extends StatelessWidget {
           ),
           if (item.reason != null && item.reason!.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.tight),
-            Text(
-              item.reason!,
-              style: theme.textTheme.bodyMedium,
-            ),
+            Text(item.reason!, style: theme.textTheme.bodyMedium),
           ],
         ],
       ),

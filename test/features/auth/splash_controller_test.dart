@@ -7,6 +7,9 @@ import 'package:esas/core/tenancy/tenant_context.dart';
 import 'package:esas/features/auth/data/models/auth_user.dart';
 import 'package:esas/features/auth/data/repositories/auth_repository.dart';
 import 'package:esas/features/auth/presentation/controllers/splash_controller.dart';
+import 'package:esas/features/auth/presentation/routes/auth_routes.dart';
+import 'package:esas/features/home/presentation/routes/home_routes.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:mocktail/mocktail.dart';
@@ -94,6 +97,55 @@ void main() {
       unconfigured.onReady();
 
       verifyNever(() => auth.restoreSession());
+    });
+  });
+
+  // CORE-04. Opening the app somewhere the server cannot be reached used to
+  // end the session and send the person to the login screen. The credential
+  // is kept now, and the app opens on what it already has.
+  group('where an unreachable server leads', () {
+    Future<void> settle(WidgetTester tester, SessionState state) async {
+      await tester.pumpWidget(
+        GetMaterialApp(
+          initialRoute: '/start',
+          getPages: [
+            GetPage(name: '/start', page: () => const Scaffold()),
+            GetPage(
+              name: HomeRoutes.home,
+              page: () => const Scaffold(body: Text('Beranda')),
+            ),
+            GetPage(
+              name: AuthRoutes.login,
+              page: () => const Scaffold(body: Text('Halaman masuk')),
+            ),
+          ],
+        ),
+      );
+
+      // Stubbed inside the test body: a completer from `setUp` lives outside
+      // the widget test's fake-async zone and would never be flushed here.
+      when(() => auth.restoreSession()).thenAnswer((_) async => state);
+
+      controller.onReady();
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('with a cached user, to the app', (tester) async {
+      await settle(tester, SessionState.unverified);
+
+      expect(find.text('Beranda'), findsOneWidget);
+      expect(find.text('Sedang offline'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('with nothing cached, to login with an explanation', (
+      tester,
+    ) async {
+      await settle(tester, SessionState.connectionLost);
+
+      expect(find.text('Halaman masuk'), findsOneWidget);
+      expect(Get.arguments, AuthRoutes.connectionLostArgument);
     });
   });
 }

@@ -56,6 +56,11 @@ class ApiException implements Exception {
   /// No HTTP status was available. This can also describe a decoding failure.
   bool get isTransportFailure => status == null;
 
+  /// The server's certificate could not be verified (CORE-05). No status, but
+  /// not a lost connection either: retrying or moving to better signal will
+  /// not fix it, so it must not be explained as one (UAT review C3).
+  bool get isTlsFailure => code == 'tls_failure';
+
   /// The app could not maintain its required connection to the server.
   bool get isConnectionFailure =>
       status == null &&

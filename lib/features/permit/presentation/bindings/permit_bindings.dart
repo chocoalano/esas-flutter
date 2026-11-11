@@ -46,6 +46,8 @@ class PermitShowBinding extends Bindings {
   @override
   void dependencies() => Get.lazyPut<PermitShowController>(
     () => PermitShowController(repository: _repository()),
+    // Per permit: a second detail screen on the stack gets its own (PRMT-09).
+    tag: PermitShowController.tagFor(Get.arguments),
   );
 }
 

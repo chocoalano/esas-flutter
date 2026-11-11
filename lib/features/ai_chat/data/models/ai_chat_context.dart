@@ -11,7 +11,9 @@ class AiChatContext {
   factory AiChatContext.fromJson(Map<String, dynamic> json) {
     return AiChatContext(
       assistantName: asString(json['assistant_name']) ?? 'ESAS Assistant',
-      opener: asString(json['opener']) ?? 'Halo! Ada yang bisa saya bantu hari ini?',
+      opener:
+          asString(json['opener']) ??
+          'Halo! Ada yang bisa saya bantu hari ini?',
       suggestions: asList(json['suggestions']).map((s) => '$s').toList(),
       maxMessageLength: asInt(json['max_message_length']) ?? 2000,
     );
@@ -22,4 +24,3 @@ class AiChatContext {
   final List<String> suggestions;
   final int maxMessageLength;
 }
-

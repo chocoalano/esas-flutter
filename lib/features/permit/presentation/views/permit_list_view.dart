@@ -25,13 +25,16 @@ class PermitListView extends GetView<PermitListController> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (didPop) return;
-        Get.offAllNamed(PermitRoutes.permit);
-      },
-      child: Scaffold(
+    return Title(
+      title: 'Pengajuan – Absensas',
+      color: Colors.black,
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (bool didPop, Object? result) {
+          if (didPop) return;
+          Get.offAllNamed(PermitRoutes.permit);
+        },
+        child: Scaffold(
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
@@ -57,12 +60,27 @@ class PermitListView extends GetView<PermitListController> {
           }
 
           if (controller.permits.isEmpty) {
+            // A failure is said as a failure (PRMT-14): an offline refresh
+            // used to claim the history was empty.
+            final error = controller.loadError.value;
+            if (error != null) {
+              return AppEmptyState(
+                icon: Icons.cloud_off_rounded,
+                title: 'Gagal memuat pengajuan',
+                message: error.message,
+                actionLabel: 'Coba lagi',
+                onAction: controller.resetAndFetch,
+              );
+            }
+
             return AppEmptyState(
               icon: Icons.description_outlined,
               title: 'Belum ada pengajuan',
-              message:
-                  'Riwayat untuk jenis izin ini masih kosong. Buat pengajuan '
-                  'pertama Anda kapan saja.',
+              message: controller.permitType.value == null
+                  ? 'Anda belum pernah mengajukan izin. Buat pengajuan '
+                        'pertama Anda kapan saja.'
+                  : 'Riwayat untuk jenis izin ini masih kosong. Buat '
+                        'pengajuan pertama Anda kapan saja.',
               actionLabel: 'Muat ulang',
               onAction: controller.resetAndFetch,
             );
@@ -70,7 +88,9 @@ class PermitListView extends GetView<PermitListController> {
 
           return RefreshIndicator(
             onRefresh: controller.resetAndFetch,
-            child: ListView.separated(
+            child: Scrollbar(
+              controller: controller.scrollController,
+              child: ListView.separated(
               controller: controller.scrollController,
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.page,
@@ -98,18 +118,24 @@ class PermitListView extends GetView<PermitListController> {
                   child: PermitSkeletonRow(),
                 );
               },
+              ),
             ),
           );
         }),
         floatingActionButton: FloatingActionButton.extended(
-          onPressed: () => Get.offAllNamed(
-            PermitRoutes.create,
-            arguments: controller.permitType.value,
-          ),
+          // Without a type there is nothing to fill in yet: the form opened
+          // with id 0 and refused at submit (PRMT-05). Ask which kind first.
+          onPressed: () => controller.permitType.value == null
+              ? Get.offAllNamed(PermitRoutes.permit)
+              : Get.offAllNamed(
+                  PermitRoutes.create,
+                  arguments: controller.permitType.value,
+                ),
           icon: const Icon(Icons.add_rounded, size: AppIconSizes.xl),
           label: const Text('Ajukan'),
         ),
       ),
+    ),
     );
   }
 }

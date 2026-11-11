@@ -43,7 +43,8 @@ class ItmsAsset {
   final String? returnedAt;
   final String? movementReference;
 
-  bool get isAcknowledged => acknowledgedAt != null || custodyStatus == 'in_custody';
-  bool get needsAcknowledgement => !isAcknowledged && custodyStatus != 'returned';
+  bool get isAcknowledged =>
+      acknowledgedAt != null || custodyStatus == 'in_custody';
+  bool get needsAcknowledgement =>
+      !isAcknowledged && custodyStatus != 'returned';
 }
-

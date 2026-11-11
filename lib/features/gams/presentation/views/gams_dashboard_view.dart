@@ -11,6 +11,14 @@ import '../routes/gams_routes.dart';
 class GamsDashboardView extends GetView<GamsDashboardController> {
   const GamsDashboardView({super.key});
 
+  /// Open a create form, and reload when it comes back having filed
+  /// something (UAT review H2). Untyped: a named GetPage route is
+  /// `GetPageRoute<dynamic>`, and `toNamed<bool>` fails the cast at runtime.
+  Future<void> _create(String route) async {
+    final Object? filed = await Get.toNamed(route);
+    if (filed == true) await controller.loadDashboard();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -21,7 +29,10 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
         title: const Text('General Affairs (GAMS)'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Get.back(),
+          // The page, not whatever overlay is on top of it (GAMS-04):
+          // `Get.back()` closes an open snackbar first, so a section error
+          // turned the first tap into a no-op.
+          onPressed: () => Navigator.of(context).maybePop(),
         ),
       ),
       body: SafeArea(
@@ -37,7 +48,11 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.error_outline, size: 48, color: palette.danger.foreground),
+                    Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: palette.danger.foreground,
+                    ),
                     const SizedBox(height: AppSpacing.md),
                     Text(
                       controller.error.value!.message,
@@ -66,22 +81,31 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
                 // ── Service Requests Section ──
                 AppSectionHeader(
                   title: 'Permintaan Layanan Fasilitas',
-                  subtitle: '${controller.serviceRequests.length} pengajuan aktif',
+                  subtitle:
+                      '${GamsDashboardController.countLabel(controller.activeServiceRequests, loaded: controller.serviceRequests.length)} pengajuan aktif',
                   dense: true,
                   naturalCase: true,
                   trailing: TextButton.icon(
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text('Buat'),
-                    onPressed: () => Get.toNamed(GamsRoutes.serviceRequests),
+                    onPressed: () => _create(GamsRoutes.serviceRequests),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                if (controller.serviceRequests.isEmpty)
+                // A section that could not load says so, on its own (GAMS-02).
+                if (controller.sectionErrors['serviceRequests']
+                    case final failed?)
+                  _SectionError(message: failed.message)
+                else if (controller.serviceRequests.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm,
+                    ),
                     child: Text(
                       'Belum ada permohonan layanan fasilitas yang diajukan.',
-                      style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: palette.textMuted,
+                      ),
                     ),
                   )
                 else
@@ -99,7 +123,11 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
                                 borderRadius: AppRadii.mdAll,
                               ),
                               alignment: Alignment.center,
-                              child: Icon(Icons.home_repair_service_outlined, size: 18, color: theme.colorScheme.primary),
+                              child: Icon(
+                                Icons.home_repair_service_outlined,
+                                size: 18,
+                                color: theme.colorScheme.primary,
+                              ),
                             ),
                             const SizedBox(width: AppSpacing.md),
                             Expanded(
@@ -108,11 +136,15 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
                                 children: [
                                   Text(
                                     req.subject,
-                                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                   Text(
                                     '${req.number} • ${req.statusLabel}',
-                                    style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: palette.textMuted,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -127,22 +159,31 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
                 // ── Space Reservations Section ──
                 AppSectionHeader(
                   title: 'Reservasi Ruang Rapat',
-                  subtitle: '${controller.spaceReservations.length} reservasi tercatat',
+                  subtitle:
+                      '${GamsDashboardController.countLabel(controller.spaceReservations.length, loaded: controller.spaceReservations.length)} reservasi terbaru',
                   dense: true,
                   naturalCase: true,
                   trailing: TextButton.icon(
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text('Pesan'),
-                    onPressed: () => Get.toNamed(GamsRoutes.spaceReservations),
+                    onPressed: () => _create(GamsRoutes.spaceReservations),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                if (controller.spaceReservations.isEmpty)
+                // A section that could not load says so, on its own (GAMS-02).
+                if (controller.sectionErrors['spaceReservations']
+                    case final failed?)
+                  _SectionError(message: failed.message)
+                else if (controller.spaceReservations.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm,
+                    ),
                     child: Text(
                       'Tidak ada jadwal penggunaan ruang pertemuan.',
-                      style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: palette.textMuted,
+                      ),
                     ),
                   )
                 else
@@ -160,7 +201,11 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
                                 borderRadius: AppRadii.mdAll,
                               ),
                               alignment: Alignment.center,
-                              child: Icon(Icons.meeting_room_outlined, size: 18, color: theme.colorScheme.primary),
+                              child: Icon(
+                                Icons.meeting_room_outlined,
+                                size: 18,
+                                color: theme.colorScheme.primary,
+                              ),
                             ),
                             const SizedBox(width: AppSpacing.md),
                             Expanded(
@@ -169,11 +214,15 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
                                 children: [
                                   Text(
                                     res.spaceName ?? 'Ruang Rapat',
-                                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                   Text(
                                     '${res.startAt.split('T').first} • ${res.status}',
-                                    style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: palette.textMuted,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -188,22 +237,31 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
                 // ── Vehicle Bookings Section ──
                 AppSectionHeader(
                   title: 'Peminjaman Kendaraan',
-                  subtitle: '${controller.vehicleBookings.length} peminjaman tercatat',
+                  subtitle:
+                      '${GamsDashboardController.countLabel(controller.vehicleBookings.length, loaded: controller.vehicleBookings.length)} peminjaman terbaru',
                   dense: true,
                   naturalCase: true,
                   trailing: TextButton.icon(
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text('Pinjam'),
-                    onPressed: () => Get.toNamed(GamsRoutes.vehicleBookings),
+                    onPressed: () => _create(GamsRoutes.vehicleBookings),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                if (controller.vehicleBookings.isEmpty)
+                // A section that could not load says so, on its own (GAMS-02).
+                if (controller.sectionErrors['vehicleBookings']
+                    case final failed?)
+                  _SectionError(message: failed.message)
+                else if (controller.vehicleBookings.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm,
+                    ),
                     child: Text(
                       'Belum ada peminjaman kendaraan operasional.',
-                      style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: palette.textMuted,
+                      ),
                     ),
                   )
                 else
@@ -221,7 +279,11 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
                                 borderRadius: AppRadii.mdAll,
                               ),
                               alignment: Alignment.center,
-                              child: Icon(Icons.directions_car_outlined, size: 18, color: theme.colorScheme.primary),
+                              child: Icon(
+                                Icons.directions_car_outlined,
+                                size: 18,
+                                color: theme.colorScheme.primary,
+                              ),
                             ),
                             const SizedBox(width: AppSpacing.md),
                             Expanded(
@@ -230,11 +292,15 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
                                 children: [
                                   Text(
                                     vb.vehicleName ?? 'Kendaraan Operasional',
-                                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                   Text(
                                     '${vb.purpose} • ${vb.status}',
-                                    style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: palette.textMuted,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -249,22 +315,30 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
                 // ── Visitor Passes Section ──
                 AppSectionHeader(
                   title: 'Buku Tamu & Visitor Pass',
-                  subtitle: '${controller.visitorPasses.length} tamu terdaftar',
+                  subtitle:
+                      '${GamsDashboardController.countLabel(controller.visitorPasses.length, loaded: controller.visitorPasses.length)} tamu terbaru',
                   dense: true,
                   naturalCase: true,
                   trailing: TextButton.icon(
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text('Daftar'),
-                    onPressed: () => Get.toNamed(GamsRoutes.visitorPasses),
+                    onPressed: () => _create(GamsRoutes.visitorPasses),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                if (controller.visitorPasses.isEmpty)
+                // A section that could not load says so, on its own (GAMS-02).
+                if (controller.sectionErrors['visits'] case final failed?)
+                  _SectionError(message: failed.message)
+                else if (controller.visitorPasses.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm,
+                    ),
                     child: Text(
                       'Belum ada pra-pendaftaran tamu atau buku kunjungan.',
-                      style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: palette.textMuted,
+                      ),
                     ),
                   )
                 else
@@ -282,7 +356,11 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
                                 borderRadius: AppRadii.mdAll,
                               ),
                               alignment: Alignment.center,
-                              child: Icon(Icons.badge_outlined, size: 18, color: theme.colorScheme.primary),
+                              child: Icon(
+                                Icons.badge_outlined,
+                                size: 18,
+                                color: theme.colorScheme.primary,
+                              ),
                             ),
                             const SizedBox(width: AppSpacing.md),
                             Expanded(
@@ -291,11 +369,15 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
                                 children: [
                                   Text(
                                     vp.visitorName,
-                                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                   Text(
                                     '${vp.purpose} • ${vp.statusLabel}',
-                                    style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: palette.textMuted,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -313,3 +395,36 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
   }
 }
 
+/// A section that could not be loaded (GAMS-02).
+class _SectionError extends StatelessWidget {
+  const _SectionError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Row(
+        children: [
+          Icon(
+            Icons.error_outline_rounded,
+            size: 16,
+            color: theme.palette.danger.foreground,
+          ),
+          const SizedBox(width: AppSpacing.tight),
+          Expanded(
+            child: Text(
+              'Bagian ini belum dapat dimuat: $message',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.palette.danger.foreground,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

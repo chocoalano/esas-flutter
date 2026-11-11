@@ -13,13 +13,8 @@ class InboxApiService {
     required String taskId,
     required String decision,
     String? note,
-  }) =>
-      _client.postObject(
-        '${ApiRoutes.tasksInbox}/$taskId/decision',
-        {
-          'decision': decision,
-          if (note != null && note.isNotEmpty) 'note': note,
-        },
-      );
+  }) => _client.postObject('${ApiRoutes.tasksInbox}/$taskId/decision', {
+    'decision': decision,
+    if (note != null && note.isNotEmpty) 'note': note,
+  });
 }
-

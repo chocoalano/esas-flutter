@@ -1,5 +1,6 @@
 import 'package:esas/core/config/asset_url.dart';
 import 'package:esas/core/theme/app_dimens.dart';
+import 'package:esas/core/utils/string_guard.dart';
 import 'package:esas/core/ui/components/app_avatar.dart';
 import 'package:esas/core/ui/components/app_badge.dart';
 import 'package:esas/core/ui/components/app_card.dart';
@@ -80,7 +81,7 @@ class ProfilePersonalView extends GetView<ProfilePersonalController> {
                           const SizedBox(height: AppSpacing.md),
                           AppRecordField(
                             label: 'NIP',
-                            value: user.nip ?? '',
+                            value: user.nip.orPlaceholder(),
                             mono: true,
                             selectable: true,
                           ),
@@ -105,12 +106,12 @@ class ProfilePersonalView extends GetView<ProfilePersonalController> {
                     AppRecordFieldPair(
                       first: AppRecordField(
                         label: 'Email',
-                        value: user.email ?? '',
+                        value: user.email.orPlaceholder(),
                         selectable: true,
                       ),
                       second: AppRecordField(
                         label: 'Telepon',
-                        value: user.details?.phone ?? '',
+                        value: (user.details?.phone).orPlaceholder(),
                         mono: true,
                         selectable: true,
                       ),
@@ -119,7 +120,7 @@ class ProfilePersonalView extends GetView<ProfilePersonalController> {
                     AppRecordFieldPair(
                       first: AppRecordField(
                         label: 'Jenis kelamin',
-                        value: user.details?.gender ?? '',
+                        value: (user.details?.gender).orPlaceholder(),
                       ),
                       second: AppRecordField(
                         label: 'Tanggal lahir',
@@ -131,22 +132,22 @@ class ProfilePersonalView extends GetView<ProfilePersonalController> {
                     AppRecordFieldPair(
                       first: AppRecordField(
                         label: 'Tempat lahir',
-                        value: user.details?.placebirth ?? '',
+                        value: (user.details?.placebirth).orPlaceholder(),
                       ),
                       second: AppRecordField(
                         label: 'Golongan darah',
-                        value: user.details?.blood ?? '',
+                        value: (user.details?.blood).orPlaceholder(),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     AppRecordFieldPair(
                       first: AppRecordField(
                         label: 'Status pernikahan',
-                        value: user.details?.maritalStatus ?? '',
+                        value: (user.details?.maritalStatus).orPlaceholder(),
                       ),
                       second: AppRecordField(
                         label: 'Agama',
-                        value: user.details?.religion ?? '',
+                        value: (user.details?.religion).orPlaceholder(),
                       ),
                     ),
                   ],
@@ -161,7 +162,7 @@ class ProfilePersonalView extends GetView<ProfilePersonalController> {
                   children: [
                     AppRecordField(
                       label: 'Tipe identitas',
-                      value: user.address?.identityType ?? '',
+                      value: (user.address?.identityType).orPlaceholder(),
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     // Enam belas digit, tabular, bisa disalin, tanpa elipsis.
@@ -169,7 +170,7 @@ class ProfilePersonalView extends GetView<ProfilePersonalController> {
                     // satunya cara halaman ini bisa gagal sepenuhnya.
                     AppRecordField(
                       label: 'Nomor identitas',
-                      value: user.address?.identityNumbers ?? '',
+                      value: (user.address?.identityNumbers).orPlaceholder(),
                       mono: true,
                       selectable: true,
                     ),
@@ -182,7 +183,7 @@ class ProfilePersonalView extends GetView<ProfilePersonalController> {
                     const SizedBox(height: AppSpacing.lg),
                     AppRecordField(
                       label: 'Alamat tinggal',
-                      value: user.address?.residentialAddress ?? '',
+                      value: (user.address?.residentialAddress).orPlaceholder(),
                       selectable: true,
                     ),
                   ],

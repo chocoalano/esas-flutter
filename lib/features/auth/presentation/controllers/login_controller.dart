@@ -47,9 +47,8 @@ class LoginController extends GetxController {
           Get.context!,
           title: 'Koneksi internet diperlukan',
           message:
-              'Koneksi ke server terputus sehingga Anda otomatis keluar. '
-              'Aplikasi ini wajib terhubung ke internet. Pastikan koneksi internet '
-              'aktif dan server dapat diakses, lalu masuk kembali.',
+              'Server belum dapat dihubungi. Pastikan koneksi internet aktif '
+              'dan server dapat diakses, lalu coba lagi.',
           icon: Icons.wifi_off_rounded,
         ),
       );
@@ -71,14 +70,17 @@ class LoginController extends GetxController {
     if (isBusy) return;
 
     final nip = nipController.text.trim();
-    final password = passwordController.text.trim();
+    // Sent exactly as typed (AUTH-05). Laravel's TrimStrings middleware leaves
+    // `password` alone, and so does the change-password screen — trimming here
+    // made a password ending in a space impossible to sign in with.
+    final password = passwordController.text;
 
     if (nip.isEmpty) {
       showWarningSnackbar('NIP tidak boleh kosong.');
       return;
     }
 
-    if (password.isEmpty) {
+    if (password.trim().isEmpty) {
       showWarningSnackbar('Kata sandi tidak boleh kosong.');
       return;
     }
@@ -90,18 +92,12 @@ class LoginController extends GetxController {
         identifier: nip,
         password: password,
         deviceId: await _deviceInfo.deviceId(),
+        legacyDeviceId: await _deviceInfo.legacyDeviceId(),
       );
 
       _enterApp();
     } on ApiException catch (error) {
-      // The mapper's default for a 401 is about an expired session, which is
-      // the wrong thing to say on the login screen. This is the one place that
-      // knows a 401 means the credentials were wrong.
-      showErrorSnackbar(
-        error.isUnauthenticated
-            ? 'NIP/Email atau kata sandi salah. Silakan coba lagi.'
-            : error.message,
-      );
+      showErrorSnackbar(_passwordRefusalMessage(error));
     } finally {
       isLoading.value = false;
       // The password is used to authenticate and then dropped. It is never
@@ -118,6 +114,7 @@ class LoginController extends GetxController {
     try {
       final user = await _auth.loginWithGoogle(
         deviceId: await _deviceInfo.deviceId(),
+        legacyDeviceId: await _deviceInfo.legacyDeviceId(),
       );
 
       // The account picker was closed. They changed their mind; say nothing.
@@ -144,6 +141,39 @@ class LoginController extends GetxController {
   /// as it is: "Akun ini tidak lagi aktif." must not become "not registered".
   /// Matching the English default is a weak signal, and it fails safe — if the
   /// backend gains a translation, its translated sentence is shown instead.
+  /// What to say when a NIP/password sign-in is refused (AUTH-04).
+  ///
+  /// The endpoint never answers 401 for wrong credentials: it answers 422 on
+  /// `identifier` with Laravel's untranslated `auth.failed` line, and its
+  /// limiter answers 429 "Too Many Attempts.". Both reached the screen in
+  /// English. A refusal the server already words in Indonesian — an inactive
+  /// account — is shown as it is.
+  static String _passwordRefusalMessage(ApiException error) {
+    const wrongCredentials =
+        'NIP/Email atau kata sandi salah. Silakan coba lagi.';
+
+    if (error.isUnauthenticated) return wrongCredentials;
+
+    if (error.status == 429) {
+      return 'Terlalu banyak percobaan masuk. Tunggu sekitar satu menit, '
+          'lalu coba lagi.';
+    }
+
+    if (error.isValidationFailure) {
+      final field = error.errors['identifier'] ?? error.errors['password'];
+      final text = field ?? error.message;
+
+      if (_isUntranslatedAuthFailure(text)) return wrongCredentials;
+
+      return field ?? error.firstFieldError ?? error.message;
+    }
+
+    return error.message;
+  }
+
+  static bool _isUntranslatedAuthFailure(String text) =>
+      text.startsWith('These credentials') || text == 'auth.failed';
+
   static String _googleRefusalMessage(ApiException error) {
     const notRegistered =
         'Akun Google ini tidak terdaftar sebagai karyawan. Gunakan email yang '

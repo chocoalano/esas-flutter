@@ -44,11 +44,10 @@ class GamsVisitorPass {
   final String? createdAt;
 
   String get statusLabel => switch (status.toLowerCase()) {
-        'pre_register' => 'Terdaftar (Pra-Kunjungan)',
-        'approved' => 'Disetujui',
-        'active' => 'Sedang Berkunjung',
-        'checked_out' => 'Selesai (Check-out)',
-        _ => status,
-      };
+    'pre_register' => 'Terdaftar (Pra-Kunjungan)',
+    'approved' => 'Disetujui',
+    'active' => 'Sedang Berkunjung',
+    'checked_out' => 'Selesai (Check-out)',
+    _ => status,
+  };
 }
-

@@ -10,11 +10,8 @@ class AiChatBinding extends Bindings {
   void dependencies() {
     Get.lazyPut<AiChatController>(
       () => AiChatController(
-        repository: AiChatRepository(
-          AiChatApiService(Get.find<ApiClient>()),
-        ),
+        repository: AiChatRepository(AiChatApiService(Get.find<ApiClient>())),
       ),
     );
   }
 }
-

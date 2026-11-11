@@ -51,5 +51,14 @@ void main() {
       expect(itmsTask.isItms, isTrue);
     });
   });
-}
 
+  // INBOX-02. The server says which tasks can be decided here; an ITMS ticket
+  // cannot, and its Setujui/Tolak always failed with a 400.
+  test('can_decide is read, and defaults to yes', () {
+    expect(
+      ApprovalTask.fromJson({'id': 'x', 'can_decide': false}).canDecide,
+      isFalse,
+    );
+    expect(ApprovalTask.fromJson({'id': 'x'}).canDecide, isTrue);
+  });
+}

@@ -3,4 +3,3 @@ class AiChatRoutes {
 
   static const chat = '/ai/chat';
 }
-

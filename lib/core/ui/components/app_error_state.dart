@@ -44,8 +44,31 @@ class AppErrorState extends StatelessWidget {
   /// Varian ringkas untuk di dalam kartu, bukan untuk satu halaman penuh.
   final bool compact;
 
+  /// Scrollable where the height is bounded, centred while it fits (UI-02).
+  ///
+  /// Under a header and a strip, a landscape phone leaves this about 150 dp;
+  /// the content needs nearly twice that. Unscrollable, the retry button sat
+  /// outside the hit-test area — the one control the state exists to offer.
+  /// The same arrangement `AppEmptyState` already uses.
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final Widget body = _body(context);
+
+        if (!constraints.hasBoundedHeight) return body;
+
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: body,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _body(BuildContext context) {
     final theme = Theme.of(context);
     final palette = theme.palette;
     final AppTone tone = palette.danger;

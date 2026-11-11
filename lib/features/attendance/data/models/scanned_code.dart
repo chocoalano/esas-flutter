@@ -80,6 +80,20 @@ class MachineCode extends ScannedCode {
   /// signed token whose payload cannot be read is one the server would refuse
   /// anyway, and pretending to understand it would send a shipping label to an
   /// endpoint that spends whatever it is given.
+  /// A seconds-since-epoch the platform can represent, or null (ATTD-06).
+  ///
+  /// `DateTime` throws past ±8.64e15 ms; an absurd `exp` used to throw a
+  /// RangeError out of a parser documented never to throw — ten times a
+  /// second, while the code sat in front of the camera. Expiry is the server's
+  /// call in any case.
+  static DateTime? _expiryFrom(int? seconds) {
+    const maxSeconds = 8640000000000;
+
+    if (seconds == null || seconds.abs() > maxSeconds) return null;
+
+    return DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+  }
+
   static MachineCode? tryParse(String raw) {
     final parts = raw.split('.');
 
@@ -99,9 +113,7 @@ class MachineCode extends ScannedCode {
       raw: raw,
       id: asString(data['jti']),
       tenant: asString(data['tid']),
-      expiresAt: expiry == null
-          ? null
-          : DateTime.fromMillisecondsSinceEpoch(expiry * 1000),
+      expiresAt: _expiryFrom(expiry),
     );
   }
 

@@ -12,7 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 
 class _Client extends ApiClient {
-  _Client(InMemoryTokenStorage tokens, Future<void> Function() disconnected)
+  _Client(InMemoryTokenStorage tokens)
     : super(
         serverConfig: ServerConfig(store: InMemorySecureStore()),
         tenantContext: TenantContext(store: InMemorySecureStore()),
@@ -20,7 +20,8 @@ class _Client extends ApiClient {
           tokenStorage: tokens,
           tenantContext: TenantContext(store: InMemorySecureStore()),
         ),
-        onConnectionLost: disconnected,
+        // Wired to the credential, so a failure mistaken for a 401 shows up
+        // as a missing token in the tests below.
         onUnauthorized: tokens.clear,
       );
 
@@ -39,41 +40,43 @@ class _Client extends ApiClient {
 void main() {
   late InMemoryTokenStorage tokens;
   late _Client client;
-  late int disconnects;
 
   setUp(() {
     tokens = InMemoryTokenStorage('current-token');
-    disconnects = 0;
-    client = _Client(tokens, () async {
-      disconnects++;
-      await tokens.clear();
-    });
+    client = _Client(tokens);
   });
 
-  test('a thrown socket failure ends an authenticated session', () async {
+  // CORE-04. A radio that has not woken up, a lift, a slow uplink: none of
+  // them says anything about whether the credential is still good. Ending the
+  // session on them signed people out from background refreshes and from
+  // attendance submits the server had already recorded.
+  test('a thrown socket failure keeps the session', () async {
     client.reply = () async => throw const SocketException('no route');
     await expectLater(
       client.getObject('/attendance/context'),
-      throwsA(isA<ApiException>()),
+      throwsA(
+        isA<ApiException>().having(
+          (e) => e.isConnectionFailure,
+          'isConnectionFailure',
+          isTrue,
+        ),
+      ),
     );
-    expect(tokens.token, isNull);
-    expect(disconnects, 1);
+    expect(tokens.token, 'current-token');
   });
 
-  test('a missing HTTP response and timeout both end the session', () async {
+  test('a missing HTTP response and a timeout keep the session', () async {
     for (final reply in [
       const Response<dynamic>(),
       const Response<dynamic>(statusText: 'TimeoutException: deadline'),
     ]) {
-      await tokens.save('current-token');
       client.reply = () async => reply;
       await expectLater(
         client.getObject('/attendance/context'),
         throwsA(isA<ApiException>()),
       );
-      expect(tokens.token, isNull);
+      expect(tokens.token, 'current-token');
     }
-    expect(disconnects, 2);
   });
 
   test(
@@ -85,7 +88,6 @@ void main() {
         throwsA(isA<ApiException>()),
       );
       expect(tokens.token, 'current-token');
-      expect(disconnects, 0);
     },
   );
 
@@ -103,7 +105,6 @@ void main() {
       );
     }
     expect(tokens.token, 'current-token');
-    expect(disconnects, 0);
   });
 
   test(
@@ -115,22 +116,54 @@ void main() {
         throwsA(isA<ApiException>()),
       );
       expect(tokens.token, isNull);
-      expect(disconnects, 0);
     },
   );
 
   test(
-    'a delayed failure from an old account cannot disconnect the new account',
+    'a delayed 401 from an old account cannot end the new account',
     () async {
       final pending = Completer<Response<dynamic>>();
       client.reply = () => pending.future;
       final request = client.getObject('/attendance/context');
       final checked = expectLater(request, throwsA(isA<ApiException>()));
       await tokens.save('new-account-token');
-      pending.complete(const Response<dynamic>());
+      pending.complete(const Response<dynamic>(statusCode: 401));
       await checked;
       expect(tokens.token, 'new-account-token');
-      expect(disconnects, 0);
     },
   );
+
+  // CORE-05. Every failure without a status used to read "Tidak ada koneksi
+  // internet" — an expired certificate and a malformed server address too,
+  // which sent people to check a Wi-Fi that was working.
+  group('a failure that is not the network says so', () {
+    test('a certificate the handset will not trust', () async {
+      client.reply = () async => const Response<dynamic>(
+        statusText:
+            'HandshakeException: Handshake error in client (OS Error: '
+            'CERTIFICATE_VERIFY_FAILED: certificate has expired)',
+      );
+
+      await expectLater(
+        client.getObject('/attendance/context'),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.code, 'code', 'tls_failure')
+              .having((e) => e.isConnectionFailure, 'isConnectionFailure', isFalse)
+              .having((e) => e.message, 'message', isNot(contains('internet'))),
+        ),
+      );
+    });
+
+    test('an address that cannot be a request', () async {
+      client.reply = () async => const Response<dynamic>(
+        statusText: 'FormatException: Invalid radix-10 number',
+      );
+
+      await expectLater(
+        client.getObject('/attendance/context'),
+        throwsA(isA<ApiException>().having((e) => e.code, 'code', 'client_error')),
+      );
+    });
+  });
 }

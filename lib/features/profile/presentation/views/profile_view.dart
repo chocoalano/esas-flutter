@@ -1,4 +1,7 @@
-import 'package:esas/core/config/env.dart';
+import 'dart:io';
+
+import 'package:esas/core/config/asset_url.dart';
+import 'package:esas/core/services/app_version_service.dart';
 import 'package:esas/core/theme/app_dimens.dart';
 import 'package:esas/core/theme/app_palette.dart';
 import 'package:esas/core/theme/app_typography.dart';
@@ -19,6 +22,18 @@ import 'package:intl/intl.dart';
 import '../controllers/profile_controller.dart';
 
 /// Satu butir menu profil.
+/// The picture the identity card shows: the one just picked, else the one
+/// stored.
+@visibleForTesting
+ImageProvider? profileAvatarImage({File? picked, required String stored}) {
+  if (picked != null) return FileImage(picked);
+  if (stored.isEmpty) return null;
+
+  // `assetUrl()`, as every other asset (PROF-09). Gluing the CDN on by hand
+  // broke an absolute URL from another host and a path with a leading slash.
+  return NetworkImage(assetUrl(stored));
+}
+
 class ProfileMenuItem {
   const ProfileMenuItem(this.icon, this.title, this.route, {this.subtitle});
 
@@ -104,14 +119,17 @@ class ProfileView extends GetView<ProfileController> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (didPop) return;
-        confirmExitApp(context);
-      },
-      child: Scaffold(
-        body: SafeArea(
+    return Title(
+      title: 'Profil – Absensas',
+      color: Colors.black,
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (bool didPop, Object? result) {
+          if (didPop) return;
+          confirmExitApp(context);
+        },
+        child: Scaffold(
+          body: SafeArea(
           bottom: false,
           child: RefreshIndicator(
             onRefresh: controller.loadSummary,
@@ -177,15 +195,22 @@ class ProfileView extends GetView<ProfileController> {
                       ),
                       onTap: () => _confirmSwitchWorkspace(context),
                     ),
-                    _MenuRow(
-                      item: const ProfileMenuItem(
-                        Icons.logout_rounded,
-                        'Keluar',
-                        null,
-                        subtitle: 'Akhiri sesi di perangkat ini',
+                    // Says it is working while it is (PROF-10): a sign-out
+                    // waits on the server, and a row that looks idle invites
+                    // the second tap.
+                    Obx(
+                      () => _MenuRow(
+                        item: ProfileMenuItem(
+                          Icons.logout_rounded,
+                          'Keluar',
+                          null,
+                          subtitle: controller.isLoggingOut.value
+                              ? 'Sedang keluar…'
+                              : 'Akhiri sesi di perangkat ini',
+                        ),
+                        destructive: true,
+                        onTap: () => _confirmLogout(context),
                       ),
-                      destructive: true,
-                      onTap: () => _confirmLogout(context),
                     ),
                   ],
                 ),
@@ -198,10 +223,13 @@ class ProfileView extends GetView<ProfileController> {
         ),
         bottomNavigationBar: const CustomBottomNavBar(),
       ),
+    ),
     );
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
+    if (controller.isLoggingOut.value) return;
+
     final bool confirmed = await showAppConfirmDialog(
       context,
       title: 'Keluar dari akun?',
@@ -249,17 +277,10 @@ class _IdentityCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Obx(() {
-            final String avatarUrl = controller.avatar.value;
-            ImageProvider? image;
-            if (controller.pickedImageFile.value != null) {
-              image = FileImage(controller.pickedImageFile.value!);
-            } else if (avatarUrl.isNotEmpty) {
-              image = NetworkImage(
-                avatarUrl.startsWith(Env.assetBaseUrl)
-                    ? avatarUrl
-                    : '${Env.assetBaseUrl}/$avatarUrl',
-              );
-            }
+            final ImageProvider? image = profileAvatarImage(
+              picked: controller.pickedImageFile.value,
+              stored: controller.avatar.value,
+            );
 
             return GestureDetector(
               onTap: controller.pickImageFromGallery,
@@ -347,12 +368,13 @@ class _IdentityCard extends StatelessWidget {
                         tone: AppBadgeTone.brand,
                         dense: true,
                       ),
-                      AppBadge(
-                        label:
-                            'Bergabung ${DateFormat('MMM yyyy', 'id').format(controller.joined.value)}',
-                        icon: Icons.event_outlined,
-                        dense: true,
-                      ),
+                      if (controller.joined.value case final joined?)
+                        AppBadge(
+                          label:
+                              'Bergabung ${DateFormat('MMM yyyy', 'id').format(joined)}',
+                          icon: Icons.event_outlined,
+                          dense: true,
+                        ),
                     ],
                   ),
                 ),
@@ -784,7 +806,8 @@ class _ThemeRow extends StatelessWidget {
   }
 }
 
-/// Kaki halaman: workspace mana yang sedang dipakai perangkat ini.
+/// Kaki halaman: workspace mana yang sedang dipakai perangkat ini, dan versi
+/// aplikasi.
 ///
 /// Informasi ini sebelumnya hanya muncul di dalam dialog konfirmasi pindah
 /// workspace — artinya baru terlihat setelah orang menekan tombol yang berisiko.
@@ -796,23 +819,38 @@ class _WorkspaceFooter extends StatelessWidget {
     final theme = Theme.of(context);
     final palette = theme.palette;
     final controller = Get.find<ProfileController>();
+    final version = AppVersionService.displayVersion;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
       children: [
-        Icon(
-          Icons.dns_outlined,
-          size: AppIconSizes.xs,
-          color: palette.textMuted,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.dns_outlined,
+              size: AppIconSizes.xs,
+              color: palette.textMuted,
+            ),
+            const SizedBox(width: AppSpacing.tight),
+            Text(
+              'Workspace ${controller.workspace}',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: palette.textMuted,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: AppSpacing.tight),
-        Text(
-          'Workspace ${controller.workspace}',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: palette.textMuted,
-            letterSpacing: 0.2,
+        if (version.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.xxs),
+          Text(
+            version,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: palette.textMuted,
+              letterSpacing: 0.2,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

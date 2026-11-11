@@ -66,19 +66,30 @@ class AppLogger {
   }
 
   /// Something recoverable went wrong. Kept in release.
+  ///
+  /// Printed rather than sent to `dart:developer`: `developer.log` reaches only
+  /// the VM service, which a release build does not have, so these levels used
+  /// to write nothing at all where they were meant to survive (CORE-07).
   static void warning(String message, {Object? data}) {
-    _emit(900, message, data);
+    _print('WARNING', message, data);
   }
 
-  /// Something failed. Kept in release.
+  /// Something failed. Kept in release, printed for the same reason as
+  /// [warning].
   static void error(String message, {Object? error, StackTrace? stackTrace}) {
-    developer.log(
-      redact(message),
-      name: _name,
-      level: 1000,
-      error: error == null ? null : redact(error.toString()),
-      stackTrace: stackTrace,
-    );
+    _print('ERROR', message, error);
+
+    if (stackTrace != null) {
+      debugPrint(redact(stackTrace.toString()));
+    }
+  }
+
+  static void _print(String level, String message, Object? detail) {
+    final line = detail == null
+        ? redact(message)
+        : '${redact(message)} ${redact('$detail')}';
+
+    debugPrint('[$_name] $level: $line');
   }
 
   static void _emit(int level, String message, Object? data) {

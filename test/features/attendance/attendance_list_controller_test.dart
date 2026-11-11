@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:esas/core/network/api_exception.dart';
 import 'package:esas/core/tenancy/workspace_clock.dart';
 import 'package:esas/features/attendance/data/models/attendance.dart';
 import 'package:esas/features/attendance/data/models/attendance_history_page.dart';
@@ -175,6 +178,127 @@ void main() {
       await controller.refreshAttendance();
 
       expect(controller.monthTotals[DateTime(2026, 9)]?.recordedDays, 22);
+    });
+  });
+
+  group('remediasi wave 4 — riwayat', () {
+    Attendance row(int id) =>
+        Attendance.fromJson({'id': id, 'date_presence': '2026-11-01'});
+
+    List<Attendance> rows(int from, int count) => [
+      for (var i = from; i < from + count; i++) row(i),
+    ];
+
+    // ATTP-03. A failed page advanced the counter anyway, and the next scroll
+    // asked for the page after it: the failed page was never fetched again and
+    // its days looked like days without attendance.
+    test('a page that failed is the page asked for again', () async {
+      final asked = <int>[];
+      when(
+        () => repository.history(
+          page: any(named: 'page'),
+          perPage: any(named: 'perPage'),
+          startDate: any(named: 'startDate'),
+          endDate: any(named: 'endDate'),
+        ),
+      ).thenAnswer((invocation) async {
+        final page = invocation.namedArguments[#page] as int;
+        final perPage = invocation.namedArguments[#perPage] as int;
+        asked.add(page);
+        if (page == 2 && asked.where((p) => p == 2).length == 1) {
+          throw const ApiException('Offline', code: 'network_unreachable');
+        }
+        return AttendanceHistoryPage(rows: rows((page - 1) * perPage, perPage));
+      });
+      final controller = build();
+      await controller.refreshAttendance();
+
+      await controller.loadMore();
+      // An error stops the automatic loading; the footer offers a retry.
+      await controller.loadMore();
+      expect(asked, [1, 2]);
+
+      await controller.retryLoadMore();
+      expect(asked, [1, 2, 2]);
+    });
+
+    // UAT review A4. A refresh that failed kept the rows on screen — and had
+    // already wound the page counter back to 1, so the retry fetched page 2
+    // again and appended rows that were already there.
+    test('a failed refresh that keeps the rows keeps their page too', () async {
+      final asked = <int>[];
+      var offline = false;
+      when(
+        () => repository.history(
+          page: any(named: 'page'),
+          perPage: any(named: 'perPage'),
+          startDate: any(named: 'startDate'),
+          endDate: any(named: 'endDate'),
+        ),
+      ).thenAnswer((invocation) async {
+        final page = invocation.namedArguments[#page] as int;
+        final perPage = invocation.namedArguments[#perPage] as int;
+        asked.add(page);
+        if (offline) {
+          throw const ApiException('Offline', code: 'network_unreachable');
+        }
+        return AttendanceHistoryPage(rows: rows((page - 1) * perPage, perPage));
+      });
+      final controller = build();
+      await controller.refreshAttendance();
+      await controller.loadMore();
+      final held = controller.attendanceList.length;
+
+      offline = true;
+      await controller.refreshAttendance();
+      expect(controller.attendanceList, hasLength(held));
+
+      offline = false;
+      asked.clear();
+      await controller.retryLoadMore();
+
+      expect(asked, [3]);
+      final ids = controller.attendanceList.map((a) => a.id).toList();
+      expect(ids.toSet(), hasLength(ids.length), reason: 'no row twice');
+    });
+
+    // ATTP-10. A slower answer for an earlier filter overwrote the newer one.
+    test('an answer for an older filter is dropped', () async {
+      final slow = Completer<AttendanceHistoryPage>();
+      var call = 0;
+      when(
+        () => repository.history(
+          page: any(named: 'page'),
+          perPage: any(named: 'perPage'),
+          startDate: any(named: 'startDate'),
+          endDate: any(named: 'endDate'),
+        ),
+      ).thenAnswer((_) {
+        call++;
+        return call == 1
+            ? slow.future
+            : Future.value(AttendanceHistoryPage(rows: rows(100, 2)));
+      });
+      final controller = build();
+
+      final first = controller.refreshAttendance();
+      await controller.togglePreset(AttendanceRangePreset.thisMonth);
+      slow.complete(AttendanceHistoryPage(rows: rows(0, 10)));
+      await first;
+
+      expect(controller.attendanceList.map((a) => a.id), [100, 101]);
+    });
+
+    // ATTP-18. On the 30th, "Bulan ini" and "30 hari terakhir" are the same
+    // dates; the chip that lit and the toggle were derived from the dates.
+    test('the preset chosen is the preset shown, and toggles off', () async {
+      final controller = build();
+
+      await controller.togglePreset(AttendanceRangePreset.last30Days);
+      expect(controller.activePreset, AttendanceRangePreset.last30Days);
+
+      await controller.togglePreset(AttendanceRangePreset.last30Days);
+      expect(controller.activePreset, isNull);
     });
   });
 }

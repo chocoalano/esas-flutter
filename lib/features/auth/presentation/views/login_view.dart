@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import '../../../setup/presentation/routes/setup_routes.dart';
 import '../controllers/login_controller.dart';
 
 /// Layar masuk.
@@ -33,6 +34,7 @@ class LoginView extends GetView<LoginController> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.xxl,
               vertical: AppSpacing.xxxl,
@@ -222,6 +224,18 @@ class LoginView extends GetView<LoginController> {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    // The way back to setup (SETUP-01). Without it a handset set
+                    // up against the wrong workspace could not be corrected:
+                    // setup opened only while none was stored, and "Pindah
+                    // Workspace" sat behind a sign-in to the wrong company.
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: () => Get.toNamed(SetupRoutes.setup),
+                        icon: const Icon(Icons.swap_horiz_rounded),
+                        label: const Text('Ganti workspace'),
+                      ),
                     ),
                   ],
                 ),

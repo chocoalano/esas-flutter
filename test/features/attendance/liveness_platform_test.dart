@@ -181,6 +181,41 @@ void main() {
       expect(continuity.broken, isFalse);
     });
 
+    // ATTD-01. Continuity was armed with the stream, before anybody's face
+    // was in frame. The first 1.5 s of a phone being raised, or of exposure
+    // settling, broke it for good — and the first movement then failed with
+    // "wajah sempat keluar dari bingkai" before anything had been asked.
+    test('the time before the first face is not a gap', () {
+      final continuity = PresenceContinuity();
+
+      for (var ms = 0; ms <= 3000; ms += 100) {
+        continuity.offer(
+          const FaceSample.noFace(0),
+          at: start.add(Duration(milliseconds: ms)),
+        );
+      }
+      continuity.offer(face(), at: start.add(const Duration(seconds: 4)));
+
+      expect(continuity.broken, isFalse);
+    });
+
+    test('once a face has been seen, losing it still counts', () {
+      final continuity = PresenceContinuity();
+
+      continuity.offer(const FaceSample.noFace(0), at: start);
+      continuity.offer(face(), at: start.add(const Duration(seconds: 2)));
+      continuity.offer(
+        const FaceSample.noFace(0),
+        at: start.add(const Duration(milliseconds: 2100)),
+      );
+      continuity.offer(
+        const FaceSample.noFace(0),
+        at: start.add(const Duration(milliseconds: 3700)),
+      );
+
+      expect(continuity.broken, isTrue);
+    });
+
     test('a gap long enough for a swap breaks it', () {
       final continuity = PresenceContinuity();
 
@@ -234,6 +269,50 @@ void main() {
       continuity.offer(face(), at: start.add(const Duration(seconds: 6)));
 
       expect(continuity.broken, isTrue);
+    });
+  });
+
+  // ATTD-03. The photograph was taken after the last movement even when the
+  // face had left the frame, a second face had come in, or continuity had
+  // broken while the screen waited for a still pose — and was sent with
+  // evidence saying one person performed every movement.
+  group('before the shutter', () {
+    test('a clean frame may be taken', () {
+      expect(
+        LivenessCapture.shutterRefusal(
+          continuityBroken: false,
+          crowded: false,
+          faceInFrame: true,
+        ),
+        isNull,
+      );
+    });
+
+    test('no face, a crowd, or a broken thread is refused', () {
+      expect(
+        LivenessCapture.shutterRefusal(
+          continuityBroken: false,
+          crowded: false,
+          faceInFrame: false,
+        )?.kind,
+        LivenessFailureKind.noFace,
+      );
+      expect(
+        LivenessCapture.shutterRefusal(
+          continuityBroken: false,
+          crowded: true,
+          faceInFrame: true,
+        )?.kind,
+        LivenessFailureKind.crowded,
+      );
+      expect(
+        LivenessCapture.shutterRefusal(
+          continuityBroken: true,
+          crowded: false,
+          faceInFrame: true,
+        ),
+        isNotNull,
+      );
     });
   });
 }

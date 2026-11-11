@@ -467,6 +467,38 @@ class LivenessCapture {
     return machine.currentIndex > index;
   }
 
+  /// Why the photograph may not be taken now, or null (ATTD-03).
+  @visibleForTesting
+  static LivenessFailure? shutterRefusal({
+    required bool continuityBroken,
+    required bool crowded,
+    required bool faceInFrame,
+  }) {
+    if (continuityBroken) {
+      return const LivenessFailure(
+        LivenessFailureKind.noFace,
+        'Wajah sempat keluar dari bingkai. Mulai ulang verifikasi wajah.',
+      );
+    }
+
+    if (crowded) {
+      return const LivenessFailure(
+        LivenessFailureKind.crowded,
+        'Ada lebih dari satu wajah di bingkai. Pastikan hanya Anda yang '
+        'terlihat, lalu mulai ulang.',
+      );
+    }
+
+    if (!faceInFrame) {
+      return const LivenessFailure(
+        LivenessFailureKind.noFace,
+        'Wajah tidak terlihat saat foto diambil. Mulai ulang verifikasi wajah.',
+      );
+    }
+
+    return null;
+  }
+
   Future<LivenessResult> _capture(
     CameraController controller,
     LivenessGestureMachine machine,
@@ -500,6 +532,16 @@ class LivenessCapture {
         'Gerakan belum lengkap terbaca. Mulai ulang verifikasi wajah.',
       );
     }
+
+    // The last frames before the shutter must still be one person, present
+    // and uninterrupted (ATTD-03). The settle wait above gives up after a
+    // ceiling without saying why; the photograph was then taken anyway.
+    final refused = shutterRefusal(
+      continuityBroken: _continuity.broken,
+      crowded: crowded.value,
+      faceInFrame: faceInFrame.value,
+    );
+    if (refused != null) throw refused;
 
     final XFile shot;
 
@@ -800,6 +842,12 @@ class PresenceContinuity {
   DateTime? _lostAt;
   bool _broken = false;
 
+  /// Whether a single face has been in frame yet. Until then nothing can have
+  /// been lost (ATTD-01): the stream starts before the phone is raised and
+  /// before exposure settles, and counting that as a gap failed the first
+  /// movement before anything had been asked.
+  bool _seen = false;
+
   /// Whether the run has already lost continuity. Sticky: once the thread is
   /// broken it cannot be mended by the face coming back, because there is
   /// nothing here that could tell whose face came back.
@@ -809,10 +857,13 @@ class PresenceContinuity {
     if (_broken) return;
 
     if (sample.hasFace && sample.faceCount == 1) {
+      _seen = true;
       _lostAt = null;
 
       return;
     }
+
+    if (!_seen) return;
 
     _lostAt ??= at;
 

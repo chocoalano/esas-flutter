@@ -8,6 +8,7 @@ import 'package:esas/features/permit/data/models/leave_list.dart';
 import 'package:esas/features/permit/presentation/routes/permit_routes.dart';
 import 'package:esas/features/permit/presentation/widgets/permit_status.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:get/get.dart';
 
 /// Beberapa pengajuan terakhir, sebagai baris — bukan sebagai kartu.
@@ -76,6 +77,10 @@ class HomeRecentActivity extends StatelessWidget {
   }
 }
 
+/// The date a row of the recent activity shows (HOME-09).
+@visibleForTesting
+String? homeActivityDateLabel(Permit permit) => _ActivityRow.dateLabel(permit);
+
 class _ActivityRow extends StatelessWidget {
   const _ActivityRow({required this.permit});
 
@@ -88,7 +93,7 @@ class _ActivityRow extends StatelessWidget {
     final PermitStatus status = resolvePermitStatus(permit);
 
     final String title = permit.permitType?.type ?? 'Pengajuan';
-    final String? date = _dateLabel(permit);
+    final String? date = dateLabel(permit);
 
     return Material(
       type: MaterialType.transparency,
@@ -172,10 +177,14 @@ class _ActivityRow extends StatelessWidget {
 
   /// Tanggal mulainya izin, atau tanggal pengajuannya bila yang pertama tidak
   /// ada. Keduanya digambar pada jam workspace lewat [DateFormatter].
-  static String? _dateLabel(Permit permit) {
+  @visibleForTesting
+  static String? dateLabel(Permit permit) {
     final DateTime? start = permit.startDate;
 
-    if (start != null) return DateFormatter.timestamp(start, 'd MMM yyyy');
+    // A calendar date, formatted as the date it is (HOME-09). Treated as an
+    // instant and moved onto the workspace clock, it slipped a day back on a
+    // handset east of the workspace.
+    if (start != null) return DateFormat('d MMM yyyy', 'id').format(start);
 
     final String? created = permit.createdAt;
 

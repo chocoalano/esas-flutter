@@ -58,6 +58,42 @@ void main() {
     });
   });
 
+  // PRMT-02. Server yang belum diisi kodenya tetap mengirim `variant`:
+  // `PermitVariant::fromCode(null)` di backend menjawab `general`. Membaca itu
+  // sebagai keputusan final mematikan pemetaan id peninggalan untuk persis
+  // tenant yang membutuhkannya, dan formulir penyesuaian tidak pernah muncul.
+  group('bentuk jawaban server yang sebenarnya untuk jenis tanpa kode', () {
+    test('`general` tanpa kode bukan keputusan; id peninggalan dipakai', () {
+      expect(
+        LeaveType.fromJson({
+          'id': 15,
+          'name': 'Penyesuaian jam',
+          'code': null,
+          'variant': 'general',
+        }).variant,
+        PermitVariant.timeAdjustment,
+      );
+      expect(
+        PermitVariant.resolve(variant: 'general', id: 16),
+        PermitVariant.shiftAdjustment,
+      );
+    });
+
+    test('`general` dengan kode tetap izin biasa', () {
+      expect(
+        PermitVariant.resolve(variant: 'general', code: 'ANNUAL', id: 15),
+        PermitVariant.general,
+      );
+    });
+
+    test('varian selain `general` tetap berwenang', () {
+      expect(
+        PermitVariant.resolve(variant: 'time_adjustment', id: 16),
+        PermitVariant.timeAdjustment,
+      );
+    });
+  });
+
   /// Tes penerimaan yang membuktikan kemerdekaan dari kunci primer.
   group('id boleh berbeda di setiap tenant', () {
     test('penyesuaian jam pada id 52, tukar shift pada id 87', () {

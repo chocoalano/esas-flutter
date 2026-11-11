@@ -37,20 +37,37 @@ import '../widgets/attendance_list_item.dart';
 class AttendanceListView extends GetView<AttendanceListController> {
   const AttendanceListView({super.key});
 
+  /// Where back goes (ATTP-17): the screen the history was opened from, when
+  /// it said so — the home screen does — and otherwise the capture screen.
+  /// Going to capture from the home screen's history started the camera and
+  /// asked for permissions nobody had asked to grant.
+  static String backTarget(Object? arguments) {
+    final origin = arguments is Map ? arguments['back'] : null;
+
+    return origin is String && origin.isNotEmpty
+        ? origin
+        : AttendanceRoutes.attendance;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        Get.offAllNamed(AttendanceRoutes.attendance);
-      },
-      child: Scaffold(
+    final String back = backTarget(Get.arguments);
+
+    return Title(
+      title: 'Absensi – Absensas',
+      color: Colors.black,
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          Get.offAllNamed(back);
+        },
+        child: Scaffold(
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
             tooltip: 'Kembali',
-            onPressed: () => Get.offAllNamed(AttendanceRoutes.attendance),
+            onPressed: () => Get.offAllNamed(back),
           ),
           title: const Text('Riwayat absensi'),
           titleSpacing: 0,
@@ -149,6 +166,7 @@ class AttendanceListView extends GetView<AttendanceListController> {
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -737,8 +755,12 @@ class _SevenDayStrip extends StatelessWidget {
 
     // Never before the window's own start either.
     final DateTime windowStart = _startOfDay(range.start);
-    final int span = anchor.difference(windowStart).inDays + 1;
-    final int days = span < _days ? span : _days;
+    final List<DateTime> stripDays = attendanceStripDays(
+      anchor: anchor,
+      windowStart: windowStart,
+      maxDays: _days,
+    );
+    final int days = stripDays.length;
 
     if (days < 1) return const SizedBox.shrink();
 
@@ -760,8 +782,7 @@ class _SevenDayStrip extends StatelessWidget {
     final Map<AppBadgeTone, int> counted = {};
     int blank = 0;
 
-    for (int offset = days - 1; offset >= 0; offset--) {
-      final DateTime day = anchor.subtract(Duration(days: offset));
+    for (final DateTime day in stripDays) {
       final Attendance? row = byDate[DateFormat('yyyy-MM-dd').format(day)];
 
       captions.add(weekday.format(day));
@@ -1124,43 +1145,75 @@ class _RangeStrip extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            SizedBox(
-              height: 48,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.page,
-                ),
-                children: [
-                  // Yang dulu hanya sebuah kalimat yang tampak bisa diketuk.
-                  _PresetChip(
-                    // Named for what it does: the endpoint caps a range at a
-                    // year, so this is as far back as the screen can see.
-                    label: '12 bulan',
-                    selected: !filtered,
-                    onTap: filtered
-                        ? () => controller.applyDateRange(null, null)
-                        : () {},
+            ShaderMask(
+              shaderCallback: (Rect bounds) {
+                return const LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [Colors.white, Colors.white, Colors.transparent],
+                  stops: [0.0, 0.85, 1.0],
+                ).createShader(bounds);
+              },
+              blendMode: BlendMode.dstIn,
+              child: SizedBox(
+                height: 48,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.page,
                   ),
-                  const SizedBox(width: AppSpacing.sm),
-                  for (final preset in AttendanceRangePreset.values) ...[
-                    _PresetChip(
-                      label: preset.label,
-                      selected: active == preset,
-                      onTap: () => controller.togglePreset(preset),
+                  children: [
+                    // Yang dulu hanya sebuah kalimat yang tampak bisa diketuk.
+                    Builder(
+                      builder: (chipCtx) => _PresetChip(
+                        // Named for what it does: the endpoint caps a range at a
+                        // year, so this is as far back as the screen can see.
+                        label: '12 bulan',
+                        selected: !filtered,
+                        onTap: filtered
+                            ? () {
+                                controller.applyDateRange(null, null);
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  if (chipCtx.mounted) Scrollable.ensureVisible(chipCtx, alignment: 0.0, duration: const Duration(milliseconds: 200));
+                                });
+                              }
+                            : () {},
+                      ),
                     ),
                     const SizedBox(width: AppSpacing.sm),
+                    for (final preset in AttendanceRangePreset.values) ...[
+                      Builder(
+                        builder: (chipCtx) => _PresetChip(
+                          label: preset.label,
+                          selected: active == preset,
+                          onTap: () {
+                            controller.togglePreset(preset);
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (chipCtx.mounted) Scrollable.ensureVisible(chipCtx, alignment: 0.5, duration: const Duration(milliseconds: 200));
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                    ],
+                    Builder(
+                      builder: (chipCtx) => _PresetChip(
+                        // Menyebut rentangnya sendiri saat ia yang sedang berlaku.
+                        label: filtered && active == null
+                            ? _rangeLabel(start, end)
+                            : 'Pilih tanggal',
+                        icon: Icons.edit_calendar_outlined,
+                        selected: filtered && active == null,
+                        onTap: () {
+                          onPickRange();
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (chipCtx.mounted) Scrollable.ensureVisible(chipCtx, alignment: 1.0, duration: const Duration(milliseconds: 200));
+                          });
+                        },
+                      ),
+                    ),
                   ],
-                  _PresetChip(
-                    // Menyebut rentangnya sendiri saat ia yang sedang berlaku.
-                    label: filtered && active == null
-                        ? _rangeLabel(start, end)
-                        : 'Pilih tanggal',
-                    icon: Icons.edit_calendar_outlined,
-                    selected: filtered && active == null,
-                    onTap: onPickRange,
-                  ),
-                ],
+                ),
               ),
             ),
           ],

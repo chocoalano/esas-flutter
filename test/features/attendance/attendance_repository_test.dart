@@ -624,6 +624,69 @@ void main() {
     });
   });
 
+  // W4-FACE-202. Below the auto-accept score (HRMS_FACE_AUTO_ACCEPT_SCORE_PERCENT,
+  // 80% by default) the server answers 202 `face_pending_review`: the
+  // verification is recorded and an officer decides. That is not an attendance
+  // that counts yet, and must never be shown as one.
+  group('what the face answer means', () {
+    Future<AttendanceOutcome> submitAnswering(Map<String, dynamic> body) {
+      when(
+        () => api.submitFace(
+          image: any(named: 'image'),
+          challengeToken: any(named: 'challengeToken'),
+          challengeId: any(named: 'challengeId'),
+          type: any(named: 'type'),
+          liveness: any(named: 'liveness'),
+          latitude: any(named: 'latitude'),
+          longitude: any(named: 'longitude'),
+          accuracy: any(named: 'accuracy'),
+          isMocked: any(named: 'isMocked'),
+          idempotencyKey: any(named: 'idempotencyKey'),
+        ),
+      ).thenAnswer((_) async => body);
+
+      final image = File('${Directory.systemTemp.path}/face_202.jpg')
+        ..writeAsBytesSync(const <int>[0xFF, 0xD8, 0xFF]);
+      addTearDown(() {
+        if (image.existsSync()) image.deleteSync();
+      });
+
+      return repository.submitFace(
+        image: image,
+        challengeToken: 't',
+        challengeId: 'c',
+        direction: PresenceDirection.clockIn,
+        liveness: const {},
+      );
+    }
+
+    test('201 face_accepted is a recorded clock', () async {
+      final outcome = await submitAnswering({
+        'message': 'Absen masuk berhasil.',
+        'code': 'face_accepted',
+        'attendance': {'time_in': '08:03:11'},
+      });
+
+      final receipt = (outcome as AttendanceAccepted).receipt;
+      expect(receipt.pendingReview, isFalse);
+      expect(receipt.recordedAt, '08:03:11');
+    });
+
+    test('202 face_pending_review is waiting on an officer', () async {
+      final outcome = await submitAnswering({
+        'message':
+            'Absensi Anda tercatat dan menunggu konfirmasi petugas sebelum '
+            'berlaku untuk penggajian.',
+        'code': 'face_pending_review',
+        'verification': {'id': 1},
+      });
+
+      final receipt = (outcome as AttendanceAccepted).receipt;
+      expect(receipt.pendingReview, isTrue);
+      expect(receipt.recordedAt, isNull);
+    });
+  });
+
   group('expiry is the SERVER\'s call, not the device clock\'s', () {
     test('a code the handset thinks is stale is still sent', () async {
       // A phone running fast must not be able to refuse every code its owner

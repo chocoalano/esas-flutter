@@ -32,10 +32,13 @@ class ProfileController extends GetxController {
   String get workspace => _tenantContext.tenant ?? '—';
 
   final RxString avatar = ''.obs;
-  final RxString name = 'nama pengguna'.obs;
-  final RxString jobTitle = 'jabatan pengguna'.obs;
-  final RxString status = 'status pengguna'.obs;
-  final Rx<DateTime> joined = DateTime.now().obs;
+  final RxString name = '—'.obs;
+  final RxString jobTitle = '—'.obs;
+  final RxString status = '—'.obs;
+
+  /// Null when not known yet. It used to fall back to `DateTime.now()`, a date
+  /// that looked real and was not (PROF-02).
+  final Rxn<DateTime> joined = Rxn<DateTime>();
 
   final RxInt late = 0.obs;
   final RxInt attendance = 0.obs;
@@ -52,16 +55,30 @@ class ProfileController extends GetxController {
     super.onInit();
     _readFromSession();
     loadSummary();
+    _loadEmployment();
   }
 
+  /// What is unknown is shown as "—", never as a placeholder that reads like
+  /// data (PROF-02).
   void _readFromSession() {
     final user = _auth.user;
 
     avatar.value = user?.avatar ?? '';
-    name.value = user?.name ?? 'nama pengguna';
-    jobTitle.value = user?.jobPosition ?? 'jabatan pengguna';
-    status.value = user?.status ?? 'status pengguna';
-    joined.value = user?.signDate ?? DateTime.now();
+    name.value = user?.name ?? '—';
+    jobTitle.value = user?.jobPosition ?? '—';
+    status.value = user?.status ?? '—';
+    joined.value = user?.signDate;
+  }
+
+  /// The sign date is on the employee record, not on the sign-in payload.
+  /// Loading it puts the employment block on the session; read it again.
+  Future<void> _loadEmployment() async {
+    try {
+      await _repository.currentUser();
+      if (!isClosed) _readFromSession();
+    } on ApiException catch (error) {
+      AppLogger.warning('Profile header could not load: ${error.message}');
+    }
   }
 
   Future<void> loadSummary() async {
@@ -83,9 +100,27 @@ class ProfileController extends GetxController {
     }
   }
 
+  /// The largest side an avatar is sent at (PROF-11). It is drawn at 64dp;
+  /// a phone camera's full resolution often exceeded the server's 5 MB limit,
+  /// so the upload was refused.
+  static const double avatarMaxSide = 1024;
+  static const int avatarQuality = 85;
+
   Future<void> pickImageFromGallery() async {
+    // A second photo chosen mid-upload used to be dropped without a word: the
+    // upload refused it, and the first upload's `finally` cleared it.
+    if (isUploading.value) {
+      showInfoSnackbar('Tunggu foto sebelumnya selesai diunggah.');
+      return;
+    }
+
     try {
-      final image = await _imagePicker.pickImage(source: ImageSource.gallery);
+      final image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: avatarMaxSide,
+        maxHeight: avatarMaxSide,
+        imageQuality: avatarQuality,
+      );
 
       if (image == null) {
         showInfoSnackbar('Tidak ada gambar yang dipilih.');
@@ -136,12 +171,36 @@ class ProfileController extends GetxController {
   /// 200, so a failed logout left the employee signed in against a session the
   /// server may already have dropped, and reported it with the message "Gagal
   /// memilih gambar", pasted from the avatar picker above (LOW-05).
+  ///
+  /// Guarded (PROF-10): a second tap while the first is on its way does
+  /// nothing, rather than signing out and navigating a second time.
   Future<void> logout() async {
-    await _auth.logout();
+    if (isLoggingOut.value) return;
+    isLoggingOut.value = true;
 
-    showSuccessSnackbar('Anda berhasil logout.', title: 'Berhasil');
-    Get.offAllNamed(AuthRoutes.login);
+    try {
+      final confirmed = await _auth.logout();
+
+      if (confirmed) {
+        showSuccessSnackbar(signedOutMessage(confirmed: true));
+      } else {
+        showInfoSnackbar(signedOutMessage(confirmed: false), title: 'Keluar');
+      }
+      Get.offAllNamed(AuthRoutes.login);
+    } finally {
+      isLoggingOut.value = false;
+    }
   }
+
+  /// True while a sign-out, or a change of workspace, is under way.
+  final RxBool isLoggingOut = false.obs;
+
+  /// What to say once signed out (PROF-10). The handset is signed out either
+  /// way; whether the server heard of it is the difference worth saying.
+  static String signedOutMessage({required bool confirmed}) => confirmed
+      ? 'Anda berhasil logout.'
+      : 'Anda sudah keluar dari perangkat ini. Server tidak dapat dihubungi, '
+            'jadi sesi di server akan berakhir dengan sendirinya.';
 
   /// Hand this handset to another company.
   ///
@@ -155,13 +214,20 @@ class ProfileController extends GetxController {
   /// anywhere else, so leaving it behind would strand a credential that can
   /// never be used and never be revoked from here.
   Future<void> switchWorkspace() async {
-    await _auth.logout();
-    await _tenantContext.clear();
+    if (isLoggingOut.value) return;
+    isLoggingOut.value = true;
 
-    showInfoSnackbar(
-      'Workspace dilepas. Masukkan kode workspace yang baru.',
-      title: 'Pindah Workspace',
-    );
-    Get.offAllNamed(SetupRoutes.setup);
+    try {
+      await _auth.logout();
+      await _tenantContext.clear();
+
+      showInfoSnackbar(
+        'Workspace dilepas. Masukkan kode workspace yang baru.',
+        title: 'Pindah Workspace',
+      );
+      Get.offAllNamed(SetupRoutes.setup);
+    } finally {
+      isLoggingOut.value = false;
+    }
   }
 }

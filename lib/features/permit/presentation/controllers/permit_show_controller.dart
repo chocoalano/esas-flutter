@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 
 import '../../../../core/ui/dialogs/app_snackbar.dart';
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/network/idempotency_key.dart';
 import '../../../../core/utils/json_parsers.dart';
 import '../../data/models/leave_list.dart';
 import '../../data/models/leave_type.dart';
@@ -21,6 +22,19 @@ class PermitShowController extends GetxController {
   final permitType = Rx<LeaveType?>(null);
 
   int get currentUserId => _repository.currentUserId ?? 0;
+
+  /// One controller per permit on the stack (PRMT-09).
+  ///
+  /// A notification for permit B, tapped while A is open, pushes a second
+  /// detail screen. Registered without a tag, the second screen was handed A's
+  /// controller — `lazyPut` of a registered type does nothing — and showed A,
+  /// and approved A. The binding, the page and the view all derive the tag
+  /// from the route's arguments, so each screen finds its own.
+  static String tagFor(Object? arguments) {
+    final id = arguments is Map ? asInt(arguments['id']) : null;
+
+    return id == null ? 'permit' : 'permit-$id';
+  }
 
   @override
   void onInit() {
@@ -69,6 +83,13 @@ class PermitShowController extends GetxController {
 
   /// Work out whether this employee is one of the approvers, and still owes a
   /// decision.
+  ///
+  /// The tier the server marks `is_current`, not the first row with this
+  /// person's id (PRMT-04). In a small company the line approver and the
+  /// manager are often the same person: their first row is the one they have
+  /// already answered, and the request then waits on their second, which the
+  /// old lookup never reached — the screen said "already approved" and the
+  /// request stalled.
   void _evaluateApproval() {
     final current = permit.value;
 
@@ -78,35 +99,110 @@ class PermitShowController extends GetxController {
       return;
     }
 
-    final mine = current.approvals.firstWhereOrNull(
-      (a) => a.userId == currentUserId,
-    );
+    final mine = current.approvals
+        .where((a) => a.userId == currentUserId)
+        .toList();
+    final serverSaysWhich = current.approvals.any((a) => a.isCurrent != null);
 
-    myApproval.value = mine;
-    // `'w'` is waiting. The original dereferenced `userApprove!` here, which
-    // throws on an approval row that has not been populated yet.
-    canApprove.value = mine != null && mine.userApprove?.toLowerCase() == 'w';
+    final owed = serverSaysWhich
+        ? mine.firstWhereOrNull((a) => a.isCurrent == true && a.isWaiting)
+        // A server that predates `is_current`: the first tier still waiting.
+        : mine.firstWhereOrNull((a) => a.isWaiting);
+
+    // Nothing owed: show what this person last decided, if anything.
+    myApproval.value =
+        owed ?? mine.where((a) => !a.isWaiting).lastOrNull ?? mine.firstOrNull;
+    canApprove.value = owed != null;
   }
 
+  /// The attachment is being fetched.
+  final RxBool isDownloading = false.obs;
+
+  /// Fetch this permit's attachment through the session (PRMT-03).
+  ///
+  /// The file is private to the tenant; opening it by a public address used
+  /// to fail for exactly the approver who had to read it.
+  Future<PermitAttachment?> downloadAttachment() async {
+    final file = permit.value?.file;
+
+    if (file == null || file.isEmpty || isDownloading.value) return null;
+
+    isDownloading.value = true;
+
+    try {
+      return await _repository.attachment(permitId: permitId.value, file: file);
+    } on ApiException catch (error) {
+      showErrorSnackbar(error.message);
+      return null;
+    } finally {
+      isDownloading.value = false;
+    }
+  }
+
+  /// A decision is being sent. Both buttons wait for it (PRMT-01).
+  final RxBool isSubmitting = false.obs;
+
+  _DecisionIntent? _intent;
+
+  /// Send this person's decision on the tier they owe.
+  ///
+  /// One decision is one request (PRMT-01). The key is minted once per
+  /// decision and kept while the outcome is unknown — a timeout, a server
+  /// error, a request the server says is still in progress — so trying again
+  /// is the same request, which the server replays instead of applying to the
+  /// next tier this same person may also hold.
   Future<void> submitApproval({required bool approve, String? notes}) async {
+    if (isSubmitting.value) return;
+
     final approval = myApproval.value;
     final approvalId = approval?.id;
 
-    if (approvalId == null) {
+    if (approvalId == null || !canApprove.value) {
       showErrorSnackbar(
         'Tidak ada peran persetujuan untuk Anda pada perizinan ini.',
       );
       return;
     }
 
-    isLoading.value = true;
+    isSubmitting.value = true;
 
     try {
+      var intent = _intent;
+
+      if (intent != null && !intent.isSameAs(approvalId, approve, notes)) {
+        // A different decision while an earlier one may already have been
+        // recorded. Find out first: if it was, the tier has moved and this
+        // decision would land on the next one.
+        await loadPermitDetails();
+        _intent = null;
+
+        if (!canApprove.value || myApproval.value?.id != approvalId) {
+          showWarningSnackbar(
+            'Status pengajuan sudah berubah. Periksa kembali sebelum '
+            'memutuskan.',
+          );
+          return;
+        }
+
+        intent = null;
+      }
+
+      intent ??= _DecisionIntent(
+        approvalId: approvalId,
+        approve: approve,
+        notes: notes,
+        key: IdempotencyKey.mint(),
+      );
+      _intent = intent;
+
       await _repository.approve(
         permitId: permitId.value,
         approve: approve,
         notes: notes,
+        idempotencyKey: intent.key,
       );
+
+      _intent = null;
 
       showSuccessSnackbar(
         approve
@@ -117,8 +213,41 @@ class PermitShowController extends GetxController {
       await loadPermitDetails();
     } on ApiException catch (error) {
       showErrorSnackbar(error.message);
+
+      if (!_outcomeUnknown(error)) {
+        // The server's final word. Let go of the key, and show the request as
+        // it now stands rather than a bar that will be refused again.
+        _intent = null;
+        await loadPermitDetails();
+      }
     } finally {
-      isLoading.value = false;
+      isSubmitting.value = false;
     }
   }
+
+  /// Whether the decision may have been recorded although no answer said so.
+  static bool _outcomeUnknown(ApiException error) =>
+      error.isTransportFailure ||
+      (error.status ?? 0) >= 500 ||
+      error.status == 429 ||
+      error.code == 'idempotency_in_progress';
+}
+
+class _DecisionIntent {
+  const _DecisionIntent({
+    required this.approvalId,
+    required this.approve,
+    required this.notes,
+    required this.key,
+  });
+
+  final int approvalId;
+  final bool approve;
+  final String? notes;
+  final String key;
+
+  bool isSameAs(int approvalId, bool approve, String? notes) =>
+      this.approvalId == approvalId &&
+      this.approve == approve &&
+      (this.notes ?? '') == (notes ?? '');
 }

@@ -6,7 +6,7 @@ import '../../data/repositories/attendance_repository.dart';
 
 class OvertimeListController extends GetxController {
   OvertimeListController({required AttendanceRepository repository})
-      : _repository = repository;
+    : _repository = repository;
 
   final AttendanceRepository _repository;
 
@@ -36,4 +36,3 @@ class OvertimeListController extends GetxController {
     }
   }
 }
-

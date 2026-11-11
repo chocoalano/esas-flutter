@@ -37,10 +37,9 @@ class OvertimeEntry {
   bool get isPending => !isApproved && !isRejected;
 
   String get statusLabel => switch (status.toLowerCase()) {
-        'approved' => 'Disetujui',
-        'rejected' => 'Ditolak',
-        'pending' || 'waiting' => 'Menunggu',
-        _ => status,
-      };
+    'approved' => 'Disetujui',
+    'rejected' => 'Ditolak',
+    'pending' || 'waiting' => 'Menunggu',
+    _ => status,
+  };
 }
-

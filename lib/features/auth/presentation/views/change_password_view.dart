@@ -46,6 +46,7 @@ class ChangePasswordView extends GetView<ChangePasswordController> {
         ),
         body: SafeArea(
           child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.xxl,
               AppSpacing.xxl,

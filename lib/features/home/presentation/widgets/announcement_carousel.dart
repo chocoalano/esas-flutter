@@ -224,7 +224,8 @@ class _AnnouncementCard extends StatelessWidget {
 
     return AppCard(
       onTap: () =>
-          Get.offAllNamed(HomeRoutes.announcementDetail, arguments: item.id),
+          // Pushed, so back returns to the home screen (HOME-02).
+          Get.toNamed(HomeRoutes.announcementDetail, arguments: item.id),
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
