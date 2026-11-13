@@ -1,0 +1,29 @@
+#!/bin/sh
+# Opt-in pre-commit secret guard for esas-selfservices.
+#
+# Check-only: it reads what is staged and never changes a file or the index.
+# It is NOT active until the repository owner enables it, once per clone:
+#
+#   git config core.hooksPath .githooks
+#
+# and disables it again with:
+#
+#   git config --unset core.hooksPath
+#
+# (core.hooksPath replaces .git/hooks for this clone; that directory holds only
+# Git's *.sample files today.)
+#
+# The same check by hand, with python3 (standard library only):
+#
+#   python3 tool/secret-guard.py                  # the staged files
+#   python3 tool/secret-guard.py --all-tracked    # every tracked file
+#   python3 tool/secret-guard.py -- PATH...       # files on disk
+
+root=$(git rev-parse --show-toplevel) || exit 1
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo 'secret-guard: python3 is not installed, so the staged files could not be checked; commit refused.' >&2
+    exit 1
+fi
+
+exec python3 -I "$root/tool/secret-guard.py"

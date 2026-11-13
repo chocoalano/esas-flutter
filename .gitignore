@@ -46,8 +46,11 @@ app.*.map.json
 
 # ─── Secrets & signing material ───────────────────────────────────────────
 # NOTE: adding a path here does NOT untrack a file already committed.
-# `esas-keystore.jks` remains tracked and remains in Git history.
-# See docs/refactoring/04-risk-register.md R-01 for the required remediation.
+# `esas-keystore.jks` is no longer tracked (removed from the index in bff0340,
+# 2026-11-11) but it remains in Git history: treat that key as leaked and
+# retired. See docs/refactoring/04-risk-register.md R-01.
+# tool/secret-guard.py refuses the same material at commit time, including in
+# a file Git already tracks.
 
 # Android signing
 *.jks
@@ -57,16 +60,35 @@ android/key.properties
 android/local.properties
 
 # Environment configuration
-.env
-.env.*
+.env*
 !.env.example
+
+# Google service account keys (server credentials, never app config).
+# google-services.json, GoogleService-Info.plist and lib/firebase_options.dart
+# are public client configuration the build needs: they stay tracked.
+firebase-adminsdk*.json
+*service-account*.json
 
 # Certificates & provisioning
 *.p12
+*.pfx
+*.p8
 *.pem
 *.cer
 *.certSigningRequest
 *.mobileprovision
+
+# Release artifacts and their export metadata. Already-tracked copies under
+# `ios/Runner 2025-*/` are not untracked by this; see the secret guard.
+*.apk
+*.aab
+*.ipa
+*.xcarchive/
+**/ExportOptions.plist
+**/DistributionSummary.plist
+/android/build/
+/android/app/build/
+/ios/build/
 
 # iOS
 ios/Flutter/flutter_export_environment.sh

@@ -121,7 +121,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
     final idText = identifier.isNotEmpty ? identifier : '[Isi NIP Anda]';
     final text =
         'Halo Tim HR / IT Administrator,\n'
-        'Saya membutuhkan bantuan untuk reset kata sandi akun ESAS.\n'
+        'Saya membutuhkan bantuan untuk reset kata sandi akun Absensas.\n'
         'NIP/Email: $idText\n'
         'Mohon bantuan petunjuk atau reset akun saya. Terima kasih.';
 

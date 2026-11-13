@@ -18,6 +18,14 @@ class DeviceErrorCodes {
   static const challengeExpired = 'CHALLENGE_EXPIRED';
   static const challengeReused = 'CHALLENGE_REUSED';
   static const enrollmentDisabled = 'DEVICE_ENROLLMENT_DISABLED';
+
+  /// 429 on the device routes: too many requests in a short time — a shift
+  /// start behind one office IP (Putaran 9).
+  static const tooManyRequests = 'TOO_MANY_REQUESTS';
+
+  /// 503 on the device-proof routes: the rate limiter cannot reach its store.
+  /// A controlled refusal, with `Retry-After`, not a server error.
+  static const rateLimiterUnavailable = 'RATE_LIMITER_UNAVAILABLE';
 }
 
 /// Why attendance is not available on this phone, as `device.attendance_block`

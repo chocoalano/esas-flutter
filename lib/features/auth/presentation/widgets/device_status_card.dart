@@ -26,6 +26,7 @@ class DeviceStatusCard extends StatelessWidget {
     this.onEnterCode,
     this.onRetry,
     this.onContinue,
+    this.retryIn,
   });
 
   final DeviceGateStatus status;
@@ -42,6 +43,13 @@ class DeviceStatusCard extends StatelessWidget {
 
   /// "Lanjut ke Absensi" — only where attendance is not yet gated.
   final VoidCallback? onContinue;
+
+  /// Time left before the server accepts another try (429, 503). While it
+  /// runs, the retry button is disabled and counts down instead of letting a
+  /// queue of people tap the limit higher.
+  final Duration? retryIn;
+
+  bool get _waiting => retryIn != null && retryIn! > Duration.zero;
 
   bool get _canEnroll => device?.enrollmentAvailable ?? false;
 
@@ -150,12 +158,15 @@ class DeviceStatusCard extends StatelessWidget {
       if (content.retryLabel != null && onRetry != null)
         AppButton(
           wrapLabel: true,
-          label: content.retryLabel!,
-          icon: Icons.refresh_rounded,
+          label: _waiting
+              ? 'Coba lagi dalam ${(retryIn!.inMilliseconds / 1000).ceil()} '
+                    'detik'
+              : content.retryLabel!,
+          icon: _waiting ? Icons.hourglass_top_rounded : Icons.refresh_rounded,
           variant: content.offersCode
               ? AppButtonVariant.outlined
               : AppButtonVariant.filled,
-          onPressed: onRetry,
+          onPressed: _waiting ? null : onRetry,
         ),
       if (status == DeviceGateStatus.offerEnrollment && onContinue != null)
         AppButton(
@@ -270,13 +281,36 @@ class DeviceStatusCard extends StatelessWidget {
       message: deviceSessionEndedMessage,
       toneOf: _info,
     ),
-    DeviceGateStatus.failed => _CardContent(
+    // Busy at a shift start (429): not the person's fault, so not "terlalu
+    // banyak percobaan" — the limit is usually the office's (Putaran 9).
+    DeviceGateStatus.failed when failure == DeviceProofFailure.rateLimited =>
+      const _CardContent(
+        icon: Icons.groups_2_outlined,
+        title: 'Pemeriksaan Perangkat Sedang Ramai',
+        message:
+            'Terlalu banyak permintaan dalam waktu singkat, biasanya saat jam '
+            'masuk. Tunggu sebentar, lalu coba lagi.',
+        retryLabel: 'Coba Lagi',
+        toneOf: _warning,
+      ),
+    // The rate limiter is down (503): temporary, and when to stop waiting.
+    DeviceGateStatus.failed
+        when failure == DeviceProofFailure.limiterUnavailable =>
+      const _CardContent(
+        icon: Icons.cloud_off_rounded,
+        title: 'Pemeriksaan Perangkat Belum Tersedia',
+        message:
+            'Pemeriksaan perangkat sedang tidak tersedia untuk sementara. Coba '
+            'lagi sebentar lagi. Bila berlanjut, hubungi HR.',
+        retryLabel: 'Coba Lagi',
+        toneOf: _warning,
+      ),
+    DeviceGateStatus.failed => const _CardContent(
       icon: Icons.error_outline_rounded,
       title: 'Perangkat Belum Dapat Diverifikasi',
-      message: failure == DeviceProofFailure.rateLimited
-          ? 'Terlalu banyak percobaan. Tunggu sebentar, lalu coba lagi.'
-          : 'Terjadi kendala saat memeriksa perangkat absensi. Coba lagi '
-                'beberapa saat lagi. Bila berulang, hubungi HR.',
+      message:
+          'Terjadi kendala saat memeriksa perangkat absensi. Coba lagi '
+          'beberapa saat lagi. Bila berulang, hubungi HR.',
       retryLabel: 'Coba Lagi',
       toneOf: _danger,
     ),

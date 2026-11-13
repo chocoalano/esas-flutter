@@ -5,9 +5,11 @@ class AppVersionService {
 
   static String _version = '';
   static String _buildNumber = '';
+  static String _packageName = '';
 
   static String get version => _version;
   static String get buildNumber => _buildNumber;
+  static String get packageName => _packageName;
 
   static String get displayVersion =>
       _version.isEmpty ? '' : 'v$_version ($_buildNumber)';
@@ -16,5 +18,6 @@ class AppVersionService {
     final info = await PackageInfo.fromPlatform();
     _version = info.version;
     _buildNumber = info.buildNumber;
+    _packageName = info.packageName;
   }
 }

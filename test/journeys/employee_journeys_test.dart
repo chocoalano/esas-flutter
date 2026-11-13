@@ -1,4 +1,9 @@
+import 'package:esas/core/network/api_exception.dart';
+import 'package:esas/core/storage/local_storage.dart';
 import 'package:esas/core/ui/components/app_button.dart';
+import 'package:esas/features/app_update/data/app_version_info.dart';
+import 'package:esas/features/app_update/presentation/app_update_controller.dart';
+import 'package:esas/features/app_update/presentation/app_update_gate.dart';
 import 'package:esas/features/attendance/presentation/views/attendance_view.dart';
 import 'package:esas/features/auth/data/models/device_status.dart';
 import 'package:esas/features/auth/presentation/views/login_view.dart';
@@ -451,5 +456,260 @@ void main() {
     expect(j.taps, 12);
     expect(j.inputs, 8);
     await finish(tester, j);
+  });
+
+  testWidgets('J9 busy shift: 429 at the Absensi door → the retry waits as '
+      'long as the server asked → attendance ready; no retry storm', (
+    tester,
+  ) async {
+    final world = JourneyWorld();
+    world.server.enrolledFingerprint = world.keystore.seed(world.alias);
+    world.server.challengeRefusals.add(
+      const ApiException(
+        'Too Many Attempts.',
+        status: 429,
+        code: 'TOO_MANY_REQUESTS',
+        retryAfter: Duration(seconds: 20),
+      ),
+    );
+    await world.boot(tester);
+    final j = JourneyRecorder('J9 busy shift', tester);
+
+    await signIn(j);
+    j.screen('Beranda');
+    await j.tap(find.text('Buka Absensi'));
+
+    j.screen('Absensi: sedang ramai');
+    j.failurePoint('429 TOO_MANY_REQUESTS, Retry-After 20');
+    expect(find.text('Pemeriksaan Perangkat Sedang Ramai'), findsOneWidget);
+    expect(world.server.challengeRequests, 1);
+
+    // Impatient taps while it counts down reach nothing.
+    for (var i = 0; i < 3; i++) {
+      await tester.tap(
+        find.textContaining('Coba lagi dalam'),
+        warnIfMissed: false,
+      );
+      await tester.pump(const Duration(seconds: 1));
+    }
+    expect(world.server.challengeRequests, 1);
+
+    await tester.pump(const Duration(seconds: 18));
+    await j.tap(button('Coba Lagi'));
+
+    j.screen('Absensi: siap');
+    expect(find.byType(AttendanceView), findsOneWidget);
+    expect(world.server.challengeRequests, 2);
+    expect(world.server.proofs, 1);
+    expect(world.session.token, isNotNull, reason: 'never signed out');
+    expect(j.taps, 3);
+    expect(j.inputs, 2);
+    await finish(tester, j);
+  });
+
+  testWidgets('J9b rate limiter down: 503 → HR named if it lasts → retry '
+      'after 30 s → attendance ready', (tester) async {
+    final world = JourneyWorld();
+    world.server.enrolledFingerprint = world.keystore.seed(world.alias);
+    world.server.challengeRefusals.add(
+      const ApiException(
+        'Pemeriksaan perangkat sedang tidak tersedia.',
+        status: 503,
+        code: 'RATE_LIMITER_UNAVAILABLE',
+        retryAfter: Duration(seconds: 30),
+      ),
+    );
+    await world.boot(tester);
+    final j = JourneyRecorder('J9b limiter down', tester);
+
+    await signIn(j);
+    j.screen('Beranda');
+    await j.tap(find.text('Buka Absensi'));
+
+    j.screen('Absensi: belum tersedia');
+    j.failurePoint('503 RATE_LIMITER_UNAVAILABLE, Retry-After 30');
+    expect(find.text('Pemeriksaan Perangkat Belum Tersedia'), findsOneWidget);
+    expect(find.textContaining('hubungi HR'), findsOneWidget);
+    // Counting down already (the journey's frames advanced the clock).
+    expect(find.textContaining('Coba lagi dalam'), findsOneWidget);
+    expect(find.text('Coba Lagi'), findsNothing);
+
+    await tester.pump(const Duration(seconds: 31));
+    await j.tap(button('Coba Lagi'));
+
+    j.screen('Absensi: siap');
+    expect(find.byType(AttendanceView), findsOneWidget);
+    expect(world.server.challengeRequests, 2);
+    expect(world.session.token, isNotNull);
+    expect(j.taps, 3);
+    await finish(tester, j);
+  });
+
+  /// The update journey of Slice U. The link is the one the Console sets
+  /// (`/selfservice.apk`), which the server redirects to a Google Drive share
+  /// page; what happens in Drive and in Android's installer is outside the app
+  /// and is not counted here.
+  AppUpdateController updateController({
+    required int Function() installed,
+    required List<Uri> opened,
+  }) => Get.put(
+    AppUpdateController(
+      fetchLatest: () async => const AppVersionInfo(
+        version: '1.0.2',
+        buildNumber: 3,
+        forceUpdate: true,
+        downloadUrl: 'https://absensas.com/selfservice.apk',
+      ),
+      installedBuild: () async => installed(),
+      openUrl: (url) async {
+        opened.add(url);
+        return true;
+      },
+      storage: InMemoryLocalStorage(),
+      interval: const Duration(hours: 1),
+    ),
+  );
+
+  /// Leave for Drive and the installer, then come back to the app.
+  Future<void> leaveAndReturn(WidgetTester tester) async {
+    for (final state in const [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    await settle(tester);
+  }
+
+  testWidgets('J10 forced update via Drive: steps shown before leaving → back '
+      'without installing, still covered → installed → sign in', (
+    tester,
+  ) async {
+    var installed = 2;
+    final opened = <Uri>[];
+    updateController(installed: () => installed, opened: opened);
+    final world = JourneyWorld();
+    await world.boot(
+      tester,
+      builder: (context, child) => AppUpdateGate(child: child!),
+    );
+    final j = JourneyRecorder('J10 update via Drive', tester);
+
+    j.screen('Pembaruan Wajib');
+    expect(find.text('Pembaruan Wajib'), findsOneWidget);
+    expect(find.text('Cara memasang'), findsOneWidget);
+    expect(find.textContaining('Google Drive'), findsOneWidget);
+    await j.tap(find.byKey(const Key('app-update-download')));
+    expect(opened.single.toString(), 'https://absensas.com/selfservice.apk');
+
+    j.failurePoint(
+      'outside the app: Drive page → Download → open .apk → '
+      'allow this source → Update',
+    );
+    await leaveAndReturn(tester);
+
+    j.screen('Pembaruan Wajib (kembali, belum dipasang)');
+    expect(find.text('Pembaruan Wajib'), findsOneWidget);
+    expect(
+      find.text('Terpasang: build 2 · Dibutuhkan: build 3'),
+      findsOneWidget,
+    );
+
+    installed = 3;
+    await leaveAndReturn(tester);
+
+    expect(find.text('Pembaruan Wajib'), findsNothing);
+    await signIn(j);
+    j.screen('Beranda');
+    expect(find.text('Buka Absensi'), findsOneWidget);
+    expect(opened, hasLength(1), reason: 'nothing reopened Drive by itself');
+    expect(j.taps, 2);
+    expect(j.inputs, 2);
+    await finish(tester, j);
+    await Get.delete<AppUpdateController>(force: true);
+  });
+
+  testWidgets('J10b the installed file reports the old build: the screen '
+      'returns, and says who to call with which builds', (tester) async {
+    final opened = <Uri>[];
+    updateController(installed: () => 2, opened: opened);
+    final world = JourneyWorld();
+    await world.boot(
+      tester,
+      builder: (context, child) => AppUpdateGate(child: child!),
+    );
+    final j = JourneyRecorder('J10b update loop', tester);
+
+    j.screen('Pembaruan Wajib');
+    await j.tap(find.byKey(const Key('app-update-download')));
+    j.failurePoint('installed APK has versionCode 2, the Console asks for 3');
+    await leaveAndReturn(tester);
+
+    j.screen('Pembaruan Wajib (lagi)');
+    expect(find.text('Pembaruan Wajib'), findsOneWidget);
+    expect(find.textContaining('hubungi HR/IT'), findsOneWidget);
+    expect(
+      find.text('Terpasang: build 2 · Dibutuhkan: build 3'),
+      findsOneWidget,
+    );
+    expect(opened, hasLength(1), reason: 'no loop of reopening Drive');
+    expect(j.taps, 1);
+    j.record();
+    await Get.delete<AppUpdateController>(force: true);
+  });
+
+  testWidgets('J11 a replacement arrives: notice → Unduh Aplikasi Baru → '
+      'Nanti → the app is still usable', (tester) async {
+    final opened = <Uri>[];
+    Get.put(
+      AppUpdateController(
+        // Forced update on the record too: the replacement must win, the
+        // old-package gate must not cover the app.
+        fetchLatest: () async => AppVersionInfo.fromJson({
+          'version': '1.0.2',
+          'build_number': 3,
+          'force_update': true,
+          'download_url': 'https://absensas.com/selfservice.apk',
+          'replacement': {
+            'package': 'com.absensas.app',
+            'download_url': 'https://absensas.com/absensas-baru.apk',
+          },
+        }),
+        installedBuild: () async => 2,
+        installedPackage: () async => 'com.example.esas',
+        openUrl: (url) async {
+          opened.add(url);
+          return true;
+        },
+        storage: InMemoryLocalStorage(),
+        interval: const Duration(hours: 1),
+      ),
+    );
+    final world = JourneyWorld();
+    await world.boot(
+      tester,
+      builder: (context, child) => AppUpdateGate(child: child!),
+    );
+    final j = JourneyRecorder('J11 migration notice', tester);
+
+    j.screen('Pemberitahuan pindah aplikasi');
+    expect(find.text('Absensas Pindah ke Aplikasi Resmi Baru'), findsOneWidget);
+    expect(find.text('Pembaruan Wajib'), findsNothing);
+    await j.tap(find.text('Unduh Aplikasi Baru'));
+    expect(opened.single.toString(), 'https://absensas.com/absensas-baru.apk');
+
+    await j.tap(find.text('Nanti'));
+    expect(find.text('Absensas Pindah ke Aplikasi Resmi Baru'), findsNothing);
+
+    await signIn(j);
+    j.screen('Beranda');
+    expect(find.text('Buka Absensi'), findsOneWidget);
+    expect(opened, hasLength(1));
+    await finish(tester, j);
+    await Get.delete<AppUpdateController>(force: true);
   });
 }

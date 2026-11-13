@@ -38,11 +38,20 @@ enum DeviceGateStatus {
 }
 
 class DeviceGateDecision {
-  const DeviceGateDecision(this.status, {this.device, this.failure});
+  const DeviceGateDecision(
+    this.status, {
+    this.device,
+    this.failure,
+    this.retryAfter,
+  });
 
   final DeviceGateStatus status;
   final DeviceStatus? device;
   final DeviceProofFailure? failure;
+
+  /// How long the server asked to wait before the next try (429, 503). The
+  /// screen keeps its retry disabled for that long.
+  final Duration? retryAfter;
 
   bool get isReady => status == DeviceGateStatus.ready;
 }
@@ -208,7 +217,11 @@ class DeviceProofGate {
 
     final decision = await _prove();
 
-    if (decision.status == DeviceGateStatus.offline) {
+    // Answers that say "not now" rather than "no" leave the retry for later:
+    // no connection, a busy shift (429), a rate limiter that is down (503).
+    if (decision.status == DeviceGateStatus.offline ||
+        decision.failure == DeviceProofFailure.rateLimited ||
+        decision.failure == DeviceProofFailure.limiterUnavailable) {
       _refusalReproveSpent = false;
     }
 
@@ -262,9 +275,15 @@ class DeviceProofGate {
       DeviceProofFailure.invalidCode ||
       DeviceProofFailure.challengeExpired ||
       DeviceProofFailure.rateLimited ||
+      DeviceProofFailure.limiterUnavailable ||
       DeviceProofFailure.failed => DeviceGateStatus.failed,
     };
 
-    return DeviceGateDecision(status, device: device, failure: error.failure);
+    return DeviceGateDecision(
+      status,
+      device: device,
+      failure: error.failure,
+      retryAfter: error.retryAfter,
+    );
   }
 }

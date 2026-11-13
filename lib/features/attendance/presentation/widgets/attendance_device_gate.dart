@@ -9,6 +9,7 @@ import '../../../../core/ui/controllers/bottom_nav_controller.dart';
 import '../../../../core/ui/dialogs/app_dialogs.dart';
 import '../../../auth/data/models/device_status.dart';
 import '../../../auth/data/repositories/device_proof_gate.dart';
+import '../../../auth/data/repositories/device_proof_repository.dart';
 import '../../../auth/presentation/bindings/device_bindings.dart';
 import '../../../auth/presentation/routes/device_routes.dart';
 import '../../../auth/presentation/widgets/device_session_notice.dart';
@@ -123,11 +124,41 @@ class _AttendanceDeviceGateState extends State<AttendanceDeviceGate> {
     setState(() => _decision = confirmed);
   }
 
+  /// Seconds before the server takes another try, after a 429 or a 503
+  /// (Putaran 9). The card's retry stays disabled meanwhile; nothing retries on
+  /// its own.
+  int _retryIn = 0;
+  Timer? _retryTimer;
+
   @override
   void dispose() {
+    _retryTimer?.cancel();
     _refusalWorker?.dispose();
     _receiptWorker?.dispose();
     super.dispose();
+  }
+
+  void _waitBeforeRetry(Duration? wait) {
+    _retryTimer?.cancel();
+    _retryIn = wait == null ? 0 : (wait.inMilliseconds / 1000).ceil();
+
+    if (_retryIn <= 0) return;
+
+    _retryTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      setState(() {
+        _retryIn--;
+
+        if (_retryIn <= 0) {
+          _retryIn = 0;
+          timer.cancel();
+        }
+      });
+    });
   }
 
   Future<void> _settle(Future<DeviceGateDecision> step) async {
@@ -142,6 +173,7 @@ class _AttendanceDeviceGateState extends State<AttendanceDeviceGate> {
     setState(() {
       _busy = false;
       _decision = decision;
+      _waitBeforeRetry(decision.retryAfter);
     });
   }
 
@@ -184,7 +216,11 @@ class _AttendanceDeviceGateState extends State<AttendanceDeviceGate> {
   void _retry() {
     final gate = _gate;
 
-    if (gate != null) _run(gate.refresh);
+    // The button is disabled while the server's wait runs; this is the guard
+    // behind it.
+    if (gate == null || _retryIn > 0) return;
+
+    _run(gate.refresh);
   }
 
   void _continue() {
@@ -270,6 +306,36 @@ class _AttendanceDeviceGateState extends State<AttendanceDeviceGate> {
             code: 'device_proof_offline',
           ),
         );
+      // Putaran 9: a busy shift (429) or a rate limiter that is down (503) is
+      // "not now", said as such — never "hubungi HR" for a crowd.
+      case DeviceGateStatus.failed
+          when decision.failure == DeviceProofFailure.rateLimited:
+        final wait = decision.retryAfter;
+        _replace(
+          controller,
+          AttendanceRefusal(
+            kind: RefusalKind.transient,
+            message: wait == null
+                ? 'Pemeriksaan perangkat sedang ramai. Tunggu sebentar, lalu '
+                      'coba lagi.'
+                : 'Pemeriksaan perangkat sedang ramai. Tunggu '
+                      '${(wait.inMilliseconds / 1000).ceil()} detik, lalu coba '
+                      'lagi.',
+            code: 'device_proof_busy',
+          ),
+        );
+      case DeviceGateStatus.failed
+          when decision.failure == DeviceProofFailure.limiterUnavailable:
+        _replace(
+          controller,
+          const AttendanceRefusal(
+            kind: RefusalKind.transient,
+            message:
+                'Pemeriksaan perangkat sedang tidak tersedia untuk sementara. '
+                'Coba lagi sebentar lagi. Bila berlanjut, hubungi HR.',
+            code: 'device_proof_unavailable',
+          ),
+        );
       case DeviceGateStatus.failed ||
           DeviceGateStatus.needsProof ||
           DeviceGateStatus.offerEnrollment:
@@ -347,6 +413,7 @@ class _AttendanceDeviceGateState extends State<AttendanceDeviceGate> {
                 onEnterCode: _enterCode,
                 onRetry: _retry,
                 onContinue: _continue,
+                retryIn: _retryIn > 0 ? Duration(seconds: _retryIn) : null,
               ),
             ],
           ),

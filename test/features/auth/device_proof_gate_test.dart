@@ -301,6 +301,41 @@ void main() {
     });
   });
 
+  group('busy shift and a rate limiter that is down (Putaran 9)', () {
+    setUp(() => deviceIs(proven));
+
+    for (final failure in [
+      DeviceProofFailure.rateLimited,
+      DeviceProofFailure.limiterUnavailable,
+    ]) {
+      test('${failure.name}: the wait travels with the decision', () async {
+        now = proven.proofValidUntil!;
+        when(() => repository.prove()).thenThrow(
+          DeviceProofException(
+            failure,
+            retryAfter: const Duration(seconds: 20),
+          ),
+        );
+
+        final decision = await gate.ensureReady();
+
+        expect(decision.status, DeviceGateStatus.failed);
+        expect(decision.failure, failure);
+        expect(decision.retryAfter, const Duration(seconds: 20));
+      });
+
+      test('${failure.name}: a re-proof that met it does not spend the one '
+          'automatic retry', () async {
+        when(() => repository.prove()).thenThrow(DeviceProofException(failure));
+
+        await gate.reproveAfterRefusal();
+        await gate.reproveAfterRefusal();
+
+        verify(() => repository.prove()).called(2);
+      });
+    }
+  });
+
   group('refresh', () {
     test('asks the server, then decides', () async {
       deviceIs(

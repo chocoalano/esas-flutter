@@ -1,15 +1,37 @@
-# Release signing credentials. Copy to `android/key.properties` and fill in.
+# Release signing credentials. Copy to `android/key.properties` and fill in -
+# or keep the passwords out of every file and set ABSENSAS_SIGNING_* instead.
 #
 # This file is an example and is committed. `key.properties` itself is not, and
 # must never be: it names a keystore and carries its passwords.
-# Keystore files (*.jks, *.keystore) must NEVER be placed in this repository.
+# Keystore files (*.jks, *.keystore, *.p12, *.pfx) must NEVER be placed in this
+# repository.
 #
 # A debug build needs none of this. Gradle only asks for these when a release is
 # actually being built (`assembleRelease` / `bundleRelease`), and refuses to
 # produce an unsigned one — see `android/app/build.gradle.kts`.
+#
+# Retired keys: a release whose keystore file is named `upload-keystore.jks` or
+# `esas-keystore.jks` is refused for com.absensas.app. Sign with the Absensas key.
+#
+# Every value below can come from the environment instead, and the environment
+# wins over this file: ABSENSAS_SIGNING_STORE_FILE, ABSENSAS_SIGNING_STORE_PASSWORD,
+# ABSENSAS_SIGNING_KEY_ALIAS, ABSENSAS_SIGNING_KEY_PASSWORD,
+# ABSENSAS_SIGNING_STORE_TYPE. For example, passwords from the macOS Keychain:
+#
+#   # once each; `-w` last makes `security` prompt for the value
+#   security add-generic-password -a "$USER" -s absensas-signing-store -w
+#   security add-generic-password -a "$USER" -s absensas-signing-key -w
+#
+#   # per build; nothing is written to disk or to shell history
+#   ABSENSAS_SIGNING_STORE_PASSWORD="$(security find-generic-password -s absensas-signing-store -w)" \
+#   ABSENSAS_SIGNING_KEY_PASSWORD="$(security find-generic-password -s absensas-signing-key -w)" \
+#   flutter build apk --release
 
-# Path to your securely stored upload keystore OUTSIDE the repository:
-storeFile=/path/to/upload-keystore.jks
+# Path to the keystore OUTSIDE the repository. A leading `~/` is expanded.
+storeFile=~/.absensas-signing/absensas-app-signing.p12
 storePassword=
-keyAlias=upload
+keyAlias=absensas
 keyPassword=
+# Optional: PKCS12 is assumed for .p12/.pfx; otherwise the JDK default, which
+# reads PKCS12 and JKS keystores alike.
+# storeType=PKCS12

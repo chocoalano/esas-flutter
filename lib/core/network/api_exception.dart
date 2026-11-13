@@ -16,6 +16,7 @@ class ApiException implements Exception {
     this.code,
     this.errors = const {},
     this.body = const {},
+    this.retryAfter,
   });
 
   /// A sentence in Indonesian, safe to show as-is when a screen has nothing
@@ -43,6 +44,12 @@ class ApiException implements Exception {
   ///
   /// Empty when the server answered with something that was not a JSON object.
   final Map<String, dynamic> body;
+
+  /// How long the server asked to wait before trying again (`Retry-After`),
+  /// or null when it did not say. Sent with 429 and with 503
+  /// `RATE_LIMITER_UNAVAILABLE` on the device-proof routes (Putaran 9); a
+  /// screen that offers a retry before this has passed only adds load.
+  final Duration? retryAfter;
 
   /// The session is gone and the app must sign out.
   ///

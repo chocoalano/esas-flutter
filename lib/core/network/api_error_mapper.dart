@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'api_exception.dart';
 
@@ -19,6 +20,7 @@ class ApiErrorMapper {
     required int? status,
     Object? body,
     String? overrideMessage,
+    Map<String, String>? headers,
   }) {
     final map = body is Map
         ? Map<String, dynamic>.from(body)
@@ -32,6 +34,50 @@ class ApiErrorMapper {
       code: map['code']?.toString(),
       errors: errors,
       body: map,
+      retryAfter: retryAfterFrom(headers),
+    );
+  }
+
+  /// The longest wait a `Retry-After` is honoured for. A server bug or a
+  /// proxy must not lock a button for an hour.
+  static const Duration longestRetryAfter = Duration(minutes: 5);
+
+  /// `Retry-After`, as seconds or as an HTTP date, read case-insensitively.
+  /// Null when absent or unreadable; never negative; at most
+  /// [longestRetryAfter].
+  static Duration? retryAfterFrom(Map<String, String>? headers) {
+    if (headers == null) return null;
+
+    String? raw;
+    for (final entry in headers.entries) {
+      if (entry.key.toLowerCase() == 'retry-after') raw = entry.value.trim();
+    }
+
+    if (raw == null || raw.isEmpty) return null;
+
+    Duration? wait;
+    final seconds = int.tryParse(raw);
+
+    if (seconds != null) {
+      if (seconds < 0) return null;
+      wait = Duration(seconds: seconds);
+    } else {
+      try {
+        final at = HttpDate.parse(raw);
+        final left = at.difference(DateTime.now().toUtc());
+        wait = left.isNegative ? Duration.zero : left;
+      } on FormatException {
+        return null;
+      } on HttpException {
+        return null;
+      }
+    }
+
+    return Duration(
+      microseconds: math.min(
+        wait.inMicroseconds,
+        longestRetryAfter.inMicroseconds,
+      ),
     );
   }
 

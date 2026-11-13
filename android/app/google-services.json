@@ -7,6 +7,58 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:873945632876:android:c0b19484a9fa50bd138849",
+        "android_client_info": {
+          "package_name": "com.absensas.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "873945632876-btp4m0mvsoid2iptoeh48hh1fq6nrrf2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.absensas.app",
+            "certificate_hash": "b89bfaa0ba21ae0eb2f71b2e2a773de1119dc7e1"
+          }
+        },
+        {
+          "client_id": "873945632876-rsgpkhe652e6682p08nb2bnbc9pm330p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.absensas.app",
+            "certificate_hash": "c5eb1f38bad606bdf22ac6aafe5bc7b02f248f94"
+          }
+        },
+        {
+          "client_id": "873945632876-0nvqpimsrcjredm4cep0nd4p4emk1ub3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAIHQtplreVHn648SQPCNpEqvLv91tCu8E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "873945632876-0nvqpimsrcjredm4cep0nd4p4emk1ub3.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "873945632876-7ric420gt9qmjus0000ckue72r3e84dd.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.esas"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:873945632876:android:201fc1f973509f84138849",
         "android_client_info": {
           "package_name": "com.example.esas"

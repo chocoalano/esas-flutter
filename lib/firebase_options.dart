@@ -65,7 +65,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyAIHQtplreVHn648SQPCNpEqvLv91tCu8E',
-    appId: '1:873945632876:android:201fc1f973509f84138849',
+    appId: '1:873945632876:android:c0b19484a9fa50bd138849',
     messagingSenderId: '873945632876',
     projectId: 'absensascom',
     storageBucket: 'absensascom.firebasestorage.app',
@@ -73,14 +73,14 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAMsw02gNMaP6Tl2H24zum5XjbSk8XWEz0',
-    appId: '1:873945632876:ios:5711102a80f4ee7b138849',
+    appId: '1:873945632876:ios:1a65e666c3abf164138849',
     messagingSenderId: '873945632876',
     projectId: 'absensascom',
     storageBucket: 'absensascom.firebasestorage.app',
     androidClientId:
         '873945632876-a5khis8bnkcmd2uis158ir5ch0o7f12g.apps.googleusercontent.com',
     iosClientId:
-        '873945632876-7ric420gt9qmjus0000ckue72r3e84dd.apps.googleusercontent.com',
-    iosBundleId: 'com.example.esas',
+        '873945632876-julomt17gb5fbr1667ehrdjfj39uthfk.apps.googleusercontent.com',
+    iosBundleId: 'com.absensas.app',
   );
 }

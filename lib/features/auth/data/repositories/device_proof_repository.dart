@@ -37,8 +37,11 @@ enum DeviceProofFailure {
   /// No connection to the server.
   offline,
 
-  /// 429.
+  /// 429: too many requests in a short time (`TOO_MANY_REQUESTS`).
   rateLimited,
+
+  /// 503 `RATE_LIMITER_UNAVAILABLE`: the device check is briefly unavailable.
+  limiterUnavailable,
 
   /// 404 `DEVICE_ENROLLMENT_DISABLED`: the backend's dark flag is off.
   disabled,
@@ -54,11 +57,19 @@ enum DeviceProofFailure {
 }
 
 class DeviceProofException implements Exception {
-  const DeviceProofException(this.failure, {this.code, this.status});
+  const DeviceProofException(
+    this.failure, {
+    this.code,
+    this.status,
+    this.retryAfter,
+  });
 
   final DeviceProofFailure failure;
   final String? code;
   final int? status;
+
+  /// How long to wait before trying again, when the server said (429, 503).
+  final Duration? retryAfter;
 
   @override
   String toString() =>
@@ -442,6 +453,9 @@ class DeviceProofRepository {
       DeviceErrorCodes.challengeExpired ||
       DeviceErrorCodes.challengeReused => DeviceProofFailure.challengeExpired,
       DeviceErrorCodes.enrollmentDisabled => DeviceProofFailure.disabled,
+      DeviceErrorCodes.rateLimiterUnavailable =>
+        DeviceProofFailure.limiterUnavailable,
+      DeviceErrorCodes.tooManyRequests => DeviceProofFailure.rateLimited,
       _ when error.isUnauthenticated => DeviceProofFailure.sessionEnded,
       _ when error.isConnectionFailure => DeviceProofFailure.offline,
       _ when error.status == 429 => DeviceProofFailure.rateLimited,
@@ -454,12 +468,22 @@ class DeviceProofRepository {
       );
     }
 
+    final busy =
+        failure == DeviceProofFailure.rateLimited ||
+        failure == DeviceProofFailure.limiterUnavailable;
+
     return DeviceProofException(
       failure,
       code: error.code,
       status: error.status,
+      // A busy answer always comes with a wait, even when a proxy dropped the
+      // header: a retry offered at once only adds to the crowd.
+      retryAfter: error.retryAfter ?? (busy ? defaultBusyWait : null),
     );
   }
+
+  /// The wait after a 429 or 503 that did not say how long.
+  static const Duration defaultBusyWait = Duration(seconds: 10);
 
   /// Persist the token and device object of an enrolment or proof reply.
   ///

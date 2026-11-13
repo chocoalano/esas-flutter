@@ -194,7 +194,11 @@ class _CodeForm extends StatelessWidget {
         const SizedBox(height: AppSpacing.xl),
         AppButton(
           wrapLabel: true,
-          label: retry ? 'Coba Lagi' : 'Daftarkan Perangkat',
+          label: !retry
+              ? 'Daftarkan Perangkat'
+              : controller.retryIn.value > 0
+              ? 'Coba lagi dalam ${controller.retryIn.value} detik'
+              : 'Coba Lagi',
           icon: retry ? Icons.refresh_rounded : Icons.verified_user_outlined,
           busy: busy,
           onPressed: controller.canSubmit ? controller.submit : null,

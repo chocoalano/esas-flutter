@@ -13,6 +13,7 @@ import 'package:esas/features/attendance/presentation/views/attendance_view.dart
 import 'package:esas/features/attendance/presentation/widgets/attendance_device_gate.dart';
 import 'package:esas/features/auth/data/models/device_status.dart';
 import 'package:esas/features/auth/data/repositories/device_proof_gate.dart';
+import 'package:esas/features/auth/data/repositories/device_proof_repository.dart';
 import 'package:esas/features/auth/data/repositories/session_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -301,6 +302,47 @@ void main() {
     });
   });
 
+  group('busy shift (Putaran 9)', () {
+    testWidgets('the retry waits as long as the server asked; taps meanwhile '
+        'send nothing', (tester) async {
+      decides(DeviceGateStatus.needsProof);
+      when(() => gate.ensureReady()).thenAnswer(
+        (_) async => const DeviceGateDecision(
+          DeviceGateStatus.failed,
+          failure: DeviceProofFailure.rateLimited,
+          retryAfter: Duration(seconds: 3),
+        ),
+      );
+      when(() => gate.refresh()).thenAnswer(
+        (_) async => const DeviceGateDecision(DeviceGateStatus.ready),
+      );
+
+      await pumpGate(tester, withGate: gate);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Pemeriksaan Perangkat Sedang Ramai'), findsOneWidget);
+      expect(find.text('Coba lagi dalam 3 detik'), findsOneWidget);
+      await tester.tap(
+        find.text('Coba lagi dalam 3 detik'),
+        warnIfMissed: false,
+      );
+      await tester.pump();
+      verifyNever(() => gate.refresh());
+
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('Coba lagi dalam 2 detik'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text('Coba Lagi'), findsOneWidget);
+      await tester.tap(find.text('Coba Lagi'));
+      await tester.pumpAndSettle();
+
+      verify(() => gate.refresh()).called(1);
+      expect(find.text('ATTENDANCE SCREEN'), findsOneWidget);
+    });
+  });
+
   group('403 DEVICE_PROOF_REQUIRED from an attendance call', () {
     late AttendanceController controller;
 
@@ -419,6 +461,31 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(sessionNotices, 1);
+    });
+
+    testWidgets('a re-proof that meets a busy shift says so, with the wait, '
+        'not "hubungi HR"', (tester) async {
+      when(() => gate.reproveAfterRefusal()).thenAnswer(
+        (_) async => const DeviceGateDecision(
+          DeviceGateStatus.failed,
+          failure: DeviceProofFailure.rateLimited,
+          retryAfter: Duration(seconds: 20),
+        ),
+      );
+
+      await pumpGate(tester, withGate: gate);
+      await tester.pump();
+
+      controller.stage.value = CaptureStage.refused;
+      controller.refusal.value = proofRequired();
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        controller.refusal.value?.message,
+        'Pemeriksaan perangkat sedang ramai. Tunggu 20 detik, lalu coba lagi.',
+      );
+      expect(controller.refusal.value?.kind, RefusalKind.transient);
     });
 
     testWidgets('other refusals are left alone', (tester) async {

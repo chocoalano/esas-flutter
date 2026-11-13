@@ -663,6 +663,92 @@ void main() {
     });
   });
 
+  group('busy shift and a rate limiter that is down (Putaran 9)', () {
+    test(
+      '429 is "busy", carries the server\'s wait, and signs nobody out',
+      () async {
+        when(() => api.challenge(purpose: 'proof')).thenThrow(
+          const ApiException(
+            'Too Many Attempts.',
+            status: 429,
+            code: 'TOO_MANY_REQUESTS',
+            retryAfter: Duration(seconds: 20),
+          ),
+        );
+
+        await expectLater(
+          repository.prove(),
+          throwsA(
+            _failure(DeviceProofFailure.rateLimited).having(
+              (e) => e.retryAfter,
+              'retryAfter',
+              const Duration(seconds: 20),
+            ),
+          ),
+        );
+        expect(session.token, 'old-token');
+      },
+    );
+
+    test(
+      '503 RATE_LIMITER_UNAVAILABLE is its own answer, with its wait',
+      () async {
+        when(() => api.challenge(purpose: 'proof')).thenThrow(
+          const ApiException(
+            'Pemeriksaan perangkat sedang tidak tersedia.',
+            status: 503,
+            code: 'RATE_LIMITER_UNAVAILABLE',
+            retryAfter: Duration(seconds: 30),
+          ),
+        );
+
+        await expectLater(
+          repository.prove(),
+          throwsA(
+            _failure(DeviceProofFailure.limiterUnavailable).having(
+              (e) => e.retryAfter,
+              'retryAfter',
+              const Duration(seconds: 30),
+            ),
+          ),
+        );
+        expect(session.token, 'old-token');
+      },
+    );
+
+    test('a busy answer without Retry-After still waits a little', () async {
+      when(
+        () => api.challenge(purpose: 'proof'),
+      ).thenThrow(const ApiException('Too Many Attempts.', status: 429));
+
+      await expectLater(
+        repository.prove(),
+        throwsA(
+          _failure(DeviceProofFailure.rateLimited).having(
+            (e) => e.retryAfter,
+            'retryAfter',
+            DeviceProofRepository.defaultBusyWait,
+          ),
+        ),
+      );
+    });
+
+    test('a 500 is not "busy" and asks for no wait', () async {
+      when(
+        () => api.challenge(purpose: 'proof'),
+      ).thenThrow(const ApiException('Server Error', status: 500));
+
+      await expectLater(
+        repository.prove(),
+        throwsA(
+          _failure(
+            DeviceProofFailure.failed,
+          ).having((e) => e.retryAfter, 'retryAfter', isNull),
+        ),
+      );
+    });
+  });
+
   group('per-workspace identity (Putaran 8, cross-workspace)', () {
     test('the same numeric user in two workspaces is two people', () async {
       final inAcme = repository.userKey;
@@ -696,5 +782,5 @@ void main() {
   });
 }
 
-Matcher _failure(DeviceProofFailure failure) =>
+TypeMatcher<DeviceProofException> _failure(DeviceProofFailure failure) =>
     isA<DeviceProofException>().having((e) => e.failure, 'failure', failure);

@@ -81,12 +81,35 @@ class DeviceEnrollmentController extends GetxController {
 
   bool get busy => stage.value == EnrollmentStage.submitting;
 
-  bool get canSubmit => codeComplete && !busy;
+  /// Seconds left before a retry is allowed, after the server asked to wait
+  /// (429 at a busy shift, 503 while the rate limiter is down). Zero means
+  /// "go ahead". Counted down by a one-second timer, never by retrying.
+  final retryIn = 0.obs;
+  Timer? _retryTimer;
+
+  bool get canSubmit => codeComplete && !busy && retryIn.value == 0;
 
   @override
   void onClose() {
+    _retryTimer?.cancel();
     codeController.dispose();
     super.onClose();
+  }
+
+  void _waitBeforeRetry(Duration? wait) {
+    _retryTimer?.cancel();
+    retryIn.value = wait == null ? 0 : (wait.inMilliseconds / 1000).ceil();
+
+    if (retryIn.value <= 0) return;
+
+    _retryTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      retryIn.value = retryIn.value - 1;
+
+      if (retryIn.value <= 0) {
+        retryIn.value = 0;
+        timer.cancel();
+      }
+    });
   }
 
   void onCodeChanged(String text) {
@@ -116,6 +139,7 @@ class DeviceEnrollmentController extends GetxController {
       stage.value = EnrollmentStage.success;
     } on DeviceProofException catch (error) {
       _settleFailure(error.failure);
+      _waitBeforeRetry(error.retryAfter);
     } finally {
       _submitting = false;
     }
@@ -142,9 +166,17 @@ class DeviceEnrollmentController extends GetxController {
       case DeviceProofFailure.challengeExpired:
         _keyMade = true;
         _fail('Waktu verifikasi habis. Coba lagi.');
+      // Not "too many attempts": at a shift start the limit is usually the
+      // office's, not this person's (Putaran 9).
       case DeviceProofFailure.rateLimited:
         _keyMade = true;
-        _fail('Terlalu banyak percobaan. Tunggu sebentar, lalu coba lagi.');
+        _fail('Pendaftaran sedang ramai. Tunggu sebentar, lalu coba lagi.');
+      case DeviceProofFailure.limiterUnavailable:
+        _keyMade = true;
+        _fail(
+          'Pendaftaran perangkat sedang tidak tersedia untuk sementara. Coba '
+          'lagi sebentar lagi. Bila berlanjut, hubungi HR.',
+        );
       case DeviceProofFailure.disabled:
         _fail(
           'Pendaftaran perangkat belum dibuka oleh perusahaan. Hubungi HR.',

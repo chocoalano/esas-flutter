@@ -185,6 +185,50 @@ void main() {
     expect(find.text('Coba Lagi'), findsOneWidget);
   });
 
+  testWidgets('a busy shift: the retry waits as long as the server asked', (
+    tester,
+  ) async {
+    when(
+      () => repository.enroll(any(), freshKey: any(named: 'freshKey')),
+    ).thenThrow(
+      const DeviceProofException(
+        DeviceProofFailure.rateLimited,
+        retryAfter: Duration(seconds: 3),
+      ),
+    );
+
+    await pumpScreen(tester);
+    await typeAndSubmit(tester, 'ABCDE12345');
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.textContaining('sedang ramai'), findsOneWidget);
+    expect(submitButton(tester).label, 'Coba lagi dalam 3 detik');
+    expect(submitButton(tester).onPressed, isNull);
+
+    await tester.pump(const Duration(seconds: 3));
+    expect(submitButton(tester).label, 'Coba Lagi');
+    expect(submitButton(tester).onPressed, isNotNull);
+  });
+
+  testWidgets('limiter down: temporary, and when to call HR', (tester) async {
+    when(
+      () => repository.enroll(any(), freshKey: any(named: 'freshKey')),
+    ).thenThrow(
+      const DeviceProofException(
+        DeviceProofFailure.limiterUnavailable,
+        retryAfter: Duration(seconds: 2),
+      ),
+    );
+
+    await pumpScreen(tester);
+    await typeAndSubmit(tester, 'ABCDE12345');
+    await tester.pump();
+
+    expect(find.textContaining('hubungi HR'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+  });
+
   testWidgets('a phone that cannot hold the key says so', (tester) async {
     enrollFails(DeviceProofFailure.keyUnavailable);
 

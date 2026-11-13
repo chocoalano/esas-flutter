@@ -165,13 +165,16 @@ void main() {
       tester,
       DeviceStatusCard(
         status: DeviceGateStatus.failed,
-        failure: DeviceProofFailure.rateLimited,
+        failure: DeviceProofFailure.failed,
         onRetry: () {},
       ),
     );
 
+    // A 429 has its own "sedang ramai" state now (Putaran 9); this is the
+    // generic failure, which still names HR if it keeps happening.
     expect(find.text('Perangkat Belum Dapat Diverifikasi'), findsOneWidget);
-    expect(find.textContaining('Terlalu banyak percobaan'), findsOneWidget);
+    expect(find.textContaining('hubungi HR'), findsOneWidget);
+    expect(find.text('Coba Lagi'), findsOneWidget);
   });
 
   testWidgets('a phone that can never hold the key is sent to HR for another '
@@ -198,6 +201,43 @@ void main() {
     expect(find.textContaining('Fitur lain'), findsOneWidget);
     expect(find.text('Coba Lagi'), findsNothing);
     expect(find.text('Masukkan Kode Aktivasi'), findsNothing);
+  });
+
+  testWidgets('busy: says so, and the retry waits as long as the server '
+      'asked', (tester) async {
+    var retried = 0;
+
+    await pumpCard(
+      tester,
+      DeviceStatusCard(
+        status: DeviceGateStatus.failed,
+        failure: DeviceProofFailure.rateLimited,
+        retryIn: const Duration(seconds: 20),
+        onRetry: () => retried++,
+      ),
+    );
+
+    expect(find.text('Pemeriksaan Perangkat Sedang Ramai'), findsOneWidget);
+    expect(find.textContaining('jam masuk'), findsOneWidget);
+    final wait = find.text('Coba lagi dalam 20 detik');
+    expect(wait, findsOneWidget);
+    await tester.tap(wait, warnIfMissed: false);
+    expect(retried, 0);
+  });
+
+  testWidgets('limiter down: temporary, and when to call HR', (tester) async {
+    await pumpCard(
+      tester,
+      DeviceStatusCard(
+        status: DeviceGateStatus.failed,
+        failure: DeviceProofFailure.limiterUnavailable,
+        onRetry: () {},
+      ),
+    );
+
+    expect(find.text('Pemeriksaan Perangkat Belum Tersedia'), findsOneWidget);
+    expect(find.textContaining('hubungi HR'), findsOneWidget);
+    expect(find.text('Coba Lagi'), findsOneWidget);
   });
 
   testWidgets('a phone without a usable keystore', (tester) async {

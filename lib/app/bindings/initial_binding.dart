@@ -230,6 +230,10 @@ class InitialBinding extends Bindings {
             await AppVersionService.load();
             return int.tryParse(AppVersionService.buildNumber);
           },
+          installedPackage: () async {
+            await AppVersionService.load();
+            return AppVersionService.packageName;
+          },
           openUrl: (url) => launchUrl(url, mode: LaunchMode.externalApplication),
           storage: localStorage,
         ),

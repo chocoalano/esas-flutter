@@ -268,9 +268,12 @@ class ApiClient extends GetConnect {
           decoded = null;
         }
 
+        final retryAfter = response.headers.value('retry-after');
+
         throw ApiErrorMapper.fromResponse(
           status: response.statusCode,
           body: decoded,
+          headers: {'retry-after': ?retryAfter},
         );
       } on ApiException {
         rethrow;
@@ -646,6 +649,7 @@ class ApiClient extends GetConnect {
     throw ApiErrorMapper.fromResponse(
       status: response.statusCode,
       body: response.body,
+      headers: response.headers,
     );
   }
 

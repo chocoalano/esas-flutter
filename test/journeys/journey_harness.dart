@@ -126,6 +126,13 @@ class FakeEsasServer {
 
   /// Faults.
   bool dropNextEnrollBeforeApplying = false;
+
+  /// Refusals the next challenge requests answer with, in order — a 429 at a
+  /// busy shift start, a 503 while the rate limiter's store is down, a 500.
+  final List<ApiException> challengeRefusals = [];
+
+  /// Every challenge request that reached this server.
+  int challengeRequests = 0;
   bool loseNextEnrollAnswerAfterApplying = false;
 
   /// Which token the app is sending, read the way `AuthInterceptor` reads it.
@@ -257,6 +264,9 @@ class FakeEsasServer {
   ) async {
     final token = await _caller();
     final owner = _accountOf(token);
+    challengeRequests++;
+
+    if (challengeRefusals.isNotEmpty) throw challengeRefusals.removeAt(0);
 
     if (!enrollmentAvailable) {
       throw const ApiException(
@@ -621,7 +631,9 @@ class JourneyWorld {
     await settle(tester);
   }
 
-  Future<void> boot(WidgetTester tester) async {
+  /// [builder] sits above the navigator, as `GetMaterialApp.builder` does in
+  /// `app.dart` (the update gate lives there).
+  Future<void> boot(WidgetTester tester, {TransitionBuilder? builder}) async {
     Get.testMode = true;
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
@@ -698,6 +710,7 @@ class JourneyWorld {
     await tester.pumpWidget(
       GetMaterialApp(
         theme: AppTheme.lightTheme,
+        builder: builder,
         initialRoute: AuthRoutes.login,
         getPages: [
           ...AuthPages.pages.where((page) => page.name == AuthRoutes.login),
