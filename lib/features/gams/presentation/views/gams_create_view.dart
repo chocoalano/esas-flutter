@@ -5,11 +5,15 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/theme/app_palette.dart';
 import '../../../../core/ui/components/app_button.dart';
+import '../../../../core/ui/components/app_card.dart';
+import '../../../../core/ui/components/app_error_state.dart';
 import '../../../../core/ui/components/app_input_decoration.dart';
+import '../../../../core/ui/components/app_section_header.dart';
 import '../../../../core/ui/dialogs/app_snackbar.dart';
 import '../controllers/gams_create_controller.dart';
 import '../controllers/gams_dashboard_controller.dart';
 import '../routes/gams_routes.dart';
+import '../widgets/gams_service_fields.dart';
 
 /// The four GAMS requests, one form each (GAMS-01).
 class GamsCreateView extends GetView<GamsCreateController> {
@@ -23,6 +27,7 @@ class GamsCreateView extends GetView<GamsCreateController> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final palette = theme.palette;
 
     return Scaffold(
       appBar: AppBar(
@@ -40,11 +45,40 @@ class GamsCreateView extends GetView<GamsCreateController> {
           return const Center(child: CircularProgressIndicator());
         }
 
+        // The options did not load: say so and offer a retry, rather than a
+        // form with an empty dropdown (UX-A07).
+        if (controller.loadError.value case final failed?) {
+          return AppErrorState(
+            title: failed.isForbidden
+                ? 'Tidak ada akses'
+                : 'Pilihan formulir belum dapat dimuat',
+            message: failed.message,
+            onRetry: failed.isForbidden ? null : controller.loadOptions,
+          );
+        }
+
         return ListView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: const EdgeInsets.all(AppSpacing.page),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.page,
+            vertical: AppSpacing.md,
+          ),
           children: [
-            ..._fields(context, theme),
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AppSectionHeader(
+                    title: 'Formulir ${kind.title}',
+                    subtitle: 'Lengkapi data permohonan berikut ini',
+                    dense: true,
+                    naturalCase: true,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  ..._fields(context, theme),
+                ],
+              ),
+            ),
             const SizedBox(height: AppSpacing.md),
             if (controller.error.value case final message?)
               Padding(
@@ -52,7 +86,7 @@ class GamsCreateView extends GetView<GamsCreateController> {
                 child: Text(
                   message,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.palette.danger.foreground,
+                    color: palette.danger.foreground,
                   ),
                 ),
               ),
@@ -96,16 +130,17 @@ class GamsCreateView extends GetView<GamsCreateController> {
   }
 
   List<Widget> _fields(BuildContext context, ThemeData theme) {
-    const gap = SizedBox(height: AppSpacing.md);
+    const gap = SizedBox(height: AppSpacing.sm);
 
     Widget dropdown<T>({
       required String label,
       required List<(int, String)> items,
       required RxnInt value,
+      String? helperText,
     }) => DropdownButtonFormField<int>(
       initialValue: value.value,
       isExpanded: true,
-      decoration: appInputDecoration(theme, label),
+      decoration: appInputDecoration(theme, label, helperText: helperText),
       items: [
         for (final (id, name) in items)
           DropdownMenuItem(value: id, child: Text(name)),
@@ -118,19 +153,28 @@ class GamsCreateView extends GetView<GamsCreateController> {
       String label, {
       int lines = 1,
       TextInputType? type,
+      String? helperText,
     }) => TextField(
       controller: c,
       minLines: lines,
       maxLines: lines,
       keyboardType: type,
-      decoration: appInputDecoration(theme, label),
+      decoration: appInputDecoration(theme, label, helperText: helperText),
     );
 
     final period = [
       gap,
-      _DateTimeField(label: 'Mulai', value: controller.startAt),
+      _DateTimeField(
+        label: 'Mulai',
+        value: controller.startAt,
+        helperText: 'Tentukan tanggal dan jam awal penggunaan.',
+      ),
       gap,
-      _DateTimeField(label: 'Selesai', value: controller.endAt),
+      _DateTimeField(
+        label: 'Selesai',
+        value: controller.endAt,
+        helperText: 'Tentukan tanggal dan jam berakhirnya penggunaan.',
+      ),
     ];
 
     return switch (kind) {
@@ -139,21 +183,45 @@ class GamsCreateView extends GetView<GamsCreateController> {
           label: 'Layanan',
           items: [for (final d in controller.definitions) (d.id, d.title)],
           value: controller.optionId,
+          helperText: controller.definitions.isEmpty
+              ? 'Belum ada layanan GA yang dapat Anda ajukan. Hubungi bagian GA.'
+              : 'Pilih jenis fasilitas atau layanan umum yang dibutuhkan.',
         ),
         gap,
         dropdown(
-          label: 'Gedung (opsional)',
+          label: controller.selectedDefinition?.requiresFacility == true
+              ? 'Gedung'
+              : 'Gedung (opsional)',
           items: [for (final f in controller.facilities) (f.id, f.name)],
           value: controller.facilityId,
+          helperText: 'Pilih lokasi gedung kerja terkait permintaan ini.',
         ),
         gap,
-        text(controller.subjectC, 'Judul permintaan'),
+        text(
+          controller.subjectC,
+          'Judul permintaan',
+          helperText: 'Tulis ringkasan permohonan layanan umum secara singkat.',
+        ),
         gap,
-        text(controller.descriptionC, 'Keterangan (opsional)', lines: 3),
+        text(
+          controller.descriptionC,
+          controller.selectedDefinition?.requiresDescription == true
+              ? 'Keterangan'
+              : 'Keterangan (opsional)',
+          lines: 3,
+          helperText:
+              'Jelaskan rincian kebutuhan, jumlah barang, atau catatan spesifik.',
+        ),
+        // The chosen service's own fields (FUNC-A01).
+        GamsServiceFields(controller: controller),
         gap,
         DropdownButtonFormField<String>(
           initialValue: controller.priority.value,
-          decoration: appInputDecoration(theme, 'Prioritas'),
+          decoration: appInputDecoration(
+            theme,
+            'Prioritas',
+            helperText: 'Tentukan tingkat urgensi penanganan permohonan ini.',
+          ),
           items: const [
             DropdownMenuItem(value: 'low', child: Text('Rendah')),
             DropdownMenuItem(value: 'medium', child: Text('Sedang')),
@@ -168,6 +236,8 @@ class GamsCreateView extends GetView<GamsCreateController> {
           label: 'Ruang',
           items: [for (final s in controller.spaces) (s.id, s.name)],
           value: controller.optionId,
+          helperText:
+              'Pilih ruangan rapat atau fasilitas bersama yang ingin digunakan.',
         ),
         ...period,
       ],
@@ -179,9 +249,16 @@ class GamsCreateView extends GetView<GamsCreateController> {
               (v.id, '${v.name} · ${v.number}'),
           ],
           value: controller.optionId,
+          helperText:
+              'Pilih armada kendaraan operasional kantor yang tersedia.',
         ),
         gap,
-        text(controller.subjectC, 'Keperluan'),
+        text(
+          controller.subjectC,
+          'Keperluan',
+          helperText:
+              'Jelaskan tujuan dinas, rute perjalanan, dan estimasi penumpang.',
+        ),
         ...period,
       ],
       GamsCreateKind.visit => [
@@ -189,19 +266,34 @@ class GamsCreateView extends GetView<GamsCreateController> {
           label: 'Gedung',
           items: [for (final f in controller.facilities) (f.id, f.name)],
           value: controller.facilityId,
+          helperText: 'Pilih lokasi gedung tempat penerimaan kunjungan tamu.',
         ),
         gap,
-        text(controller.visitorNameC, 'Nama tamu'),
+        text(
+          controller.visitorNameC,
+          'Nama tamu',
+          helperText: 'Masukkan nama lengkap tamu atau perwakilan pihak luar.',
+        ),
         gap,
         text(
           controller.visitorPhoneC,
           'Telepon tamu (opsional)',
           type: TextInputType.phone,
+          helperText: 'Nomor telepon atau kontak WhatsApp aktif tamu.',
         ),
         gap,
-        text(controller.visitorCompanyC, 'Perusahaan tamu (opsional)'),
+        text(
+          controller.visitorCompanyC,
+          'Perusahaan tamu (opsional)',
+          helperText: 'Nama instansi, vendor, atau organisasi asal tamu.',
+        ),
         gap,
-        text(controller.subjectC, 'Keperluan kunjungan'),
+        text(
+          controller.subjectC,
+          'Keperluan kunjungan',
+          helperText:
+              'Jelaskan agenda pertemuan atau kepentingan kunjungan tamu.',
+        ),
       ],
     };
   }
@@ -209,10 +301,15 @@ class GamsCreateView extends GetView<GamsCreateController> {
 
 /// A date and a time, picked one after the other.
 class _DateTimeField extends StatelessWidget {
-  const _DateTimeField({required this.label, required this.value});
+  const _DateTimeField({
+    required this.label,
+    required this.value,
+    this.helperText,
+  });
 
   final String label;
   final Rxn<DateTime> value;
+  final String? helperText;
 
   @override
   Widget build(BuildContext context) {
@@ -227,6 +324,7 @@ class _DateTimeField extends StatelessWidget {
           decoration: appInputDecoration(
             theme,
             label,
+            helperText: helperText,
             suffixIcon: const Icon(Icons.event_rounded, size: 18),
           ),
           child: Text(

@@ -9,6 +9,7 @@ import '../../../auth/data/repositories/session_repository.dart';
 import '../../../home/presentation/routes/home_routes.dart';
 import '../../../permit/presentation/routes/permit_routes.dart';
 import '../../../profile/presentation/routes/profile_routes.dart';
+import '../../../tasks/presentation/routes/tasks_routes.dart';
 import '../../presentation/routes/notification_routes.dart';
 import '../repositories/notification_repository.dart';
 
@@ -41,7 +42,37 @@ class NotificationDestination {
         announcementId,
       );
     }
+    final task = _fieldTask(data);
+    if (task != null) {
+      return NotificationDestination(TasksRoutes.detail, task);
+    }
     return const NotificationDestination(NotificationRoutes.notification);
+  }
+
+  /// A notification about a field task (an MTMS work order assigned to the
+  /// worker today; GAMS work orders and ITMS tickets when they send one)
+  /// opens that task. The flat `work_order_id` survives a push payload; the
+  /// in-app row also carries `about {subject, id}`. The task's own API
+  /// decides again whether this worker may see it.
+  static Map<String, Object>? _fieldTask(Map<String, dynamic> data) {
+    const domains = {
+      'mtcms.work_order': 'mtms',
+      'gams.work_order': 'gams',
+      'itms.ticket': 'itms',
+    };
+    final about = asObject(data['about']);
+    final aboutDomain = domains[asString(about['subject'])];
+    final aboutId = asInt(about['id']);
+    if (aboutDomain != null && aboutId != null && aboutId > 0) {
+      return {'domain': aboutDomain, 'id': aboutId};
+    }
+    final workOrderId = asInt(data['work_order_id']);
+    if (asString(data['source_domain']) == 'mtcms' &&
+        workOrderId != null &&
+        workOrderId > 0) {
+      return {'domain': 'mtms', 'id': workOrderId};
+    }
+    return null;
   }
 }
 

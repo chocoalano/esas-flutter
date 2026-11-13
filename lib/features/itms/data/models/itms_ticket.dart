@@ -15,6 +15,13 @@ class ItmsTicket {
     this.resolutionNotes,
     this.createdAt,
     this.resolvedAt,
+    this.triagedAt,
+    this.assignedAt,
+    this.startedAt,
+    this.waitingAt,
+    this.closedAt,
+    this.isAssigned = false,
+    this.assigneeName,
   });
 
   factory ItmsTicket.fromJson(Map<String, dynamic> json) {
@@ -32,6 +39,13 @@ class ItmsTicket {
       resolutionNotes: asString(json['resolution_notes']),
       createdAt: asString(json['created_at']),
       resolvedAt: asString(json['resolved_at']),
+      triagedAt: asString(json['triaged_at']),
+      assignedAt: asString(json['assigned_at']),
+      startedAt: asString(json['started_at']),
+      waitingAt: asString(json['waiting_at']),
+      closedAt: asString(json['closed_at']),
+      isAssigned: json['is_assigned'] == true,
+      assigneeName: asString(json['assignee_name']),
     );
   }
 
@@ -48,6 +62,19 @@ class ItmsTicket {
   final String? resolutionNotes;
   final String? createdAt;
   final String? resolvedAt;
+
+  // Detail only (FUNC-D04): when each step happened. Who handled it is not
+  // sent; the technician's notes stay internal.
+  final String? triagedAt;
+  final String? assignedAt;
+  final String? startedAt;
+  final String? waitingAt;
+  final String? closedAt;
+  final bool isAssigned;
+
+  /// The officially assigned technician's name (D-05, ADR-F), and nothing
+  /// else about them. Null when unassigned or not available.
+  final String? assigneeName;
 
   // `cancelled` is finished too (backend ItmsTicketStatus) — UAT review H4.
   bool get isClosed =>

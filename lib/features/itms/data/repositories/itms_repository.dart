@@ -31,10 +31,12 @@ class ItmsRepository {
     required int serviceId,
     required String subject,
     String? description,
+    String? idempotencyKey,
   }) => _api.createTicket(
     serviceId: serviceId,
     subject: subject,
     description: description,
+    idempotencyKey: idempotencyKey,
   );
 
   Future<List<ItmsKnowledgeArticle>> knowledgeArticles({

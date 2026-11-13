@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/network/idempotency_key.dart';
 import '../../data/models/gams_service_request.dart';
 import '../../data/models/gams_space_reservation.dart';
 import '../../data/models/gams_vehicle_booking.dart';
@@ -54,6 +55,45 @@ class GamsDashboardController extends GetxController {
   /// book — somebody without access to it — hid the three that had loaded,
   /// and trying again failed the same way. The screen-wide [error] is kept for
   /// the case where nothing at all could be loaded.
+  final Map<String, String> _cancelKeys = {};
+
+  /// Withdraws one of the requester's bookings through the domain (D-06,
+  /// F-21). Null when it went through, otherwise the message to show; a lost
+  /// answer keeps the Idempotency-Key so a retry cannot cancel twice.
+  Future<String?> cancelBooking({
+    required bool vehicle,
+    required int id,
+    required String reason,
+  }) async {
+    final intent = '${vehicle ? 'v' : 's'}:$id:$reason';
+    final key = _cancelKeys[intent] ??= IdempotencyKey.mint();
+    try {
+      final why = reason.isEmpty ? null : reason;
+      if (vehicle) {
+        await _repository.cancelVehicleBooking(
+          id,
+          reason: why,
+          idempotencyKey: key,
+        );
+      } else {
+        await _repository.cancelSpaceReservation(
+          id,
+          reason: why,
+          idempotencyKey: key,
+        );
+      }
+      _cancelKeys.remove(intent);
+      await loadDashboard();
+      return null;
+    } on ApiException catch (e) {
+      if (e.status != null && e.status! < 500 && e.status != 429) {
+        _cancelKeys.remove(intent);
+        await loadDashboard();
+      }
+      return e.message;
+    }
+  }
+
   Future<void> loadDashboard() async {
     isLoading.value = true;
     error.value = null;

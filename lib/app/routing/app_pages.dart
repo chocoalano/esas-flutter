@@ -1,9 +1,11 @@
 import 'package:get/get.dart';
 
 import '../../features/ai_chat/presentation/routes/ai_chat_pages.dart';
+import '../../features/atk/presentation/routes/atk_pages.dart';
 import '../../features/attendance/presentation/routes/attendance_pages.dart';
 import '../../features/auth/presentation/routes/auth_pages.dart';
 import '../../features/auth/presentation/routes/auth_routes.dart';
+import '../../features/auth/presentation/routes/device_pages.dart';
 import '../../features/gams/presentation/routes/gams_pages.dart';
 import '../../features/home/presentation/routes/home_pages.dart';
 import '../../features/inbox/presentation/routes/inbox_pages.dart';
@@ -12,7 +14,9 @@ import '../../features/notification/presentation/routes/notification_pages.dart'
 import '../../features/permit/presentation/routes/permit_pages.dart';
 import '../../features/profile/presentation/routes/profile_pages.dart';
 import '../../features/setup/presentation/routes/setup_pages.dart';
+import '../../features/tasks/presentation/routes/tasks_pages.dart';
 import 'not_found_view.dart';
+import '../../features/mtms/presentation/routes/mtms_pages.dart';
 
 /// The application's route table — an aggregator, and nothing else.
 ///
@@ -49,5 +53,9 @@ class AppPages {
     ...GamsPages.pages,
     ...ItmsPages.pages,
     ...InboxPages.pages,
+    ...TasksPages.pages,
+    ...MtmsPages.pages,
+    ...AtkPages.pages,
+    ...DevicePages.pages,
   ];
 }

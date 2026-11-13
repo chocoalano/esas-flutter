@@ -19,6 +19,10 @@ class ItmsDashboardController extends GetxController {
   final RxList<ItmsService> services = <ItmsService>[].obs;
   final RxList<ItmsKnowledgeArticle> articles = <ItmsKnowledgeArticle>[].obs;
 
+  /// Why a section could not be loaded, by section key.
+  final RxMap<String, ApiException> sectionErrors =
+      <String, ApiException>{}.obs;
+
   /// The rows one page of tickets holds — what the API is asked for.
   static const int pageSize = 20;
 
@@ -33,23 +37,40 @@ class ItmsDashboardController extends GetxController {
     loadDashboard();
   }
 
+  /// Load all three sections in parallel, each failing on its own.
+  ///
+  /// The sequential version meant a 404 on tickets hid the service catalog
+  /// and the knowledge base too — the most common failure on a first deploy
+  /// where ticket history is empty but services are configured.
   Future<void> loadDashboard() async {
     isLoading.value = true;
     error.value = null;
+    sectionErrors.clear();
+
+    Future<void> section<T>(
+      String key,
+      Future<List<T>> Function() load,
+      RxList<T> into,
+    ) async {
+      try {
+        into.assignAll(await load());
+      } on ApiException catch (e) {
+        sectionErrors[key] = e;
+      } catch (e) {
+        sectionErrors[key] = ApiException(e.toString());
+      }
+    }
 
     try {
-      final t = await _repository.tickets();
-      tickets.assignAll(t);
+      await Future.wait([
+        section('tickets', _repository.tickets, tickets),
+        section('services', _repository.services, services),
+        section('articles', _repository.knowledgeArticles, articles),
+      ]);
 
-      final s = await _repository.services();
-      services.assignAll(s);
-
-      final a = await _repository.knowledgeArticles();
-      articles.assignAll(a);
-    } on ApiException catch (e) {
-      error.value = e;
-    } catch (e) {
-      error.value = ApiException(e.toString());
+      if (sectionErrors.length == 3) {
+        error.value = sectionErrors.values.first;
+      }
     } finally {
       isLoading.value = false;
     }

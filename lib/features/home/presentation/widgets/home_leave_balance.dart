@@ -219,6 +219,7 @@ class _BalanceTile extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           HomeMetric(
+            icon: Icons.beach_access_outlined,
             value: leaveDaysLabel(balance.remaining),
             unit: 'hari',
             label: leaveTypeLabel(balance),

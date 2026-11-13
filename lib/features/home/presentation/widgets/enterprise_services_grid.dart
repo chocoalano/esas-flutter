@@ -81,9 +81,15 @@ class _EnterpriseServiceTileState extends State<_EnterpriseServiceTile> {
     final palette = theme.palette;
     final item = widget.service;
 
-    final Color background = theme.colorScheme.surface;
-    final Color foreground = theme.colorScheme.onSurface;
-    final Color edge = palette.borderSubtle;
+    final Color background = item.accent
+        ? palette.brandSubtle
+        : theme.colorScheme.surface;
+    final Color foreground = item.accent
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurface;
+    final Color edge = item.accent
+        ? theme.colorScheme.primary.withValues(alpha: 0.3)
+        : palette.borderSubtle;
 
     return Semantics(
       button: true,
@@ -108,18 +114,27 @@ class _EnterpriseServiceTileState extends State<_EnterpriseServiceTile> {
                   scale: _pressed ? 0.94 : 1,
                   duration: AppDurations.fast,
                   curve: AppMotion.standard,
-                  child: Container(
-                    width: 48,
-                    height: 48,
+                  child: AnimatedContainer(
+                    duration: AppDurations.fast,
+                    curve: AppMotion.standard,
+                    width: 52,
+                    height: 52,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: background,
+                      color: _pressed
+                          ? (item.accent ? palette.brandSubtle : palette.surfaceSubtle)
+                          : background,
                       borderRadius: AppRadii.xlAll,
-                      border: Border.all(color: edge),
+                      border: Border.all(
+                        color: _pressed
+                            ? theme.colorScheme.primary.withValues(alpha: 0.4)
+                            : edge,
+                        width: _pressed ? 1.5 : 1.0,
+                      ),
                     ),
                     child: Icon(
                       item.icon,
-                      size: AppIconSizes.xxl,
+                      size: AppIconSizes.xl,
                       color: foreground,
                     ),
                   ),

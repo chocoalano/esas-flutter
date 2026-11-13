@@ -37,6 +37,7 @@ class GamsVehicleBooking {
     required this.startsAt,
     required this.endsAt,
     required this.status,
+    this.canCancel = false,
     this.createdAt,
   });
 
@@ -51,9 +52,13 @@ class GamsVehicleBooking {
       startsAt: asString(json['starts_at']) ?? '',
       endsAt: asString(json['ends_at']) ?? '',
       status: asString(json['status']) ?? 'booking',
+      canCancel: json['can_cancel'] == true,
       createdAt: asString(json['created_at']),
     );
   }
+
+  /// Whether the server lets the requester withdraw it now (D-06).
+  final bool canCancel;
 
   final int id;
   final String number;

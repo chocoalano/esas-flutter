@@ -97,8 +97,11 @@ void main() {
       controller.serviceId.value = 4;
       expect(controller.validate(), contains('Judul'));
 
-      controller.subjectC.text = 'x' * 256;
-      expect(controller.validate(), contains('255'));
+      controller.subjectC.text = 'x' * 151;
+      expect(controller.validate(), contains('150'));
+
+      controller.subjectC.text = 'x' * 150;
+      expect(controller.validate(), isNot(contains('Judul paling banyak')));
 
       controller.subjectC.text = 'Wi-Fi lantai 3 mati';
       controller.descriptionC.text = 'y' * 4001;
@@ -114,6 +117,7 @@ void main() {
           serviceId: any(named: 'serviceId'),
           subject: any(named: 'subject'),
           description: any(named: 'description'),
+          idempotencyKey: any(named: 'idempotencyKey'),
         ),
       ).thenAnswer((_) async {});
       controller.serviceId.value = 4;
@@ -131,6 +135,8 @@ void main() {
           serviceId: 4,
           subject: 'Wi-Fi lantai 3 mati',
           description: null,
+          // One intent, one key - minted by the form, not left out.
+          idempotencyKey: any(named: 'idempotencyKey', that: isNotEmpty),
         ),
       ).called(1);
     });
@@ -141,6 +147,7 @@ void main() {
           serviceId: any(named: 'serviceId'),
           subject: any(named: 'subject'),
           description: any(named: 'description'),
+          idempotencyKey: any(named: 'idempotencyKey'),
         ),
       ).thenThrow(
         const ApiException(

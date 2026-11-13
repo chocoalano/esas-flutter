@@ -1,9 +1,27 @@
+import 'dart:convert';
+import 'dart:io' show Platform;
+import 'dart:math';
+
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/utils/app_logger.dart';
+
+/// Whether Apple Sign-In is natively available (iOS 13+, macOS 10.15+).
+bool get isAppleSignInAvailable =>
+    !kIsWeb && (Platform.isIOS || Platform.isMacOS);
+
+/// Who Apple says this person is, as Firebase Authentication has verified it.
+class AppleIdentity {
+  const AppleIdentity({required this.uid, required this.idToken});
+
+  final String uid;
+  final String idToken;
+}
 
 /// Who Google says this person is, as Firebase Authentication has verified it.
 ///
@@ -125,6 +143,81 @@ class FirebaseIdentityService {
         code: 'firebase_${error.code}',
       );
     }
+  }
+
+  /// Ask Apple who this is (native iOS/macOS dialog), then sign in to Firebase.
+  ///
+  /// Returns null when the user cancels the dialog. Throws [ApiException] for
+  /// everything else. A cryptographic nonce is passed through Apple's id_token
+  /// to Firebase, preventing replay attacks (required by Apple's guidelines).
+  Future<AppleIdentity?> signInWithApple() async {
+    try {
+      final rawNonce = _generateNonce();
+      final hashedNonce = _sha256ofString(rawNonce);
+
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: hashedNonce,
+      );
+
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        rawNonce: rawNonce,
+      );
+
+      final credential = await _auth.signInWithCredential(oauthCredential);
+      final user = credential.user;
+      final idToken = await user?.getIdToken();
+
+      if (user == null || idToken == null || idToken.isEmpty) {
+        throw const ApiException(
+          'Apple tidak mengembalikan identitas. Silakan coba lagi.',
+          code: 'apple_identity_missing',
+        );
+      }
+
+      return AppleIdentity(uid: user.uid, idToken: idToken);
+    } on SignInWithAppleAuthorizationException catch (error) {
+      if (error.code == AuthorizationErrorCode.canceled) return null;
+
+      AppLogger.warning('Apple sign-in failed: ${error.code} ${error.message}');
+      throw ApiException(
+        'Masuk dengan Apple gagal. Silakan coba lagi.',
+        code: 'apple_${error.code.name}',
+      );
+    } on FirebaseAuthException catch (error) {
+      if (error.code == 'popup-closed-by-user' ||
+          error.code == 'cancelled-popup-request') {
+        return null;
+      }
+
+      AppLogger.warning('Firebase Apple sign-in failed: ${error.code}');
+      throw ApiException(
+        error.code == 'network-request-failed'
+            ? 'Tidak ada koneksi internet. Periksa jaringan Anda.'
+            : 'Masuk dengan Apple gagal. Silakan coba lagi.',
+        code: 'firebase_${error.code}',
+      );
+    }
+  }
+
+  static String _generateNonce([int length = 32]) {
+    const charset =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(
+      length,
+      (_) => charset[random.nextInt(charset.length)],
+    ).join();
+  }
+
+  static String _sha256ofString(String input) {
+    final bytes = utf8.encode(input);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
   }
 
   /// Sign out of Firebase **and** Google.

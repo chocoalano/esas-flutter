@@ -23,15 +23,18 @@ InputDecoration appInputDecoration(
   Widget? suffixIcon,
   Widget? prefixIcon,
   String? helperText,
+  int? helperMaxLines,
 }) {
   return InputDecoration(
-    labelText: labelText,
+    labelText: labelText.trim().isEmpty ? null : labelText,
     hintText: hintText,
     // `??` dan bukan nilai baku parameter: pemanggil yang menyerahkan `null`
     // secara eksplisit juga harus tetap mendapat barisnya.
     helperText: helperText ?? ' ',
+    helperMaxLines: helperMaxLines ?? 2,
     suffixIcon: suffixIcon,
     prefixIcon: prefixIcon,
+    isDense: true,
     // Label mengambang dipakai alih-alih label di dalam, supaya tinggi baris
     // input tidak berubah saat field mendapat fokus.
     floatingLabelBehavior: FloatingLabelBehavior.auto,
@@ -53,7 +56,7 @@ class AppFieldLabel extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs + 2),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -67,6 +70,8 @@ class AppFieldLabel extends StatelessWidget {
               label,
               style: theme.textTheme.titleSmall?.copyWith(
                 color: theme.colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
               ),
             ),
           ),
@@ -75,6 +80,7 @@ class AppFieldLabel extends StatelessWidget {
               ' *',
               style: theme.textTheme.titleSmall?.copyWith(
                 color: theme.palette.danger.foreground,
+                fontWeight: FontWeight.w700,
               ),
             ),
         ],

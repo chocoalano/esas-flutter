@@ -1,3 +1,4 @@
+import 'package:esas/core/network/api_exception.dart';
 import 'dart:async';
 
 import 'package:esas/core/tenancy/workspace_clock.dart';
@@ -194,6 +195,7 @@ void main() {
         purpose: any(named: 'purpose'),
         startsAt: any(named: 'startsAt'),
         endsAt: any(named: 'endsAt'),
+        idempotencyKey: any(named: 'idempotencyKey'),
       ),
     ).thenAnswer((_) async {});
     final controller = await open(GamsCreateKind.vehicleBooking);
@@ -209,6 +211,8 @@ void main() {
         purpose: 'Kunjungan klien',
         startsAt: any(named: 'startsAt'),
         endsAt: any(named: 'endsAt'),
+        // FUNC-A04: a retry replays the first booking.
+        idempotencyKey: any(named: 'idempotencyKey', that: isNotNull),
       ),
     ).called(1);
   });
@@ -222,6 +226,7 @@ void main() {
         visitorCompany: any(named: 'visitorCompany'),
         visitorIdNumber: any(named: 'visitorIdNumber'),
         purpose: any(named: 'purpose'),
+        idempotencyKey: any(named: 'idempotencyKey'),
       ),
     ).thenAnswer((_) async {});
     final controller = await open(GamsCreateKind.visit);
@@ -242,7 +247,38 @@ void main() {
         visitorCompany: any(named: 'visitorCompany'),
         visitorIdNumber: any(named: 'visitorIdNumber'),
         purpose: 'Rapat vendor',
+        idempotencyKey: any(named: 'idempotencyKey', that: isNotNull),
       ),
     ).called(1);
   });
+
+  test(
+    'options that fail to load offer a retry, not an empty form (UX-A07)',
+    () async {
+      var fail = true;
+      when(() => repo.spaces()).thenAnswer((_) async {
+        if (fail) throw const ApiException('Server tidak dapat dihubungi');
+        return const [
+          GamsSpace(
+            id: 5,
+            name: 'Ruang Rapat 1',
+            code: 'R1',
+            kind: 'Meeting Room',
+          ),
+        ];
+      });
+      final controller = await open(GamsCreateKind.spaceReservation);
+
+      expect(
+        controller.loadError.value?.message,
+        'Server tidak dapat dihubungi',
+      );
+      expect(controller.error.value, isNull);
+
+      fail = false;
+      await controller.loadOptions();
+      expect(controller.loadError.value, isNull);
+      expect(controller.spaces, hasLength(1));
+    },
+  );
 }

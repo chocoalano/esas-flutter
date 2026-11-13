@@ -89,6 +89,7 @@ class _Populated extends StatelessWidget {
             children: <Widget>[
               Expanded(
                 child: HomeMetric(
+                  icon: Icons.calendar_month_outlined,
                   value: '${data.workedDays}',
                   unit: 'hari',
                   label: 'Hari kerja',
@@ -97,6 +98,9 @@ class _Populated extends StatelessWidget {
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: HomeMetric(
+                  icon: late
+                      ? Icons.alarm_on_rounded
+                      : Icons.check_circle_outline_rounded,
                   value: '${data.lateCount}',
                   unit: late ? 'hari' : null,
                   label: 'Terlambat',

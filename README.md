@@ -1,4 +1,5 @@
 # MOBILE SELF-SERVICE APPLICATION BLUEPRINT
+
 ## Human Capital & Workforce Operating System — Employee Mobile Experience v1.1
 
 **Status:** Product / UX / Domain / Technical Blueprint — **diselaraskan dengan kode nyata pada 2026-09-01**  
@@ -9,6 +10,7 @@
 **Sibling client:** `esas_attendance` — kiosk absensi, **sudah live di `/api/v1`**  
 **Face service:** `supports` — FastAPI stateless scoring  
 **Source basis:**
+
 - `tenancy-app/app/Panels/Hrms/plans/blueprint.md` — Master Product Blueprint Foundation v1.0 (termasuk §0 Keadaan Nyata Proyek)
 - `tenancy-app/app/Panels/Hrms/plans/implement_prompts/` — Wave 0–11, 128 module plan, ADR 001–010
 - `esas-selfservices/docs/adr/0001…0006` dan `docs/refactoring/00…06`
@@ -19,7 +21,7 @@
 
 1. **§0 adalah kenyataan kode; sisanya rancangan.** Bila keduanya berbeda, §0 yang berlaku untuk perencanaan — aturan yang sama dipakai Master Blueprint §0 dan `implement_prompts/000-README.md`.
 2. **Setiap capability punya penopang backend.** Tidak ada layar yang boleh masuk sprint sebelum module plan penopangnya selesai. Pemetaannya di **Lampiran A**.
-3. **Kontrak API yang mengikat ada di Lampiran B**, bukan di badan dokumen. Badan dokumen menjelaskan *mengapa*; lampiran menetapkan *apa*.
+3. **Kontrak API yang mengikat ada di Lampiran B**, bukan di badan dokumen. Badan dokumen menjelaskan _mengapa_; lampiran menetapkan _apa_.
 4. **Nilai policy tenant-specific** (threshold, SLA, jumlah tingkat approval, retensi) tidak di-hardcode; ia configurable dan diselesaikan lewat domain specification.
 5. **Penomoran §1–§151 dipertahankan** dari v1.0 supaya rujukan lama tetap valid; penyesuaian dilakukan di dalam bagian, bukan dengan menomori ulang.
 
@@ -38,12 +40,12 @@
 
 ## 0.1 Peta repositori
 
-| Repo | Peran | Kondisi terverifikasi |
-|---|---|---|
-| `tenancy-app` | Backend tunggal untuk seluruh client mobile | 20 route `/api/v1`, 9 controller API, 23 Filament resource HRMS, 39 model `Hrms`, 25 migrasi tenant |
-| `esas-selfservices` | **Aplikasi ini** | 144 berkas Dart, 6 fitur, 22 route, 22 view, 17 controller, 18 berkas test / 171 test hijau; refactor Fase 0–6 **selesai**, Fase 7–9 belum |
-| `esas_attendance` | Client kiosk absensi | **Sudah berjalan di `/api/v1`** — referensi implementasi tenancy, sesi, dan HTTP client yang diadopsi ADR-0005 |
-| `supports` | Face scoring stateless (FastAPI) | Dipanggil hanya oleh `App\Support\Hrms\FaceApiClient` |
+| Repo                | Peran                                       | Kondisi terverifikasi                                                                                                                      |
+| ------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `tenancy-app`       | Backend tunggal untuk seluruh client mobile | 20 route `/api/v1`, 9 controller API, 23 Filament resource HRMS, 39 model `Hrms`, 25 migrasi tenant                                        |
+| `esas-selfservices` | **Aplikasi ini**                            | 144 berkas Dart, 6 fitur, 22 route, 22 view, 17 controller, 18 berkas test / 171 test hijau; refactor Fase 0–6 **selesai**, Fase 7–9 belum |
+| `esas_attendance`   | Client kiosk absensi                        | **Sudah berjalan di `/api/v1`** — referensi implementasi tenancy, sesi, dan HTTP client yang diadopsi ADR-0005                             |
+| `supports`          | Face scoring stateless (FastAPI)            | Dipanggil hanya oleh `App\Support\Hrms\FaceApiClient`                                                                                      |
 
 Empat repositori, **satu backend**. Itu keputusan ADR-0006, dan sudah dibuktikan
 oleh `esas_attendance` yang berjalan di atasnya — bukan asumsi.
@@ -97,14 +99,14 @@ Enam fitur, masing-masing `data/{models,repositories,services}` +
 `presentation/{bindings,controllers,routes,views,widgets}`. 22 route dipatok oleh
 test verbatim karena string-nya dipakai payload FCM.
 
-| Sudah jadi dan terbukti | Belum |
-|---|---|
-| `ApiClient` tunggal, origin di-resolve per request, 401 → sesi berakhir | Fase 7 platform services (FCM iOS, background handler) |
-| `ServerConfig` + `TenantContext` + header `X-Tenant` (ADR-0005) | Fase 8 testing, Fase 9 dokumentasi |
-| Token di keychain/EncryptedSharedPreferences, mirror `GetStorage` **sudah mati** | Offline cache apa pun — belum ada sama sekali |
-| `BootPipeline` dengan klasifikasi fatal/optional per langkah | Entitlement, feature flag, persona switching |
-| `AppLogger` dengan redaksi token/password/NIP/FCM | Deep link `app://` — belum ada handler |
-| Route ↔ binding diuji, `ignore_for_file` nol di `lib/` | Step-up auth, screenshot protection |
+| Sudah jadi dan terbukti                                                          | Belum                                                  |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `ApiClient` tunggal, origin di-resolve per request, 401 → sesi berakhir          | Fase 7 platform services (FCM iOS, background handler) |
+| `ServerConfig` + `TenantContext` + header `X-Tenant` (ADR-0005)                  | Fase 8 testing, Fase 9 dokumentasi                     |
+| Token di keychain/EncryptedSharedPreferences, mirror `GetStorage` **sudah mati** | Offline cache apa pun — belum ada sama sekali          |
+| `BootPipeline` dengan klasifikasi fatal/optional per langkah                     | Entitlement, feature flag, persona switching           |
+| `AppLogger` dengan redaksi token/password/NIP/FCM                                | Deep link `app://` — belum ada handler                 |
+| Route ↔ binding diuji, `ignore_for_file` nol di `lib/`                           | Step-up auth, screenshot protection                    |
 
 Enam fitur itu memetakan ke ESS: `home`, `attendance`, `permit` (= leave),
 `profile`, `notification`, `auth`. **Tidak ada** schedule, overtime, pay, requests,
@@ -115,11 +117,11 @@ inbox/approvals, documents, skills, learning, performance, team, atau AI.
 Repositori ini memberi **dua jawaban berbeda** untuk pertanyaan yang sama: di
 namespace mana self-service dilayani?
 
-| Sumber | Jawaban |
-|---|---|
-| ADR-0006 + `docs/refactoring/06-api-migration-map.md` | `/api/v1` — 24 endpoint sudah dipetakan ke sana |
-| `lib/core/config/env.dart` (kode yang berjalan) | `/api/selfservice` — nilai default `Env.apiPrefix` |
-| `tenancy-app/routes/api.php` (kenyataan server) | **`/api/selfservice` tidak ada**, dan 18 dari 24 endpoint belum ada di `/api/v1` |
+| Sumber                                                | Jawaban                                                                          |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------- |
+| ADR-0006 + `docs/refactoring/06-api-migration-map.md` | `/api/v1` — 24 endpoint sudah dipetakan ke sana                                  |
+| `lib/core/config/env.dart` (kode yang berjalan)       | `/api/selfservice` — nilai default `Env.apiPrefix`                               |
+| `tenancy-app/routes/api.php` (kenyataan server)       | **`/api/selfservice` tidak ada**, dan 18 dari 24 endpoint belum ada di `/api/v1` |
 
 Instruksi owner pada Fase 4 adalah "path tidak lagi menyebut layout modul
 backend". **Kedua opsi memenuhi instruksi itu** — `/api/v1/permits` sama tidak
@@ -170,18 +172,18 @@ Lampiran B.
 **B. Domain yang belum ada sama sekali di backend.** Layar untuknya tidak boleh
 dijadwalkan sebelum module plan-nya selesai:
 
-| Kebutuhan blueprint mobile | Kondisi backend | Module plan penopang |
-|---|---|---|
-| Overtime request | tidak ada tabel/model | `122-overtime` (Wave 2) |
-| Schedule employee-facing | `UserTimeworkSchedule` ada; belum ada API | `118-scheduling-foundation` (Wave 2) |
-| Payslip untuk karyawan | run payroll + `PayrollItem` ada; **publikasi ke karyawan belum** | `142-payslip` (Wave 4) |
-| Expense, cash advance, travel, loan | tidak ada | `149`–`152` (Wave 5) |
-| Documents, e-signature | `Documentation` hanya artikel panel | `129`, `197`, `198` |
-| Approval generik multi-tier | hanya `PermitApprove`, khusus izin | `125-approval-engine` (Wave 3) |
-| Skills, learning, performance, career | tidak ada | Wave 6 & Wave 8 |
-| Helpdesk, knowledge base | tidak ada (`BugReport` bukan tiket) | `194`, `196` (Wave 8) |
-| Entitlement / feature flag | tidak ada; `Tenant::DATA_SHAPE` mengunci 8 kunci kredensial | `217`, `227` (Wave 11) |
-| Effective dating, audit engine, outbox | nol kolom, nol tabel | `100`, `101`, `104` (Wave 0) |
+| Kebutuhan blueprint mobile             | Kondisi backend                                                  | Module plan penopang                 |
+| -------------------------------------- | ---------------------------------------------------------------- | ------------------------------------ |
+| Overtime request                       | tidak ada tabel/model                                            | `122-overtime` (Wave 2)              |
+| Schedule employee-facing               | `UserTimeworkSchedule` ada; belum ada API                        | `118-scheduling-foundation` (Wave 2) |
+| Payslip untuk karyawan                 | run payroll + `PayrollItem` ada; **publikasi ke karyawan belum** | `142-payslip` (Wave 4)               |
+| Expense, cash advance, travel, loan    | tidak ada                                                        | `149`–`152` (Wave 5)                 |
+| Documents, e-signature                 | `Documentation` hanya artikel panel                              | `129`, `197`, `198`                  |
+| Approval generik multi-tier            | hanya `PermitApprove`, khusus izin                               | `125-approval-engine` (Wave 3)       |
+| Skills, learning, performance, career  | tidak ada                                                        | Wave 6 & Wave 8                      |
+| Helpdesk, knowledge base               | tidak ada (`BugReport` bukan tiket)                              | `194`, `196` (Wave 8)                |
+| Entitlement / feature flag             | tidak ada; `Tenant::DATA_SHAPE` mengunci 8 kunci kredensial      | `217`, `227` (Wave 11)               |
+| Effective dating, audit engine, outbox | nol kolom, nol tabel                                             | `100`, `101`, `104` (Wave 0)         |
 
 **C. Fondasi Wave 0 belum ada.** Tanpa audit engine dan outbox, klaim §102 (audit
 setiap aksi sensitif) dan §99 (notifikasi event-driven) belum dapat dipenuhi:
@@ -189,18 +191,18 @@ notifikasi hari ini dikirim langsung dari kode domain, bukan dari domain event.
 
 ## 0.7 Risiko terbuka yang membatasi rollout
 
-| ID | Risiko | Sisi | Dampak ke mobile |
-|---|---|---|---|
-| CRIT-01 | Keystore rilis ter-commit | client | Play App Signing belum dijawab; memblokir rilis publik |
-| CRIT-02 / TEN-03 | Validasi TLS dimatikan global (`MyHttpOverrides`) | client | **Harus mati sebelum Gate A**; menunggu sertifikat wildcard |
-| CRIT-05 | Token/PII pada log rilis | client | `AppLogger` siap; pemasangan di Fase 7 |
-| HIGH-03 / HIGH-05 | iOS tak pernah mendaftarkan FCM token; background handler memakai plugin belum ter-init | client | Push iOS mati; Fase 7 |
-| HIGH-08 | `com.example.esas` sebagai application id | client | Ditolak Play Store |
-| G-2 | Device binding: satu akun satu handset, dilepas HR | backend | **Keputusan produk**, belum diambil untuk self-service |
-| G-3 | Token abilities hanya `['attendance']` | backend | **Dugaan ini terbantah oleh observasi runtime 2026-09-03**: `announcements` dan `permits` berhasil pada token yang sama sementara `attendance/context` menjawab 403 — kebalikan dari yang diramalkan G-3. Penyebab 403 belum diketahui; sumber backend tidak tersedia. Lihat `docs/HOME_DASHBOARD.md` §8 |
-| AUTHZ | `WorkspacePermissions::isEnforced()` fail-open pada workspace tanpa role | backend | Deny-by-default yang diasumsikan §84 belum berlaku |
-| QR-DEPT | `redeem` meloloskan karyawan yang tidak punya departemen | backend | Fail-open kecil; harus fail-closed sebelum QR dibuka luas |
-| LICENSE | Model wajah `buffalo_l` non-komersial | supports | Memblokir komersialisasi fitur wajah |
+| ID                | Risiko                                                                                  | Sisi     | Dampak ke mobile                                                                                                                                                                                                                                                                                         |
+| ----------------- | --------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CRIT-01           | Keystore rilis ter-commit                                                               | client   | Play App Signing belum dijawab; memblokir rilis publik                                                                                                                                                                                                                                                   |
+| CRIT-02 / TEN-03  | Validasi TLS dimatikan global (`MyHttpOverrides`)                                       | client   | **Harus mati sebelum Gate A**; menunggu sertifikat wildcard                                                                                                                                                                                                                                              |
+| CRIT-05           | Token/PII pada log rilis                                                                | client   | `AppLogger` siap; pemasangan di Fase 7                                                                                                                                                                                                                                                                   |
+| HIGH-03 / HIGH-05 | iOS tak pernah mendaftarkan FCM token; background handler memakai plugin belum ter-init | client   | Push iOS mati; Fase 7                                                                                                                                                                                                                                                                                    |
+| HIGH-08           | `com.example.esas` sebagai application id                                               | client   | Ditolak Play Store                                                                                                                                                                                                                                                                                       |
+| G-2               | Device binding: satu akun satu handset, dilepas HR                                      | backend  | **Keputusan produk**, belum diambil untuk self-service                                                                                                                                                                                                                                                   |
+| G-3               | Token abilities hanya `['attendance']`                                                  | backend  | **Dugaan ini terbantah oleh observasi runtime 2026-09-03**: `announcements` dan `permits` berhasil pada token yang sama sementara `attendance/context` menjawab 403 — kebalikan dari yang diramalkan G-3. Penyebab 403 belum diketahui; sumber backend tidak tersedia. Lihat `docs/HOME_DASHBOARD.md` §8 |
+| AUTHZ             | `WorkspacePermissions::isEnforced()` fail-open pada workspace tanpa role                | backend  | Deny-by-default yang diasumsikan §84 belum berlaku                                                                                                                                                                                                                                                       |
+| QR-DEPT           | `redeem` meloloskan karyawan yang tidak punya departemen                                | backend  | Fail-open kecil; harus fail-closed sebelum QR dibuka luas                                                                                                                                                                                                                                                |
+| LICENSE           | Model wajah `buffalo_l` non-komersial                                                   | supports | Memblokir komersialisasi fitur wajah                                                                                                                                                                                                                                                                     |
 
 ## 0.8 Konsekuensi untuk dokumen ini
 
@@ -799,13 +801,13 @@ Server is source of truth.
 
 Metode yang **benar-benar ada** di backend hari ini, dan siapa pemakainya:
 
-| Metode | Endpoint | Pemakai | Status di aplikasi ini |
-|---|---|---|---|
-| Face (handset) | `POST /attendance/face/challenge` → `/attendance/face` | karyawan | ⬜ belum diimplementasi |
-| QR dari mesin | `POST /attendance/qr` | karyawan | 🟨 client punya scanner; endpoint belum dipakai |
-| QR presence departemen | `POST /qr-presences/redeem` | karyawan | 🟨 idem |
-| Terbitkan QR presence | `GET /qr-presences/context` → `POST /qr-presences` | pemegang permission `qr presences` | ⬜ |
-| Face / QR kiosk | `kiosk/*` | mesin absensi | ✖ milik `esas_attendance` |
+| Metode                 | Endpoint                                               | Pemakai                            | Status di aplikasi ini                          |
+| ---------------------- | ------------------------------------------------------ | ---------------------------------- | ----------------------------------------------- |
+| Face (handset)         | `POST /attendance/face/challenge` → `/attendance/face` | karyawan                           | ⬜ belum diimplementasi                         |
+| QR dari mesin          | `POST /attendance/qr`                                  | karyawan                           | 🟨 client punya scanner; endpoint belum dipakai |
+| QR presence departemen | `POST /qr-presences/redeem`                            | karyawan                           | 🟨 idem                                         |
+| Terbitkan QR presence  | `GET /qr-presences/context` → `POST /qr-presences`     | pemegang permission `qr presences` | ⬜                                              |
+| Face / QR kiosk        | `kiosk/*`                                              | mesin absensi                      | ✖ milik `esas_attendance`                       |
 
 Dua saklar menentukan apa yang tampil, dan keduanya **dibaca dari server, bukan
 ditebak client**:
@@ -846,13 +848,13 @@ Yang **sudah dikerjakan server** dan tidak boleh diduplikasi di client:
 - `challenge_id` unik dan barisnya ditulis **sebelum** layanan penilaian dipanggil
   — dua permintaan yang berlomba pada satu rekaman tidak bisa dua-duanya lolos;
 - id diambil dari token yang ditandatangani, bukan dari body permintaan;
-- `inconclusive` diantrekan ke *Kehadiran → Verifikasi wajah* untuk ditinjau HR,
+- `inconclusive` diantrekan ke _Kehadiran → Verifikasi wajah_ untuk ditinjau HR,
   tidak ditolak otomatis; skor tidak pernah ditulis ulang;
 - retensi: klip dibuang setelah dinilai kecuali `HRMS_FACE_KEEP_VIDEO`, frame
   disimpan sampai `HRMS_FACE_MEDIA_RETENTION_DAYS`.
 
 Pendaftaran wajah (lima foto referensi + consent) dilakukan **HR di panel**
-(*Karyawan → Pendaftaran wajah*), bukan di aplikasi ini. Selama belum terdaftar,
+(_Karyawan → Pendaftaran wajah_), bukan di aplikasi ini. Selama belum terdaftar,
 `face_enrolled: false` dan aplikasi mengatakannya di muka.
 
 ## Mandatory UX
@@ -908,7 +910,7 @@ Dua aturan yang tidak boleh dilanggar implementasi apa pun:
 1. **Baris asli tetap dapat ditelusuri.** Koreksi adalah catatan baru dengan
    alasan dan penyetuju, bukan `UPDATE` di tempat.
 2. **Mobile tidak pernah menimpa histori absensi secara diam-diam.** Yang dikirim
-   aplikasi adalah *permintaan*, bukan hasil.
+   aplikasi adalah _permintaan_, bukan hasil.
 
 Sampai audit engine (`101-audit-engine`) ada, koreksi tidak boleh dirilis: koreksi
 tanpa jejak tak terbantahkan justru menghapus nilai bukti dari absensi itu sendiri.
@@ -2286,23 +2288,23 @@ Mobile payroll admin capabilities are intentionally limited unless explicitly de
 
 Mobile does not own domain data.
 
-| Mobile Surface | System of Record |
-|---|---|
-| Profile | People / Employment |
-| Schedule | Scheduling |
-| Attendance | Attendance |
-| Leave | Leave |
-| Overtime | Overtime |
-| Payslip | Payroll |
-| Expenses | Expense |
-| Skills | Skills |
-| Certifications | Skills/Qualification |
-| Learning | Learning |
-| Performance | Performance |
-| Requests | Owning domain / workflow |
-| Notifications | Notification Platform |
-| Tasks | Workflow/Automation |
-| AI | No SoR — governed consumer/action layer |
+| Mobile Surface | System of Record                        |
+| -------------- | --------------------------------------- |
+| Profile        | People / Employment                     |
+| Schedule       | Scheduling                              |
+| Attendance     | Attendance                              |
+| Leave          | Leave                                   |
+| Overtime       | Overtime                                |
+| Payslip        | Payroll                                 |
+| Expenses       | Expense                                 |
+| Skills         | Skills                                  |
+| Certifications | Skills/Qualification                    |
+| Learning       | Learning                                |
+| Performance    | Performance                             |
+| Requests       | Owning domain / workflow                |
+| Notifications  | Notification Platform                   |
+| Tasks          | Workflow/Automation                     |
+| AI             | No SoR — governed consumer/action layer |
 
 ---
 
@@ -2346,32 +2348,32 @@ Aturan yang mengikat setiap endpoint baru:
 Kelompok resource, dengan status nyata — inilah peta yang menggantikan daftar
 konseptual v1.0:
 
-| Group | Endpoint | Status | Penopang |
-|---|---|---|---|
-| `/workspace` | probe workspace | ✅ ada | — |
-| `/auth` | login, me, logout | ✅ ada | — |
-| `/auth/password` | ganti sandi | ⬜ 18-endpoint | `Settings/SecurityController` |
-| `/attendance` | context, face, qr | ✅ ada | `AttendanceDay`, `Geofence` |
-| `/attendances` | riwayat absensi | ⬜ 18-endpoint | `UserAttendance` |
-| `/attendance/summary` | ringkasan bulanan | ⬜ 18-endpoint | `UserAttendance` |
-| `/qr-presences` | terbit + redeem | ✅ ada | permission `qr presences` |
-| `/push-tokens` | daftar + lepas | ✅ ada | `FcmModel` |
-| `/announcements` | daftar, aktif, detail | ⬜ 18-endpoint | `Announcement` |
-| `/notifications` | daftar, tandai dibaca | ⬜ 18-endpoint | tabel `notifications` |
-| `/activities` | log aktivitas | ⬜ 18-endpoint | `ActivityLog` |
-| `/bug-reports` | lapor masalah | ⬜ 18-endpoint | `BugReport` |
-| `/permit-types`, `/permits` | jenis, daftar, form, ajukan, detail, approval | ⬜ 18-endpoint | `Permit`, `PermitApprove` |
-| `/profile` | profil bersarang | ⬜ 18-endpoint | 8 tabel satelit karyawan |
-| `/payroll` | komponen upah karyawan | ⬜ 18-endpoint | `PayrollItem`, `PayrollPeriod` |
-| `/schedules` | jadwal karyawan | ⛔ Wave 2 | `118-scheduling-foundation` |
-| `/overtime` | lembur | ⛔ Wave 2 | `122-overtime` |
-| `/payslips` | slip gaji terbit | ⛔ Wave 4 | `142-payslip` |
-| `/requests`, `/approvals`, `/tasks`, `/inbox` | permintaan generik | ⛔ Wave 3 | `125-approval-engine` |
-| `/expenses`, `/travel`, `/loans` | keuangan karyawan | ⛔ Wave 5 | `149`–`152` |
-| `/documents`, `/e-sign` | dokumen | ⛔ Wave 3/8 | `129`, `197`, `198` |
-| `/skills`, `/certifications`, `/learning`, `/performance` | talenta | ⛔ Wave 6/8 | — |
-| `/team`, `/workforce` | manager & manufaktur | ⛔ Wave 2/7 | `116-mss`, Wave 7 |
-| `/ai` | copilot | ⛔ Wave 10 | `207-ai-gateway` |
+| Group                                                     | Endpoint                                      | Status         | Penopang                       |
+| --------------------------------------------------------- | --------------------------------------------- | -------------- | ------------------------------ |
+| `/workspace`                                              | probe workspace                               | ✅ ada         | —                              |
+| `/auth`                                                   | login, me, logout                             | ✅ ada         | —                              |
+| `/auth/password`                                          | ganti sandi                                   | ⬜ 18-endpoint | `Settings/SecurityController`  |
+| `/attendance`                                             | context, face, qr                             | ✅ ada         | `AttendanceDay`, `Geofence`    |
+| `/attendances`                                            | riwayat absensi                               | ⬜ 18-endpoint | `UserAttendance`               |
+| `/attendance/summary`                                     | ringkasan bulanan                             | ⬜ 18-endpoint | `UserAttendance`               |
+| `/qr-presences`                                           | terbit + redeem                               | ✅ ada         | permission `qr presences`      |
+| `/push-tokens`                                            | daftar + lepas                                | ✅ ada         | `FcmModel`                     |
+| `/announcements`                                          | daftar, aktif, detail                         | ⬜ 18-endpoint | `Announcement`                 |
+| `/notifications`                                          | daftar, tandai dibaca                         | ⬜ 18-endpoint | tabel `notifications`          |
+| `/activities`                                             | log aktivitas                                 | ⬜ 18-endpoint | `ActivityLog`                  |
+| `/bug-reports`                                            | lapor masalah                                 | ⬜ 18-endpoint | `BugReport`                    |
+| `/permit-types`, `/permits`                               | jenis, daftar, form, ajukan, detail, approval | ⬜ 18-endpoint | `Permit`, `PermitApprove`      |
+| `/profile`                                                | profil bersarang                              | ⬜ 18-endpoint | 8 tabel satelit karyawan       |
+| `/payroll`                                                | komponen upah karyawan                        | ⬜ 18-endpoint | `PayrollItem`, `PayrollPeriod` |
+| `/schedules`                                              | jadwal karyawan                               | ⛔ Wave 2      | `118-scheduling-foundation`    |
+| `/overtime`                                               | lembur                                        | ⛔ Wave 2      | `122-overtime`                 |
+| `/payslips`                                               | slip gaji terbit                              | ⛔ Wave 4      | `142-payslip`                  |
+| `/requests`, `/approvals`, `/tasks`, `/inbox`             | permintaan generik                            | ⛔ Wave 3      | `125-approval-engine`          |
+| `/expenses`, `/travel`, `/loans`                          | keuangan karyawan                             | ⛔ Wave 5      | `149`–`152`                    |
+| `/documents`, `/e-sign`                                   | dokumen                                       | ⛔ Wave 3/8    | `129`, `197`, `198`            |
+| `/skills`, `/certifications`, `/learning`, `/performance` | talenta                                       | ⛔ Wave 6/8    | —                              |
+| `/team`, `/workforce`                                     | manager & manufaktur                          | ⛔ Wave 2/7    | `116-mss`, Wave 7              |
+| `/ai`                                                     | copilot                                       | ⛔ Wave 10     | `207-ai-gateway`               |
 
 ✅ ada · ⬜ dipetakan, belum dibangun (Lampiran B) · ⛔ menunggu module plan.
 
@@ -2467,10 +2469,10 @@ workspace ditolak tanpa fallback.
 
 Dua mode yang keduanya didukung dan harus tetap didukung:
 
-| Mode | Kapan | Bentuk |
-|---|---|---|
-| Header | alamat berupa IP/host tunggal, atau DNS wildcard belum ada | `http://host:8000` + `X-Tenant: acme` |
-| Subdomain | produksi dengan wildcard DNS + TLS | `https://acme.hrms.example.com` + `X-Tenant` tetap dikirim |
+| Mode      | Kapan                                                      | Bentuk                                                     |
+| --------- | ---------------------------------------------------------- | ---------------------------------------------------------- |
+| Header    | alamat berupa IP/host tunggal, atau DNS wildcard belum ada | `http://host:8000` + `X-Tenant: acme`                      |
+| Subdomain | produksi dengan wildcard DNS + TLS                         | `https://acme.hrms.example.com` + `X-Tenant` tetap dikirim |
 
 > **TEN-03 masih terbuka:** selama `MyHttpOverrides` mematikan validasi TLS
 > global, mode subdomain tidak boleh dinyatakan aman. Ini syarat Gate A.
@@ -2525,11 +2527,11 @@ Yang sudah dijamin server, dan tidak boleh diulang atau dilemahkan client:
 
 Tiga hal yang **belum** selesai dan berdampak langsung ke aplikasi ini:
 
-| Gap | Isi | Keputusan |
-|---|---|---|
-| **G-2** | `device_id` mengikat akun ke satu handset; handset kedua ditolak sampai HR membebaskan | Produk. Wajar untuk kiosk absensi; belum tentu untuk karyawan yang membuka slip gaji dari ponsel cadangan |
-| **G-3** | Token dicetak dengan abilities `['attendance']` | Backend. Setiap endpoint self-service akan ditolak sampai diperlebar |
-| **G-1** | Payload `user` datar: tanpa `company.latitude/longitude`, `employee.departement_id`, `sign_date` | Sebagian sudah dijawab `attendance/context` (§0.5); sisanya dijawab `GET /profile` (Lampiran B) |
+| Gap     | Isi                                                                                              | Keputusan                                                                                                 |
+| ------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| **G-2** | `device_id` mengikat akun ke satu handset; handset kedua ditolak sampai HR membebaskan           | Produk. Wajar untuk kiosk absensi; belum tentu untuk karyawan yang membuka slip gaji dari ponsel cadangan |
+| **G-3** | Token dicetak dengan abilities `['attendance']`                                                  | Backend. Setiap endpoint self-service akan ditolak sampai diperlebar                                      |
+| **G-1** | Payload `user` datar: tanpa `company.latitude/longitude`, `employee.departement_id`, `sign_date` | Sebagian sudah dijawab `attendance/context` (§0.5); sisanya dijawab `GET /profile` (Lampiran B)           |
 
 Belum ada dan perlu keputusan tersendiri: refresh token (Sanctum di sini
 berumur panjang tanpa rotasi), MFA, biometric **local unlock** (berbeda dari face
@@ -2573,13 +2575,13 @@ Yang **sudah** berlaku di aplikasi ini:
 
 Yang **belum** dan menjadi syarat gate:
 
-| Item | Status | Gate |
-|---|---|---|
-| Validasi TLS aktif (hapus bypass global) | ⛔ CRIT-02/TEN-03 | A |
-| Redaksi terpasang di seluruh jalur log rilis | 🟨 CRIT-05, Fase 7 | A |
-| Tidak ada cache slip gaji/bank/pajak dalam bentuk polos | ⬜ belum relevan — fiturnya belum ada | C |
-| Screenshot protection untuk layar finansial | ⬜ keputusan produk | C |
-| Hapus cache sensitif saat logout/ganti akun | 🟨 sesi sudah; cache domain belum ada | B |
+| Item                                                    | Status                                | Gate |
+| ------------------------------------------------------- | ------------------------------------- | ---- |
+| Validasi TLS aktif (hapus bypass global)                | ⛔ CRIT-02/TEN-03                     | A    |
+| Redaksi terpasang di seluruh jalur log rilis            | 🟨 CRIT-05, Fase 7                    | A    |
+| Tidak ada cache slip gaji/bank/pajak dalam bentuk polos | ⬜ belum relevan — fiturnya belum ada | C    |
+| Screenshot protection untuk layar finansial             | ⬜ keputusan produk                   | C    |
+| Hapus cache sensitif saat logout/ganti akun             | 🟨 sesi sudah; cache domain belum ada | B    |
 
 Catatan yang mudah terlewat: **cache user record sengaja dipertahankan** saat
 restore sesi — kehilangannya hanya berarti satu refresh, bukan sesi yang putus.
@@ -2672,7 +2674,7 @@ tabel `fcm_models` masing-masing tenant.
 
 Registrasi dikunci pada **token, bukan orang** — ponsel yang diwariskan ke
 karyawan pengganti melaporkan token yang sama, sehingga registrasi
-*memindahkan*, bukan menambah pendengar kedua.
+_memindahkan_, bukan menambah pendengar kedua.
 
 Deep link hari ini memakai **string route aplikasi** (22 path yang dipatok test),
 bukan skema `app://` — payload FCM membawa path, dan instalasi yang diperbarui
@@ -2697,11 +2699,11 @@ Bentuk yang **berlaku hari ini**: tiga notifikasi dikirim langsung dari kode
 domain, tanpa event dan tanpa outbox (`104-domain-events-and-transactional-outbox`
 masih Wave 0 dan belum dikerjakan):
 
-| Kejadian | Yang mendengar |
-|---|---|
+| Kejadian                          | Yang mendengar                          |
+| --------------------------------- | --------------------------------------- |
 | rantai izin sampai pada seseorang | peninjau itu saja — rantainya berurutan |
-| rantai izin selesai | pengaju |
-| pengumuman diterbitkan | orang di perusahaan itu |
+| rantai izin selesai               | pengaju                                 |
+| pengumuman diterbitkan            | orang di perusahaan itu                 |
 
 Kegagalan dibedakan: perangkat yang dilaporkan `UNREGISTERED` dihapus barisnya,
 perangkat yang gagal karena Firebase sedang mati tidak — menghapus token satu
@@ -2783,13 +2785,13 @@ DEVICE/SESSION CONTEXT where appropriate
 
 Sinyal perangkat yang **sudah** dikirim/dipakai hari ini:
 
-| Sinyal | Dari | Dipakai untuk |
-|---|---|---|
-| `device_id` | `device_info_plus` saat login | Mengikat akun ke satu handset (G-2) |
-| Push token + platform | FCM | Menyalakan notifikasi; dilepas saat logout |
-| Atestasi ML Kit | perangkat, saat absensi wajah | Menandai rekaman yang gagal liveness di sisi client |
-| Koordinat | `geolocator` | Geofence; server tetap yang memutuskan |
-| Deteksi mock GPS | `LocationService` | Anti-fraud absensi |
+| Sinyal                | Dari                          | Dipakai untuk                                       |
+| --------------------- | ----------------------------- | --------------------------------------------------- |
+| `device_id`           | `device_info_plus` saat login | Mengikat akun ke satu handset (G-2)                 |
+| Push token + platform | FCM                           | Menyalakan notifikasi; dilepas saat logout          |
+| Atestasi ML Kit       | perangkat, saat absensi wajah | Menandai rekaman yang gagal liveness di sisi client |
+| Koordinat             | `geolocator`                  | Geofence; server tetap yang memutuskan              |
+| Deteksi mock GPS      | `LocationService`             | Anti-fraud absensi                                  |
 
 Yang belum dikirim dan sebaiknya ada sebelum Gate B: versi aplikasi dan versi OS —
 keduanya prasyarat force-update (§137) dan diagnosis lapangan.
@@ -3202,11 +3204,13 @@ Dari 93 layar baseline, **22 sudah ada**. Itu bukan kekurangan — itu ukuran ja
 yang harus dipakai untuk menganggarkan, menggantikan kesan "tinggal menambah layar".
 
 ## Home
+
 1. Home — ✅
 2. Quick Actions — 🟨 (kartu ringkasan + aktivitas terakhir sudah ada; aksi cepat belum berbasis kapabilitas)
 3. Attention Detail — ⬜
 
 ## Attendance
+
 4. Attendance Home — ✅
 5. Clock Action — 🟨 (pemindai QR ada; `attendance/qr` belum dipakai; wajah belum)
 6. Attendance History — ✅
@@ -3216,11 +3220,13 @@ yang harus dipakai untuk menganggarkan, menggantikan kesan "tinggal menambah lay
 10. Consent — ⛔ mengikuti §9
 
 ## Schedule — ⛔ Wave 2 (`118-scheduling-foundation`)
+
 11. Schedule Calendar · 12. Shift Detail · 13. Open Shifts · 14. Shift Bid · 15. Shift Swap · 16. Availability
 
 > Jadwal hari ini **sudah** tampil di Home dan di `attendance/context`; yang belum ada adalah modul jadwal sebagai layar tersendiri.
 
 ## Leave — dilayani fitur `permit`
+
 17. Leave Overview — ✅
 18. Leave Balances — ⬜ (butuh perhitungan saldo di domain, bukan di client)
 19. New Leave — ✅
@@ -3229,23 +3235,29 @@ yang harus dipakai untuk menganggarkan, menggantikan kesan "tinggal menambah lay
 22. Leave Calendar — ⬜
 
 ## Overtime — ⛔ Wave 2 (`122-overtime`, belum ada tabel)
+
 23. Overtime Overview · 24. New Overtime · 25. Assigned Overtime · 26. Overtime Detail · 27. Overtime History
 
 ## Pay — ⛔ Wave 4 (`142-payslip`)
+
 28. Payslips · 29. Payslip Detail · 30. Explain Pay · 31. THR/Off-cycle Detail · 32. Loan Deduction
 
 > `/profile/payroll` sudah ada dan menampilkan komponen upah dari payload profil — itu **bukan** slip gaji terbit, dan tidak boleh dinamai demikian di UI.
 
 ## Requests — ⛔ Wave 3 (`125-approval-engine`)
+
 33. Requests Home · 34. Generic Request Form · 35. Request Detail · 36. Request History
 
 ## Expense — ⛔ Wave 5
+
 37. Expense List · 38. New Expense · 39. Receipt Capture · 40. Expense Detail
 
 ## Travel / Advance / Loan — ⛔ Wave 5
+
 41. Travel · 42. Travel Detail · 43. Cash Advance · 44. Settlement · 45. Loan Overview · 46. Loan Detail
 
 ## Inbox
+
 47. Inbox — ⬜
 48. Approval Detail — 🟨 (`permits/{id}/approval` dipetakan; inbox generik menunggu Wave 3)
 49. Tasks — ⛔ Wave 3
@@ -3253,9 +3265,11 @@ yang harus dipakai untuk menganggarkan, menggantikan kesan "tinggal menambah lay
 51. Announcements — ✅ (daftar + detail)
 
 ## Documents — ⛔ Wave 3/8
+
 52. Documents · 53. Document Detail · 54. Sign Document
 
 ## Profile
+
 55. Profile — ✅
 56. Personal Data — ✅
 57. Employment — ✅
@@ -3276,15 +3290,19 @@ Ada satu layar yang **sudah ada tetapi tidak tercantum di baseline v1.0**:
 kelak menjadi jalan masuk ke Helpdesk (§53).
 
 ## Employee Services — ⛔ Wave 8
+
 69. Help Center · 70. New Ticket · 71. Ticket Detail · 72. Knowledge Base · 73. Article Detail
 
 ## Skills/Learning — ⛔ Wave 6 & 8
+
 74. My Skills · 75. Skill Detail · 76. Certifications · 77. Certification Detail · 78. Learning Home · 79. Course Detail · 80. Training Detail · 81. Quiz/Assessment
 
 ## Performance/Career — ⛔ Wave 8
+
 82. Goals · 83. Goal Detail · 84. Performance Cycle · 85. Self Review · 86. Feedback · 87. 1-on-1 · 88. Development Plan · 89. Career Path
 
 ## Engagement
+
 90. Surveys — ⛔ Wave 8 · 91. Survey Form — ⛔ · 92. Recognition — ⛔ · 93. Company News — ✅
 
 Total baseline: **93 layar**, dengan visibilitas nyata ditentukan capability.
@@ -3299,10 +3317,10 @@ penopangnya adalah `116-mss` (Wave 2) untuk 94–103 serta Wave 7 untuk 104–11
 
 94. My Team · 95. Team Member · 96. Team Attendance · 97. Team Schedule · 98. Team Leave · 99. Team Overtime · 100. Approval Queue · 101. Team Goals · 102. Team Performance · 103. Team Skills
 
-104. Coverage · 105. Replacement Candidates · 106. Crew · 107. Crew Matrix · 108. Line Assignment · 109. Qualification Alert
+95. Coverage · 105. Replacement Candidates · 106. Crew · 107. Crew Matrix · 108. Line Assignment · 109. Qualification Alert
 
-110. Interview Schedule · 111. Candidate Brief · 112. Interview Scorecard — ⛔ Wave 8
-113. Training Attendance · 114. Skill Validation — ⛔ Wave 8
+96. Interview Schedule · 111. Candidate Brief · 112. Interview Scorecard — ⛔ Wave 8
+97. Training Attendance · 114. Skill Validation — ⛔ Wave 8
 
 > Persyaratan yang berlaku untuk **semua** layar di atas: organization scope datang
 > dari server. Filter di layar bukan pembatas akses (§142).
@@ -3328,20 +3346,20 @@ Matriks ini adalah **rancangan produk**, dan hari ini belum ada mekanisme yang
 menegakkannya di mobile: aplikasi belum menerima daftar kapabilitas dari server
 (§140), sehingga visibilitas masih ditentukan kode.
 
-| Capability | Employee | Manager | Supervisor | Executive |
-|---|:---:|:---:|:---:|:---:|
-| Attendance | ✓ | ✓ | ✓ | optional |
-| Schedule | ✓ | ✓ | ✓ | — |
-| Leave | ✓ | ✓ | ✓ | — |
-| Overtime | ✓ | ✓ | ✓ | analytics |
-| Payslip | own | own | own | own |
-| Approvals | if approver | ✓ | ✓ | critical |
-| Team | — | ✓ | ✓ | — |
-| Skills | own | team scope | crew scope | summary |
-| Learning | own | team | crew | summary |
-| Performance | own | team | team | summary |
-| Workforce Coverage | — | optional | ✓ | summary |
-| AI | entitlement | entitlement | entitlement | entitlement |
+| Capability         |  Employee   |   Manager   | Supervisor  |  Executive  |
+| ------------------ | :---------: | :---------: | :---------: | :---------: |
+| Attendance         |      ✓      |      ✓      |      ✓      |  optional   |
+| Schedule           |      ✓      |      ✓      |      ✓      |      —      |
+| Leave              |      ✓      |      ✓      |      ✓      |      —      |
+| Overtime           |      ✓      |      ✓      |      ✓      |  analytics  |
+| Payslip            |     own     |     own     |     own     |     own     |
+| Approvals          | if approver |      ✓      |      ✓      |  critical   |
+| Team               |      —      |      ✓      |      ✓      |      —      |
+| Skills             |     own     | team scope  | crew scope  |   summary   |
+| Learning           |     own     |    team     |    crew     |   summary   |
+| Performance        |     own     |    team     |    team     |   summary   |
+| Workforce Coverage |      —      |  optional   |      ✓      |   summary   |
+| AI                 | entitlement | entitlement | entitlement | entitlement |
 
 Peran yang **benar-benar ada** di database tenant hari ini adalah lima:
 `super-admin`, `admin`, `hr-admin`, `manager`, `employee`. Persona di dokumen ini
@@ -3404,17 +3422,17 @@ jangan pula menjanjikan layar yang domainnya belum ada.
 
 Menambahkan, dan setiap baris punya prasyarat yang tidak bisa dilompati:
 
-| Kemampuan | Prasyarat |
-|---|---|
-| Payslip | `142-payslip` — publikasi slip ke karyawan (hari ini payroll berhenti di panel) |
-| THR | `138-thr` |
-| Explain Pay Lite | `133-calculation-trace` — tanpa jejak perhitungan, "explain" hanyalah label |
-| Bank / Tax / BPJS Profile | **step-up auth (§93) + field-level authorization** |
-| Employee Requests | `195-employee-request` + Approval Engine |
-| Expense / Reimbursement | `150-expense` |
-| Helpdesk | `194-hr-helpdesk` (Bug Report menjadi jalan masuknya) |
-| Knowledge Base | `196-knowledge-base` |
-| E-Sign | `198-e-signature` + step-up |
+| Kemampuan                 | Prasyarat                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| Payslip                   | `142-payslip` — publikasi slip ke karyawan (hari ini payroll berhenti di panel) |
+| THR                       | `138-thr`                                                                       |
+| Explain Pay Lite          | `133-calculation-trace` — tanpa jejak perhitungan, "explain" hanyalah label     |
+| Bank / Tax / BPJS Profile | **step-up auth (§93) + field-level authorization**                              |
+| Employee Requests         | `195-employee-request` + Approval Engine                                        |
+| Expense / Reimbursement   | `150-expense`                                                                   |
+| Helpdesk                  | `194-hr-helpdesk` (Bug Report menjadi jalan masuknya)                           |
+| Knowledge Base            | `196-knowledge-base`                                                            |
+| E-Sign                    | `198-e-signature` + step-up                                                     |
 
 > Tidak ada layar finansial yang dirilis sebelum field-level authorization ada.
 > Kebocoran yang sudah tercatat di §0 blueprint induk — field gaji tergerbang di
@@ -3492,18 +3510,18 @@ penghambatnya bukan di aplikasi ini.
 
 ## Mobile Gate A — Safe Identity
 
-| Syarat | Pemilik | Status |
-|---|---|---|
-| Autentikasi + tenant isolation | mobile + backend | ✅ tersedia |
-| **M-D1 namespace API diputuskan** | owner | ⛔ terbuka |
-| Validasi TLS aktif (bypass global dihapus) | mobile + infra | ⛔ CRIT-02 / TEN-03 |
-| Keystore & application id layak rilis | owner | ⛔ CRIT-01 / HIGH-08 |
-| Redaksi log rilis terpasang | mobile | 🟨 CRIT-05 |
-| Secure storage untuk kredensial | mobile | ✅ |
-| Otorisasi fail-closed | backend | ⛔ `102-authorization-hardening` |
-| Token abilities memadai (G-3) | backend | ⛔ |
-| Kebijakan device binding diputuskan (G-2) | produk | ⛔ |
-| Audit atas aksi sensitif | backend | ⛔ `101-audit-engine` |
+| Syarat                                     | Pemilik          | Status                           |
+| ------------------------------------------ | ---------------- | -------------------------------- |
+| Autentikasi + tenant isolation             | mobile + backend | ✅ tersedia                      |
+| **M-D1 namespace API diputuskan**          | owner            | ⛔ terbuka                       |
+| Validasi TLS aktif (bypass global dihapus) | mobile + infra   | ⛔ CRIT-02 / TEN-03              |
+| Keystore & application id layak rilis      | owner            | ⛔ CRIT-01 / HIGH-08             |
+| Redaksi log rilis terpasang                | mobile           | 🟨 CRIT-05                       |
+| Secure storage untuk kredensial            | mobile           | ✅                               |
+| Otorisasi fail-closed                      | backend          | ⛔ `102-authorization-hardening` |
+| Token abilities memadai (G-3)              | backend          | ⛔                               |
+| Kebijakan device binding diputuskan (G-2)  | produk           | ⛔                               |
+| Audit atas aksi sensitif                   | backend          | ⛔ `101-audit-engine`            |
 
 ## Mobile Gate B — Operational ESS
 
@@ -3911,41 +3929,41 @@ menyebut **pemilik** dan **penghambat**.
 
 ### Blok 0 — dapat dikerjakan sekarang, tanpa menunggu siapa pun
 
-| # | Pekerjaan | Pemilik |
-|---|---|---|
-| 1 | **M-D1: putuskan namespace API** (§0.4) | owner |
-| 2 | Fase 7 client: FCM iOS (HIGH-03), background handler (HIGH-05), redaksi log rilis (CRIT-05) | mobile |
-| 3 | Jawab CRIT-01 (Play App Signing) dan HIGH-08 (application id) | owner |
-| 4 | Sertifikat valid → matikan bypass TLS (CRIT-02/TEN-03) | infra + mobile |
-| 5 | Putuskan G-2 (device binding) dan G-3 (token abilities) | produk + backend |
+| #   | Pekerjaan                                                                                   | Pemilik          |
+| --- | ------------------------------------------------------------------------------------------- | ---------------- |
+| 1   | **M-D1: putuskan namespace API** (§0.4)                                                     | owner            |
+| 2   | Fase 7 client: FCM iOS (HIGH-03), background handler (HIGH-05), redaksi log rilis (CRIT-05) | mobile           |
+| 3   | Jawab CRIT-01 (Play App Signing) dan HIGH-08 (application id)                               | owner            |
+| 4   | Sertifikat valid → matikan bypass TLS (CRIT-02/TEN-03)                                      | infra + mobile   |
+| 5   | Putuskan G-2 (device binding) dan G-3 (token abilities)                                     | produk + backend |
 
 ### Blok 1 — Gate A: identitas yang aman
 
-| # | Pekerjaan | Pemilik |
-|---|---|---|
-| 6 | `102-authorization-hardening` — hentikan fail-open | backend |
-| 7 | `101-audit-engine` — audit ditulis application service | backend |
-| 8 | Pindahkan auth client ke kontrak `/api/v1` (identifier + device_id, logout POST + fcm_token) | mobile |
-| 9 | Absensi: pakai `attendance/context`, `attendance/qr`, wajah | mobile |
+| #   | Pekerjaan                                                                                    | Pemilik |
+| --- | -------------------------------------------------------------------------------------------- | ------- |
+| 6   | `102-authorization-hardening` — hentikan fail-open                                           | backend |
+| 7   | `101-audit-engine` — audit ditulis application service                                       | backend |
+| 8   | Pindahkan auth client ke kontrak `/api/v1` (identifier + device_id, logout POST + fcm_token) | mobile  |
+| 9   | Absensi: pakai `attendance/context`, `attendance/qr`, wajah                                  | mobile  |
 
 ### Blok 2 — Gate B: ESS operasional
 
-| # | Pekerjaan | Pemilik |
-|---|---|---|
-| 10 | 18 endpoint self-service, **satu fitur per kali**, urutan Lampiran B | backend |
-| 11 | Home · Profil · Izin · Pengumuman · Notifikasi · Bug report ke kontrak baru | mobile |
-| 12 | `GET /bootstrap` (§140) dan navigasi berbasis kapabilitas | backend + mobile |
-| 13 | `Idempotency-Key` pada seluruh write | keduanya |
-| 14 | `118-scheduling-foundation` → layar Schedule | backend → mobile |
-| 15 | `122-overtime` → layar Overtime | backend → mobile |
-| 16 | `125-approval-engine` → Inbox + Approvals + Tasks | backend → mobile |
-| 17 | `129-document-platform` → Documents | backend → mobile |
+| #   | Pekerjaan                                                                   | Pemilik          |
+| --- | --------------------------------------------------------------------------- | ---------------- |
+| 10  | 18 endpoint self-service, **satu fitur per kali**, urutan Lampiran B        | backend          |
+| 11  | Home · Profil · Izin · Pengumuman · Notifikasi · Bug report ke kontrak baru | mobile           |
+| 12  | `GET /bootstrap` (§140) dan navigasi berbasis kapabilitas                   | backend + mobile |
+| 13  | `Idempotency-Key` pada seluruh write                                        | keduanya         |
+| 14  | `118-scheduling-foundation` → layar Schedule                                | backend → mobile |
+| 15  | `122-overtime` → layar Overtime                                             | backend → mobile |
+| 16  | `125-approval-engine` → Inbox + Approvals + Tasks                           | backend → mobile |
+| 17  | `129-document-platform` → Documents                                         | backend → mobile |
 
 ### Blok 3 — Gate C: aman untuk payroll
 
 18. Field-level authorization · 19. Step-up auth (§93) · 20. `142-payslip` →
-Payslip + Explain Pay · 21. Bank/Pajak/BPJS · 22. `150-expense` → Expense ·
-23. `194-hr-helpdesk` + `196-knowledge-base`.
+    Payslip + Explain Pay · 21. Bank/Pajak/BPJS · 22. `150-expense` → Expense ·
+19. `194-hr-helpdesk` + `196-knowledge-base`.
 
 ### Blok 4 — Gate D: manufaktur
 
@@ -3994,32 +4012,32 @@ Tiga alasan urutan ini, bukan urutan yang terlihat lebih menarik:
 
 Epic tetap seperti v1.0, ditambah kolom yang membuatnya dapat dijadwalkan:
 
-| Epic | Gate | Penopang backend | Status |
-|---|---|---|---|
-| MOB-00 Foundation | A | — | ✅ Fase 0–6 selesai |
-| MOB-01 Authentication & Tenant | A | ada | 🟨 pindah kontrak |
-| MOB-02 App Bootstrap & Navigation | B | `GET /bootstrap` | ⬜ |
-| MOB-03 Home | B | 3 endpoint | ⬜ |
-| MOB-04 Attendance | A/B | ✅ ada | 🟨 |
-| MOB-05 Schedule | B | `118` | ⛔ |
-| MOB-06 Leave | B | 6 endpoint | ⬜ |
-| MOB-07 Overtime | B | `122` | ⛔ |
-| MOB-08 Inbox & Approvals | B | `125` | ⛔ |
-| MOB-09 Profile | B | `/profile` | ⬜ |
-| MOB-10 Documents | B | `129` | ⛔ |
-| MOB-11 Payroll | C | `142`, `133` | ⛔ |
-| MOB-12 Requests & Helpdesk | C | `194`, `195` | ⛔ |
-| MOB-13 Expense & Finance | C | `149`–`152` | ⛔ |
-| MOB-14 Skills & Certification | D | Wave 6 | ⛔ |
-| MOB-15 Learning | D | Wave 8 | ⛔ |
-| MOB-16 Performance | D | Wave 8 | ⛔ |
-| MOB-17 Manager Workspace | D | `116` | ⛔ |
-| MOB-18 Manufacturing Workforce | D | Wave 7 | ⛔ |
-| MOB-19 Engagement | D | Wave 8 | ⛔ |
-| MOB-20 AI | E | Wave 10 | ⛔ |
-| MOB-21 Security & Privacy | A | `102`, `101` | 🟨 |
-| MOB-22 Observability | B | — | ⬜ |
-| MOB-23 Accessibility & Localization | B | — | 🟨 locale `id` sudah dipasang |
+| Epic                                | Gate | Penopang backend | Status                        |
+| ----------------------------------- | ---- | ---------------- | ----------------------------- |
+| MOB-00 Foundation                   | A    | —                | ✅ Fase 0–6 selesai           |
+| MOB-01 Authentication & Tenant      | A    | ada              | 🟨 pindah kontrak             |
+| MOB-02 App Bootstrap & Navigation   | B    | `GET /bootstrap` | ⬜                            |
+| MOB-03 Home                         | B    | 3 endpoint       | ⬜                            |
+| MOB-04 Attendance                   | A/B  | ✅ ada           | 🟨                            |
+| MOB-05 Schedule                     | B    | `118`            | ⛔                            |
+| MOB-06 Leave                        | B    | 6 endpoint       | ⬜                            |
+| MOB-07 Overtime                     | B    | `122`            | ⛔                            |
+| MOB-08 Inbox & Approvals            | B    | `125`            | ⛔                            |
+| MOB-09 Profile                      | B    | `/profile`       | ⬜                            |
+| MOB-10 Documents                    | B    | `129`            | ⛔                            |
+| MOB-11 Payroll                      | C    | `142`, `133`     | ⛔                            |
+| MOB-12 Requests & Helpdesk          | C    | `194`, `195`     | ⛔                            |
+| MOB-13 Expense & Finance            | C    | `149`–`152`      | ⛔                            |
+| MOB-14 Skills & Certification       | D    | Wave 6           | ⛔                            |
+| MOB-15 Learning                     | D    | Wave 8           | ⛔                            |
+| MOB-16 Performance                  | D    | Wave 8           | ⛔                            |
+| MOB-17 Manager Workspace            | D    | `116`            | ⛔                            |
+| MOB-18 Manufacturing Workforce      | D    | Wave 7           | ⛔                            |
+| MOB-19 Engagement                   | D    | Wave 8           | ⛔                            |
+| MOB-20 AI                           | E    | Wave 10          | ⛔                            |
+| MOB-21 Security & Privacy           | A    | `102`, `101`     | 🟨                            |
+| MOB-22 Observability                | B    | —                | ⬜                            |
+| MOB-23 Accessibility & Localization | B    | —                | 🟨 locale `id` sudah dipasang |
 
 Epic ber-status ⛔ **tidak boleh masuk sprint planning**. Ia masuk ke dependency
 board bersama module plan yang menopangnya.
@@ -4193,41 +4211,41 @@ The goal is:
 Setiap capability mobile, modul backend yang menopangnya, dan status nyatanya.
 **Inilah yang menentukan apa yang boleh masuk sprint** — bukan §122.
 
-| § | Capability mobile | Module plan penopang | Wave | Backend | Mobile |
-|---|---|---|---|---|---|
-| 8–11 | Home / persona home | `115-ess`, `GET /bootstrap` | 2 | ⬜ | 🟨 |
-| 12–18 | Attendance | `119-attendance`, `120-attendance-policy` | 2 | ✅ | 🟨 |
-| 16 | Face attendance | `103-biometric-attendance-governance` | 0 | ✅ | ⬜ |
-| 17 | Attendance correction | `120`, `125-approval-engine` | 2–3 | ⛔ | ⛔ |
-| 19–23 | Schedule, open shift, swap | `117-calendar`, `118-scheduling-foundation`, `161` | 2, 7 | ⛔ | ⛔ |
-| 24–26 | Leave | `121-leave` (data & panel sudah ada) | 2 | 🟨 | 🟨 |
-| 27–28 | Overtime | `122-overtime` | 2 | ⛔ | ⛔ |
-| 29–32 | Pay, payslip, explain pay | `142-payslip`, `133-calculation-trace` | 4 | ⛔ | ⛔ |
-| 33–34 | Requests hub | `195-employee-request`, `125` | 3, 8 | ⛔ | ⛔ |
-| 35–38 | Expense, advance, travel, loan | `149`–`152` | 5 | ⛔ | ⛔ |
-| 39–44 | Inbox, approvals, tasks, notifikasi | `125`, `128-notification-platform` | 3 | 🟨 push saja | 🟨 |
-| 45–51 | Profile, timeline, bank, pajak | `106`–`110`, `100-effective-dating` | 0–1 | 🟨 | 🟨 |
-| 52 | Documents | `129-document-platform`, `197` | 3, 8 | ⛔ | ⛔ |
-| 52.1 | E-signature | `198-e-signature` | 8 | ⛔ | ⛔ |
-| 53–54 | Helpdesk, knowledge base | `194`, `196` | 8 | ⛔ | ⛔ |
-| 55–57 | Skills, certification, qualification | `153`–`156` | 6 | ⛔ | ⛔ |
-| 58–59 | Learning | `183`–`187` | 8 | ⛔ | ⛔ |
-| 60–63 | Performance, goals, feedback | `178`–`181` | 8 | ⛔ | ⛔ |
-| 64–65 | Career, internal opportunity | `188`–`190` | 8 | ⛔ | ⛔ |
-| 66–68 | Engagement, recognition, ER | `191`–`193` | 8 | ⛔ | ⛔ |
-| 69–70 | Recruitment, interviewer mode | `170`–`176` | 8 | ⛔ | ⛔ |
-| 71–72 | My team | `116-mss` | 2 | ⛔ | ⛔ |
-| 73–76 | Coverage, replacement, crew, line | `158`–`167` | 7 | ⛔ | ⛔ |
-| 77 | Executive mobile | Wave 9 analytics | 9 | ⛔ | ⛔ |
-| 78–80 | AI copilot & tool policy | `207`–`213` | 10 | ⛔ | ⛔ |
-| 81–83 | Search, direktori, pengumuman | `115-ess` | 2 | 🟨 | 🟨 |
-| 84–85 | Permission model, data ownership | `102-authorization-hardening` | 0 | ⛔ | ⬜ |
-| 86–89 | API boundary | `215-public-api`, `019-api-architecture` | 11 | 🟨 `/api/v1` | 🟨 |
-| 90–91 | Tenant & multi-employment | `022-multi-tenancy`, `107`, `108` | — , 1 | ✅ / ⛔ | ✅ / ⛔ |
-| 92–94 | Auth, step-up, local security | `020-security-architecture` | — | 🟨 | 🟨 |
-| 98–99 | Push & event-driven | `128`, `104-outbox` | 3, 0 | 🟨 | 🟨 |
-| 100–102 | Privacy, consent, audit | `021`, `101-audit-engine` | 0 | ⛔ | ⬜ |
-| 138 | Feature flag vs entitlement | `217`, `227` | 11 | ⛔ | ⛔ |
+| §       | Capability mobile                    | Module plan penopang                               | Wave  | Backend      | Mobile  |
+| ------- | ------------------------------------ | -------------------------------------------------- | ----- | ------------ | ------- |
+| 8–11    | Home / persona home                  | `115-ess`, `GET /bootstrap`                        | 2     | ⬜           | 🟨      |
+| 12–18   | Attendance                           | `119-attendance`, `120-attendance-policy`          | 2     | ✅           | 🟨      |
+| 16      | Face attendance                      | `103-biometric-attendance-governance`              | 0     | ✅           | ⬜      |
+| 17      | Attendance correction                | `120`, `125-approval-engine`                       | 2–3   | ⛔           | ⛔      |
+| 19–23   | Schedule, open shift, swap           | `117-calendar`, `118-scheduling-foundation`, `161` | 2, 7  | ⛔           | ⛔      |
+| 24–26   | Leave                                | `121-leave` (data & panel sudah ada)               | 2     | 🟨           | 🟨      |
+| 27–28   | Overtime                             | `122-overtime`                                     | 2     | ⛔           | ⛔      |
+| 29–32   | Pay, payslip, explain pay            | `142-payslip`, `133-calculation-trace`             | 4     | ⛔           | ⛔      |
+| 33–34   | Requests hub                         | `195-employee-request`, `125`                      | 3, 8  | ⛔           | ⛔      |
+| 35–38   | Expense, advance, travel, loan       | `149`–`152`                                        | 5     | ⛔           | ⛔      |
+| 39–44   | Inbox, approvals, tasks, notifikasi  | `125`, `128-notification-platform`                 | 3     | 🟨 push saja | 🟨      |
+| 45–51   | Profile, timeline, bank, pajak       | `106`–`110`, `100-effective-dating`                | 0–1   | 🟨           | 🟨      |
+| 52      | Documents                            | `129-document-platform`, `197`                     | 3, 8  | ⛔           | ⛔      |
+| 52.1    | E-signature                          | `198-e-signature`                                  | 8     | ⛔           | ⛔      |
+| 53–54   | Helpdesk, knowledge base             | `194`, `196`                                       | 8     | ⛔           | ⛔      |
+| 55–57   | Skills, certification, qualification | `153`–`156`                                        | 6     | ⛔           | ⛔      |
+| 58–59   | Learning                             | `183`–`187`                                        | 8     | ⛔           | ⛔      |
+| 60–63   | Performance, goals, feedback         | `178`–`181`                                        | 8     | ⛔           | ⛔      |
+| 64–65   | Career, internal opportunity         | `188`–`190`                                        | 8     | ⛔           | ⛔      |
+| 66–68   | Engagement, recognition, ER          | `191`–`193`                                        | 8     | ⛔           | ⛔      |
+| 69–70   | Recruitment, interviewer mode        | `170`–`176`                                        | 8     | ⛔           | ⛔      |
+| 71–72   | My team                              | `116-mss`                                          | 2     | ⛔           | ⛔      |
+| 73–76   | Coverage, replacement, crew, line    | `158`–`167`                                        | 7     | ⛔           | ⛔      |
+| 77      | Executive mobile                     | Wave 9 analytics                                   | 9     | ⛔           | ⛔      |
+| 78–80   | AI copilot & tool policy             | `207`–`213`                                        | 10    | ⛔           | ⛔      |
+| 81–83   | Search, direktori, pengumuman        | `115-ess`                                          | 2     | 🟨           | 🟨      |
+| 84–85   | Permission model, data ownership     | `102-authorization-hardening`                      | 0     | ⛔           | ⬜      |
+| 86–89   | API boundary                         | `215-public-api`, `019-api-architecture`           | 11    | 🟨 `/api/v1` | 🟨      |
+| 90–91   | Tenant & multi-employment            | `022-multi-tenancy`, `107`, `108`                  | — , 1 | ✅ / ⛔      | ✅ / ⛔ |
+| 92–94   | Auth, step-up, local security        | `020-security-architecture`                        | —     | 🟨           | 🟨      |
+| 98–99   | Push & event-driven                  | `128`, `104-outbox`                                | 3, 0  | 🟨           | 🟨      |
+| 100–102 | Privacy, consent, audit              | `021`, `101-audit-engine`                          | 0     | ⛔           | ⬜      |
+| 138     | Feature flag vs entitlement          | `217`, `227`                                       | 11    | ⛔           | ⛔      |
 
 ✅ siap dipakai · 🟨 sebagian · ⬜ dipetakan, belum dibangun · ⛔ menunggu Wave.
 
@@ -4243,37 +4261,37 @@ Setiap capability mobile, modul backend yang menopangnya, dan status nyatanya.
 
 ## B.1 Sudah ada (6)
 
-| Kebutuhan client | Endpoint | Catatan kontrak |
-|---|---|---|
-| Login | `POST /auth/login` | `identifier` (NIP **atau** email) + `password` + `device_id`. Bukan `nip` + `device_info` |
-| Sesi saat ini | `GET /auth/me` | `{ user }` — bentuk datar; lihat G-1 |
-| Logout | `POST /auth/logout` | **POST**, bukan GET. Body opsional `{ fcm_token }` melepas handset ini |
-| Daftar push token | `POST /push-tokens` | `{ token, platform }`; `POST /push-tokens/forget` untuk melepas |
-| Absen QR | `POST /attendance/qr` atau `POST /qr-presences/redeem` | Menggantikan IP cleartext yang lama; single-use dijaga indeks unik |
-| Konteks absensi | `GET /attendance/context` | Menjawab shift, status clock, `next_presence`, geofence, `attendance_enabled`, `face_enrolled`, `can_issue_qr`, `server_time` |
+| Kebutuhan client  | Endpoint                                               | Catatan kontrak                                                                                                               |
+| ----------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Login             | `POST /auth/login`                                     | `identifier` (NIP **atau** email) + `password` + `device_id`. Bukan `nip` + `device_info`                                     |
+| Sesi saat ini     | `GET /auth/me`                                         | `{ user }` — bentuk datar; lihat G-1                                                                                          |
+| Logout            | `POST /auth/logout`                                    | **POST**, bukan GET. Body opsional `{ fcm_token }` melepas handset ini                                                        |
+| Daftar push token | `POST /push-tokens`                                    | `{ token, platform }`; `POST /push-tokens/forget` untuk melepas                                                               |
+| Absen QR          | `POST /attendance/qr` atau `POST /qr-presences/redeem` | Menggantikan IP cleartext yang lama; single-use dijaga indeks unik                                                            |
+| Konteks absensi   | `GET /attendance/context`                              | Menjawab shift, status clock, `next_presence`, geofence, `attendance_enabled`, `face_enrolled`, `can_issue_qr`, `server_time` |
 
 ## B.2 Harus dibangun (18)
 
 Urutan kolom **Urut** adalah urutan yang direkomendasikan: satu fitur selesai
 end-to-end sebelum fitur berikutnya dimulai.
 
-| Urut | Endpoint | Model penopang | Menggantikan pemakaian client |
-|:--:|---|---|---|
-| 1 | `GET /profile` | `UserDetail`, `UserEmploye`, `UserFamily`, `UserFormalEducation`, `UserAddress`, `UserWorkExperience`, `UserSalary` | 5 tab profil yang dulu memanggil `/auth` masing-masing |
-| 2 | `POST /auth/password` | `User` | `/auth/change-password` |
-| 3 | `GET /announcements` · `GET /announcements/{id}` | `Announcement` | daftar + detail; `?active=1` menggantikan `/announcements/active` |
-| 4 | `GET /notifications` · `PATCH /notifications/{id}/read` | tabel `notifications` | daftar + tandai dibaca |
-| 5 | `GET /activities` | `ActivityLog` | `/auth/activity` |
-| 6 | `GET /attendances` | `UserAttendance` | `/user-attendances` |
-| 7 | `GET /attendance/summary` | `UserAttendance` | `/auth/summary-absen` |
-| 8 | `GET /permit-types` | `PermitType` | `/permit-types/list` |
-| 9 | `GET /permits` (`?type=`) | `Permit` | `/permits/list/{typeId}` |
-| 10 | `GET /permits/form` | `TimeWork`, `UserAttendance` | `/permits/create` |
-| 11 | `POST /permits` | `Permit` | pengajuan izin — **wajib `Idempotency-Key`** |
-| 12 | `GET /permits/{id}` | `Permit`, `PermitApprove` | detail + rantai persetujuan |
-| 13 | `POST /permits/{id}/approval` | `PermitApprove` | keputusan approver — **wajib `Idempotency-Key`** |
-| 14 | `POST /bug-reports` | `BugReport` | lapor masalah (multipart lampiran) |
-| 15 | `GET /payroll` | `PayrollItem`, `PayrollPeriod`, `PayrollGrade` | tab payroll di profil — **bukan** slip gaji |
+| Urut | Endpoint                                                | Model penopang                                                                                                      | Menggantikan pemakaian client                                     |
+| :--: | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+|  1   | `GET /profile`                                          | `UserDetail`, `UserEmploye`, `UserFamily`, `UserFormalEducation`, `UserAddress`, `UserWorkExperience`, `UserSalary` | 5 tab profil yang dulu memanggil `/auth` masing-masing            |
+|  2   | `POST /auth/password`                                   | `User`                                                                                                              | `/auth/change-password`                                           |
+|  3   | `GET /announcements` · `GET /announcements/{id}`        | `Announcement`                                                                                                      | daftar + detail; `?active=1` menggantikan `/announcements/active` |
+|  4   | `GET /notifications` · `PATCH /notifications/{id}/read` | tabel `notifications`                                                                                               | daftar + tandai dibaca                                            |
+|  5   | `GET /activities`                                       | `ActivityLog`                                                                                                       | `/auth/activity`                                                  |
+|  6   | `GET /attendances`                                      | `UserAttendance`                                                                                                    | `/user-attendances`                                               |
+|  7   | `GET /attendance/summary`                               | `UserAttendance`                                                                                                    | `/auth/summary-absen`                                             |
+|  8   | `GET /permit-types`                                     | `PermitType`                                                                                                        | `/permit-types/list`                                              |
+|  9   | `GET /permits` (`?type=`)                               | `Permit`                                                                                                            | `/permits/list/{typeId}`                                          |
+|  10  | `GET /permits/form`                                     | `TimeWork`, `UserAttendance`                                                                                        | `/permits/create`                                                 |
+|  11  | `POST /permits`                                         | `Permit`                                                                                                            | pengajuan izin — **wajib `Idempotency-Key`**                      |
+|  12  | `GET /permits/{id}`                                     | `Permit`, `PermitApprove`                                                                                           | detail + rantai persetujuan                                       |
+|  13  | `POST /permits/{id}/approval`                           | `PermitApprove`                                                                                                     | keputusan approver — **wajib `Idempotency-Key`**                  |
+|  14  | `POST /bug-reports`                                     | `BugReport`                                                                                                         | lapor masalah (multipart lampiran)                                |
+|  15  | `GET /payroll`                                          | `PayrollItem`, `PayrollPeriod`, `PayrollGrade`                                                                      | tab payroll di profil — **bukan** slip gaji                       |
 
 Lima belas baris untuk 18 endpoint karena tiga di antaranya adalah pasangan
 daftar/detail pada resource yang sama.
@@ -4286,14 +4304,34 @@ rekaman karyawan.
 
 ```jsonc
 {
-  "user":     { "id": 1, "name": "…", "nip": "…", "email": "…", "avatar": "…", "status": "…" },
-  "company":  { "id": 1, "name": "…", "latitude": -6.2, "longitude": 106.8, "radius": 150 },
-  "employee": {
-    "user_id": 1, "departement_id": 3, "departement": "…",
-    "job_position": "…", "job_level": "…",
-    "sign_date": "2021-03-01", "resign_date": null
+  "user": {
+    "id": 1,
+    "name": "…",
+    "nip": "…",
+    "email": "…",
+    "avatar": "…",
+    "status": "…",
   },
-  "addresses": [], "families": [], "educations": [], "experiences": []
+  "company": {
+    "id": 1,
+    "name": "…",
+    "latitude": -6.2,
+    "longitude": 106.8,
+    "radius": 150,
+  },
+  "employee": {
+    "user_id": 1,
+    "departement_id": 3,
+    "departement": "…",
+    "job_position": "…",
+    "job_level": "…",
+    "sign_date": "2021-03-01",
+    "resign_date": null,
+  },
+  "addresses": [],
+  "families": [],
+  "educations": [],
+  "experiences": [],
 }
 ```
 
@@ -4316,14 +4354,14 @@ geofence. Absensi tidak boleh mengambilnya dari sini.
 
 ## B.5 Yang berubah di sisi Flutter
 
-| Lapisan | Dampak |
-|---|---|
-| `Env.apiPrefix` | satu konstanta |
-| `ApiRoutes` | seluruh path — satu berkas |
-| `AuthApiService` | `identifier`/`device_id`, logout POST, `fcm_token` saat keluar |
-| `SessionRepository` | jalur galat device binding (G-2), abilities (G-3) |
-| Model | setiap `fromJson` diarahkan ulang; fixture test **diambil dari API baru**, bukan dari yang lama |
-| Repository | path berubah; **call site di controller tidak** — itulah gunanya lapisan ini |
+| Lapisan             | Dampak                                                                                          |
+| ------------------- | ----------------------------------------------------------------------------------------------- |
+| `Env.apiPrefix`     | satu konstanta                                                                                  |
+| `ApiRoutes`         | seluruh path — satu berkas                                                                      |
+| `AuthApiService`    | `identifier`/`device_id`, logout POST, `fcm_token` saat keluar                                  |
+| `SessionRepository` | jalur galat device binding (G-2), abilities (G-3)                                               |
+| Model               | setiap `fromJson` diarahkan ulang; fixture test **diambil dari API baru**, bukan dari yang lama |
+| Repository          | path berubah; **call site di controller tidak** — itulah gunanya lapisan ini                    |
 
 ---
 
@@ -4332,14 +4370,14 @@ geofence. Absensi tidak boleh mengambilnya dari sini.
 Enam keputusan yang menghambat pekerjaan nyata. Masing-masing menyebut pemilik,
 apa yang tertahan, dan apa yang terjadi bila jawabannya tertunda.
 
-| ID | Pertanyaan | Pemilik | Menahan | Rekomendasi |
-|---|---|---|---|---|
-| **M-D1** | `/api/v1` atau `/api/selfservice`? (§0.4) | owner | Lampiran B, Gate B, seluruh pekerjaan backend ESS | **`/api/v1`** — satu permukaan, tenancy dan guard tidak diduplikasi |
-| **M-D2** | Device binding berlaku untuk self-service? (G-2) | produk | Login pada handset kedua; Gate A | Wajar untuk kiosk; untuk self-service **longgarkan** menjadi daftar perangkat yang dapat dicabut sendiri |
-| **M-D3** | Abilities token untuk self-service? (G-3) | backend | Setiap endpoint ESS | Satu ability per kelompok resource, bukan satu ability untuk semuanya |
-| **M-D4** | Play App Signing aktif? application id diganti? (CRIT-01/HIGH-08) | owner | Rilis publik | Jawab sebelum rilis pertama; rotasi kunci mahal setelahnya |
-| **M-D5** | Onboarding (`IntroductionScreen`) dipertahankan? | produk | `onboardingCompleted` yang ditulis tetapi tidak pernah dibaca | Hapus atau aktifkan; jangan tinggalkan tulisan tanpa pembaca |
-| **M-D6** | Skema deep link `app://` menggantikan path route? (§121) | produk + backend | Deep link dari email/web | Tunda sampai ada pengirim di luar FCM; perubahannya berversi |
+| ID       | Pertanyaan                                                        | Pemilik          | Menahan                                                       | Rekomendasi                                                                                              |
+| -------- | ----------------------------------------------------------------- | ---------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **M-D1** | `/api/v1` atau `/api/selfservice`? (§0.4)                         | owner            | Lampiran B, Gate B, seluruh pekerjaan backend ESS             | **`/api/v1`** — satu permukaan, tenancy dan guard tidak diduplikasi                                      |
+| **M-D2** | Device binding berlaku untuk self-service? (G-2)                  | produk           | Login pada handset kedua; Gate A                              | Wajar untuk kiosk; untuk self-service **longgarkan** menjadi daftar perangkat yang dapat dicabut sendiri |
+| **M-D3** | Abilities token untuk self-service? (G-3)                         | backend          | Setiap endpoint ESS                                           | Satu ability per kelompok resource, bukan satu ability untuk semuanya                                    |
+| **M-D4** | Play App Signing aktif? application id diganti? (CRIT-01/HIGH-08) | owner            | Rilis publik                                                  | Jawab sebelum rilis pertama; rotasi kunci mahal setelahnya                                               |
+| **M-D5** | Onboarding (`IntroductionScreen`) dipertahankan?                  | produk           | `onboardingCompleted` yang ditulis tetapi tidak pernah dibaca | Hapus atau aktifkan; jangan tinggalkan tulisan tanpa pembaca                                             |
+| **M-D6** | Skema deep link `app://` menggantikan path route? (§121)          | produk + backend | Deep link dari email/web                                      | Tunda sampai ada pengirim di luar FCM; perubahannya berversi                                             |
 
 Dua hal yang **bukan** keputusan terbuka, dan sudah dijawab kode — ditulis di sini
 supaya tidak dibuka kembali:
@@ -4351,10 +4389,10 @@ supaya tidak dibuka kembali:
 
 ---
 
-
 Semua langkah dari prompt Anda sudah diterapkan. Build Android dan iOS berhasil, tetapi tombol Google belum bisa dicoba dari HP sampai tenancy-app dideploy ke server. Belum ada yang di-commit, baik di repo ini maupun di tenancy-app.
 
 Di Firebase (absensascom)
+
 - Aplikasi Apple: com.example.esas sudah terdaftar.
 - Google Sign-In: provider sudah aktif.
 - Firestore: database Enterprise absensas dibuat di asia-southeast2 (Jakarta), dan rules dari firestore.rules sudah dideploy.
@@ -4362,17 +4400,21 @@ Di Firebase (absensascom)
 - Rules Firestore: ini masih prototipe. Hanya pemilik akun yang bisa membaca dan menulis users/{uid} miliknya, email harus sama dengan yang diverifikasi Google, dan selebihnya ditolak. Sebaiknya Anda periksa dulu sebelum aplikasi dipakai luas.
 
 Di aplikasi (esas-selfservices)
+
 - File konfigurasi: GoogleService-Info.plist dan google-services.json diunduh ulang dari absensascom. Ada tambahan lib/firebase_options.dart dan URL scheme Google di Info.plist.
 - Login Google: tombol "Masuk dengan Google" sudah terpasang, beserta penukaran token kserver dan pencatatan profil
-- Hasil uji: flutter analyze bersih, dan build debug Android maupun iOS berhasil. Dari seluruh tes, 4409 lulus dan 1home_view_test: tes itumengharapkan teks "September" padahal sekarang sudah Oktober, dan tidak berkaitan    dengan perubahan ini.
+- Hasil uji: flutter analyze bersih, dan build debug Android maupun iOS berhasil. Dari seluruh tes, 4409 lulus dan 1home_view_test: tes itumengharapkan teks "September" padahal sekarang sudah Oktober, dan tidak berkaitan dengan perubahan ini.
 - ADR: keputusan ini dicatat di docs/adr/0009-firebase-google-sign-in-and-firestore.md.
-Di backend (tenancy-app)                                                               Endpoint POST /api/v1/auth/fites API lulus. Servermemverifikasi token Firebase, mencocokkan email Google dengan akun yang sudah ada, lamemberi jawaban yang sama sepidak pernah membuat akun baru.
+  Di backend (tenancy-app) Endpoint POST /api/v1/auth/fites API lulus. Servermemverifikasi token Firebase, mencocokkan email Google dengan akun yang sudah ada, lamemberi jawaban yang sama sepidak pernah membuat akun baru.
 - Login Google yang ditolak dijawab 422 dengan pesan bawaan Laravel berbahasa Inggris, jadi di aplikasi saya ganti desan "Akun ini tidak lagiaktif." tetap ditampilkan apa adanya.
 
-Yang perlu Anda putuskan atau kerjakan                                                Deploy tenancy-app. Sebelum rfungsi. Di server perlucomposer install (ada paket baru kreait/firebase-tokens) dan                       FIREBASE_PROJECT_ID=absensas
-2. Versi plugin Firebase dikunci di rilis 3 Agustus 2026 karena Flutter di mesin ini  masih 3.35:
-   - firebase_core 4.13                                                               - firebase_auth 6.5.7
-   - firebase_messaging 16.5                                                          - cloud_firestore 6.8
-                                                                                      Versi yang lebih baru butuh OS gagal dengan "Cannot findtype FlutterSceneLifeCycleDelegate", dan di Android firebase_auth 6.5.x tidak bisa dikompilasi bersama firebaseFlutter di-upgrade, kunci inidibuka bersamaan.
-3. SHA rilis dan SHA Play App Skarena key.properties tidak adadi mesin ini. Tanpa itu, Google Sign-In tidak jalan di build rilis.                    Push iOS sekarang lewat abse4d5d. Pengirim notifikasi diserver harus memakai kredensial absensascom.                                           Bundle ID com.example.esas aau diganti, aplikasi iOS danAndroid harus didaftarkan ulang di Firebase.                                           Pod Firebase akan berhenti dh Oktober 2026. Cepat ataulambat iOS perlu pindah ke Swift Package Manager.                                      Dokumentasi device binding t Menurut laporan subagentbackend, handset kedua tidak ditolak: ia tetap mendapat token, hanya tanpa izin absen. README dan ADR-0006 (G-2) maditolak, jadi dokumen itu sudah tidak sesuai.                                                                      
-Kalau ingin langsung mencoba, saya bisa membantu menjalankan tenancy-app secara lokal atau menyiapkan commit untuk ke
+Yang perlu Anda putuskan atau kerjakan Deploy tenancy-app. Sebelum rfungsi. Di server perlucomposer install (ada paket baru kreait/firebase-tokens) dan FIREBASE_PROJECT_ID=absensas 2. Versi plugin Firebase dikunci di rilis 3 Agustus 2026 karena Flutter di mesin ini masih 3.35:
+
+- firebase_core 4.13 - firebase_auth 6.5.7
+- firebase_messaging 16.5 - cloud_firestore 6.8
+  Versi yang lebih baru butuh OS gagal dengan "Cannot findtype FlutterSceneLifeCycleDelegate", dan di Android firebase_auth 6.5.x tidak bisa dikompilasi bersama firebaseFlutter di-upgrade, kunci inidibuka bersamaan.
+
+3. SHA rilis dan SHA Play App Skarena key.properties tidak adadi mesin ini. Tanpa itu, Google Sign-In tidak jalan di build rilis. Push iOS sekarang lewat abse4d5d. Pengirim notifikasi diserver harus memakai kredensial absensascom. Bundle ID com.example.esas aau diganti, aplikasi iOS danAndroid harus didaftarkan ulang di Firebase. Pod Firebase akan berhenti dh Oktober 2026. Cepat ataulambat iOS perlu pindah ke Swift Package Manager. Dokumentasi device binding t Menurut laporan subagentbackend, handset kedua tidak ditolak: ia tetap mendapat token, hanya tanpa izin absen. README dan ADR-0006 (G-2) maditolak, jadi dokumen itu sudah tidak sesuai.  
+   Kalau ingin langsung mencoba, saya bisa membantu menjalankan tenancy-app secara lokal atau menyiapkan commit untuk ke
+
+Satu langkah manual yang masih perlu dilakukan: Di Xcode, buka Runner target → Signing & Capabilities → klik "+" → tambah Sign in with Apple. Entitlement di file sudah diset, tapi Xcode perlu sinkronisasi dengan App ID di developer portal.

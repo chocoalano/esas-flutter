@@ -151,8 +151,10 @@ class PermitShowController extends GetxController {
   /// error, a request the server says is still in progress — so trying again
   /// is the same request, which the server replays instead of applying to the
   /// next tier this same person may also hold.
-  Future<void> submitApproval({required bool approve, String? notes}) async {
-    if (isSubmitting.value) return;
+  /// True when the decision was recorded. The reject sheet stays open,
+  /// with the reason in it, until then (UX-C12).
+  Future<bool> submitApproval({required bool approve, String? notes}) async {
+    if (isSubmitting.value) return false;
 
     final approval = myApproval.value;
     final approvalId = approval?.id;
@@ -161,7 +163,7 @@ class PermitShowController extends GetxController {
       showErrorSnackbar(
         'Tidak ada peran persetujuan untuk Anda pada perizinan ini.',
       );
-      return;
+      return false;
     }
 
     isSubmitting.value = true;
@@ -181,7 +183,7 @@ class PermitShowController extends GetxController {
             'Status pengajuan sudah berubah. Periksa kembali sebelum '
             'memutuskan.',
           );
-          return;
+          return false;
         }
 
         intent = null;
@@ -211,6 +213,7 @@ class PermitShowController extends GetxController {
       );
 
       await loadPermitDetails();
+      return true;
     } on ApiException catch (error) {
       showErrorSnackbar(error.message);
 
@@ -220,6 +223,7 @@ class PermitShowController extends GetxController {
         _intent = null;
         await loadPermitDetails();
       }
+      return false;
     } finally {
       isSubmitting.value = false;
     }

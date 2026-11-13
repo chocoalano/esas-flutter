@@ -35,107 +35,111 @@ class PermitListView extends GetView<PermitListController> {
           Get.offAllNamed(PermitRoutes.permit);
         },
         child: Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            tooltip: 'Kembali',
-            onPressed: () => Get.offAllNamed(PermitRoutes.permit),
-          ),
-          title: Obx(
-            () => Text(
-              controller.appBarTitle.value.isEmpty
-                  ? 'Riwayat pengajuan'
-                  : controller.appBarTitle.value,
-              overflow: TextOverflow.ellipsis,
+          appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded),
+              tooltip: 'Kembali',
+              onPressed: () => Get.offAllNamed(PermitRoutes.permit),
             ),
+            title: Obx(
+              () => Text(
+                controller.appBarTitle.value.isEmpty
+                    ? 'Riwayat pengajuan'
+                    : controller.appBarTitle.value,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            titleSpacing: 0,
           ),
-          titleSpacing: 0,
-        ),
-        body: Obx(() {
-          if (controller.isLoading.value && controller.permits.isEmpty) {
-            return const Padding(
-              padding: EdgeInsets.only(top: AppSpacing.lg),
-              child: AppSkeletonList(count: 4, shape: AppSkeletonShape.permit),
-            );
-          }
+          body: Obx(() {
+            if (controller.isLoading.value && controller.permits.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.only(top: AppSpacing.lg),
+                child: AppSkeletonList(
+                  count: 4,
+                  shape: AppSkeletonShape.permit,
+                ),
+              );
+            }
 
-          if (controller.permits.isEmpty) {
-            // A failure is said as a failure (PRMT-14): an offline refresh
-            // used to claim the history was empty.
-            final error = controller.loadError.value;
-            if (error != null) {
+            if (controller.permits.isEmpty) {
+              // A failure is said as a failure (PRMT-14): an offline refresh
+              // used to claim the history was empty.
+              final error = controller.loadError.value;
+              if (error != null) {
+                return AppEmptyState(
+                  icon: Icons.cloud_off_rounded,
+                  title: 'Gagal memuat pengajuan',
+                  message: error.message,
+                  actionLabel: 'Coba lagi',
+                  onAction: controller.resetAndFetch,
+                );
+              }
+
               return AppEmptyState(
-                icon: Icons.cloud_off_rounded,
-                title: 'Gagal memuat pengajuan',
-                message: error.message,
-                actionLabel: 'Coba lagi',
+                icon: Icons.description_outlined,
+                title: 'Belum ada pengajuan',
+                message: controller.permitType.value == null
+                    ? 'Anda belum pernah mengajukan izin. Buat pengajuan '
+                          'pertama Anda kapan saja.'
+                    : 'Riwayat untuk jenis izin ini masih kosong. Buat '
+                          'pengajuan pertama Anda kapan saja.',
+                actionLabel: 'Muat ulang',
                 onAction: controller.resetAndFetch,
               );
             }
 
-            return AppEmptyState(
-              icon: Icons.description_outlined,
-              title: 'Belum ada pengajuan',
-              message: controller.permitType.value == null
-                  ? 'Anda belum pernah mengajukan izin. Buat pengajuan '
-                        'pertama Anda kapan saja.'
-                  : 'Riwayat untuk jenis izin ini masih kosong. Buat '
-                        'pengajuan pertama Anda kapan saja.',
-              actionLabel: 'Muat ulang',
-              onAction: controller.resetAndFetch,
-            );
-          }
-
-          return RefreshIndicator(
-            onRefresh: controller.resetAndFetch,
-            child: Scrollbar(
-              controller: controller.scrollController,
-              child: ListView.separated(
-              controller: controller.scrollController,
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.page,
-                AppSpacing.lg,
-                AppSpacing.page,
-                // Ruang bagi tombol mengambang supaya kartu terakhir tetap bisa
-                // dibaca seluruhnya saat digulir sampai bawah.
-                AppSpacing.huge + AppSpacing.xxl,
-              ),
-              itemCount:
-                  controller.permits.length +
-                  (controller.hasMore.value ? 1 : 0),
-              separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
-              itemBuilder: (context, index) {
-                if (index < controller.permits.length) {
-                  final Permit permit = controller.permits[index];
-                  return PermitListItem(permit: permit);
-                }
-                // Kerangka yang menyusul memakai bentuk baris pengajuan,
-                // bukan bentuk baris umum: yang akan menggantikannya adalah
-                // sebuah kartu pengajuan, dan kerangka yang tingginya meleset
-                // membuat daftar melompat tepat saat orang sedang menggulir.
-                return const Padding(
-                  padding: EdgeInsets.only(top: AppSpacing.sm),
-                  child: PermitSkeletonRow(),
-                );
-              },
-              ),
-            ),
-          );
-        }),
-        floatingActionButton: FloatingActionButton.extended(
-          // Without a type there is nothing to fill in yet: the form opened
-          // with id 0 and refused at submit (PRMT-05). Ask which kind first.
-          onPressed: () => controller.permitType.value == null
-              ? Get.offAllNamed(PermitRoutes.permit)
-              : Get.offAllNamed(
-                  PermitRoutes.create,
-                  arguments: controller.permitType.value,
+            return RefreshIndicator(
+              onRefresh: controller.resetAndFetch,
+              child: Scrollbar(
+                controller: controller.scrollController,
+                child: ListView.separated(
+                  controller: controller.scrollController,
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.page,
+                    AppSpacing.lg,
+                    AppSpacing.page,
+                    // Ruang bagi tombol mengambang supaya kartu terakhir tetap bisa
+                    // dibaca seluruhnya saat digulir sampai bawah.
+                    AppSpacing.huge + AppSpacing.xxl,
+                  ),
+                  itemCount:
+                      controller.permits.length +
+                      (controller.hasMore.value ? 1 : 0),
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: AppSpacing.md),
+                  itemBuilder: (context, index) {
+                    if (index < controller.permits.length) {
+                      final Permit permit = controller.permits[index];
+                      return PermitListItem(permit: permit);
+                    }
+                    // Kerangka yang menyusul memakai bentuk baris pengajuan,
+                    // bukan bentuk baris umum: yang akan menggantikannya adalah
+                    // sebuah kartu pengajuan, dan kerangka yang tingginya meleset
+                    // membuat daftar melompat tepat saat orang sedang menggulir.
+                    return const Padding(
+                      padding: EdgeInsets.only(top: AppSpacing.sm),
+                      child: PermitSkeletonRow(),
+                    );
+                  },
                 ),
-          icon: const Icon(Icons.add_rounded, size: AppIconSizes.xl),
-          label: const Text('Ajukan'),
+              ),
+            );
+          }),
+          floatingActionButton: FloatingActionButton.extended(
+            // Without a type there is nothing to fill in yet: the form opened
+            // with id 0 and refused at submit (PRMT-05). Ask which kind first.
+            onPressed: () => controller.permitType.value == null
+                ? Get.offAllNamed(PermitRoutes.permit)
+                : Get.offAllNamed(
+                    PermitRoutes.create,
+                    arguments: controller.permitType.value,
+                  ),
+            icon: const Icon(Icons.add_rounded, size: AppIconSizes.xl),
+            label: const Text('Ajukan'),
+          ),
         ),
       ),
-    ),
     );
   }
 }

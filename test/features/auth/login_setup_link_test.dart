@@ -57,4 +57,34 @@ void main() {
 
     expect(find.text('Halaman setup'), findsOneWidget);
   });
+
+  testWidgets('renders Google sign-in button with logo when enabled',
+      (tester) async {
+    Get.testMode = true;
+    final auth = _Auth();
+    when(() => auth.canSignInWithGoogle).thenReturn(true);
+    when(() => auth.isAuthenticated).thenReturn(false);
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        theme: AppTheme.lightTheme,
+        initialRoute: AuthRoutes.login,
+        getPages: [
+          GetPage(
+            name: AuthRoutes.login,
+            page: () => const LoginView(),
+            binding: BindingsBuilder(() {
+              Get.put(LoginController(
+                authRepository: auth,
+                deviceInfo: _Device(),
+              ));
+            }),
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Masuk dengan Google'), findsOneWidget);
+  });
 }

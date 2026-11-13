@@ -5,6 +5,7 @@ import 'package:esas/features/inbox/presentation/routes/inbox_routes.dart';
 import 'package:esas/features/itms/presentation/routes/itms_routes.dart';
 import 'package:esas/features/attendance/presentation/routes/attendance_routes.dart';
 import 'package:esas/features/auth/presentation/routes/auth_routes.dart';
+import 'package:esas/features/auth/presentation/routes/device_routes.dart';
 import 'package:esas/features/home/presentation/routes/home_routes.dart';
 import 'package:esas/features/notification/presentation/routes/notification_routes.dart';
 import 'package:esas/features/permit/presentation/routes/permit_routes.dart';
@@ -75,13 +76,38 @@ void main() {
         '/gams/space-reservations',
         '/gams/vehicle-bookings',
         '/gams/visitor-passes',
+        // FUNC-D05: every GA request of the requester's, and one opened.
+        '/gams/requests',
+        '/gams/requests/detail',
         '/itms',
         '/itms/tickets',
         '/itms/catalog',
         '/itms/knowledge',
         // ITMS-01: "Lapor" had nowhere to go but the dashboard it sat on.
         '/itms/tickets/create',
+        // FUNC-D04: every ticket of the requester's, and one ticket opened.
+        '/itms/tickets/history',
+        '/itms/tickets/detail',
         '/inbox/approvals',
+        // Mobile Field Operations Phase 2: the worker's assigned tasks, opened
+        // whole or from a module tile filtered to that domain.
+        '/tasks',
+        '/tasks/gams',
+        '/tasks/itms',
+        '/tasks/mtms',
+        // FUNC-D02: an employee's damage reports, and filing one.
+        '/mtms/reports',
+        '/mtms/reports/create',
+        '/tasks/detail',
+        // Phase 3 (D-02): the employee's ATK requests and the GA officer's
+        // ATK desk.
+        '/atk',
+        '/atk/create',
+        '/atk/detail',
+        '/atk/desk',
+        '/atk/desk/detail',
+        // ADR-D: enrolling this phone for attendance with an HR code.
+        '/device/enrollment',
       });
     });
 
@@ -126,7 +152,10 @@ void main() {
         ItmsRoutes.catalog,
         ItmsRoutes.knowledge,
         ItmsRoutes.ticketCreate,
+        ItmsRoutes.ticketHistory,
+        ItmsRoutes.ticketDetail,
         InboxRoutes.inbox,
+        DeviceRoutes.enrollment,
       ]) {
         expect(paths, contains(constant));
       }

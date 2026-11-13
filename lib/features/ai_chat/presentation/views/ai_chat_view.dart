@@ -140,19 +140,9 @@ class AiChatView extends GetView<AiChatController> {
                 return const SizedBox.shrink();
               }
 
-              return ShaderMask(
-                shaderCallback: (Rect bounds) {
-                  return const LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [Colors.white, Colors.white, Colors.transparent],
-                    stops: [0.0, 0.8, 1.0],
-                  ).createShader(bounds);
-                },
-                blendMode: BlendMode.dstIn,
-                child: Container(
-                  height: 40,
-                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+              return Container(
+                height: 40,
+                margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(
@@ -175,7 +165,6 @@ class AiChatView extends GetView<AiChatController> {
                       );
                     },
                   ),
-                ),
               );
             }),
 

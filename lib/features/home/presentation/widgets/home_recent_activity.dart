@@ -113,15 +113,11 @@ class _ActivityRow extends StatelessWidget {
           child: Row(
             children: <Widget>[
               AppIconBox(
-                // Satu ikon untuk semua jenis. Memetakan jenis izin ke ikon
-                // menuntut kamus kanonis yang tidak dikirim server mana pun,
-                // dan menebaknya dari nama jenis akan meleset pada instalasi
-                // pertama yang menamai jenisnya sendiri.
                 icon: Icons.description_outlined,
                 size: 40,
-                foreground: palette.textMuted,
-                background: palette.surfaceSubtle,
-                borderColor: palette.borderSubtle,
+                foreground: theme.colorScheme.primary,
+                background: palette.brandSubtle,
+                borderColor: theme.colorScheme.primary.withValues(alpha: 0.2),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -131,7 +127,9 @@ class _ActivityRow extends StatelessWidget {
                   children: <Widget>[
                     Text(
                       title,
-                      style: theme.textTheme.titleSmall,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),

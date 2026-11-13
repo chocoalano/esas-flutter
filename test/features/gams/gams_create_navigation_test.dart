@@ -94,6 +94,10 @@ void main() {
     form.optionId.value = 3;
     form.subjectC.text = 'AC ruang rapat mati';
 
+    // The form is taller than the 800x600 test screen: scroll to the button
+    // the way a person would, instead of tapping off-screen.
+    await tester.ensureVisible(find.text('Kirim'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Kirim'));
     await tester.pumpAndSettle();
 

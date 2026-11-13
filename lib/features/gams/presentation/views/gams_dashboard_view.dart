@@ -6,7 +6,9 @@ import '../../../../core/theme/app_palette.dart';
 import '../../../../core/ui/components/app_card.dart';
 import '../../../../core/ui/components/app_section_header.dart';
 import '../controllers/gams_dashboard_controller.dart';
+import '../../../../core/ui/dialogs/app_snackbar.dart';
 import '../routes/gams_routes.dart';
+import 'gams_request_tracking_views.dart';
 
 class GamsDashboardView extends GetView<GamsDashboardController> {
   const GamsDashboardView({super.key});
@@ -112,47 +114,64 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
                   for (final req in controller.serviceRequests.take(3))
                     Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                      child: AppCard(
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: palette.brandSubtle,
-                                borderRadius: AppRadii.mdAll,
+                      // Opens the request (FUNC-D05); rows were read-only.
+                      child: InkWell(
+                        borderRadius: AppRadii.mdAll,
+                        onTap: () => Get.toNamed(
+                          GamsRoutes.requestDetail,
+                          arguments: req.id,
+                        ),
+                        child: AppCard(
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: palette.brandSubtle,
+                                  borderRadius: AppRadii.mdAll,
+                                ),
+                                alignment: Alignment.center,
+                                child: Icon(
+                                  Icons.home_repair_service_outlined,
+                                  size: 18,
+                                  color: theme.colorScheme.primary,
+                                ),
                               ),
-                              alignment: Alignment.center,
-                              child: Icon(
-                                Icons.home_repair_service_outlined,
-                                size: 18,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.md),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    req.subject,
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.w600,
+                              const SizedBox(width: AppSpacing.md),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      req.subject,
+                                      style: theme.textTheme.titleSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                     ),
-                                  ),
-                                  Text(
-                                    '${req.number} • ${req.statusLabel}',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: palette.textMuted,
+                                    Text(
+                                      '${req.number} • ${req.statusLabel}',
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(color: palette.textMuted),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
+                // Older requests were out of reach beyond these three
+                // (FUNC-D05).
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () => Get.toNamed(GamsRoutes.requests),
+                    child: const Text('Semua permintaan saya'),
+                  ),
+                ),
 
                 const SizedBox(height: AppSpacing.xxl),
 
@@ -224,6 +243,36 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
                                       color: palette.textMuted,
                                     ),
                                   ),
+                                  // Withdraw it while the server allows (D-06).
+                                  if (res.canCancel)
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: TextButton(
+                                        onPressed: () async {
+                                          final done =
+                                              await confirmGamsCancellation(
+                                                context,
+                                                title:
+                                                    'Batalkan reservasi ruang?',
+                                                consequence:
+                                                    'Ruang dilepas untuk pemohon lain.',
+                                                reasonRequired: false,
+                                                onCancel: (reason) =>
+                                                    controller.cancelBooking(
+                                                      vehicle: false,
+                                                      id: res.id,
+                                                      reason: reason,
+                                                    ),
+                                              );
+                                          if (done) {
+                                            showSuccessSnackbar(
+                                              'Pembatalan berhasil.',
+                                            );
+                                          }
+                                        },
+                                        child: const Text('Batalkan'),
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
@@ -302,6 +351,35 @@ class GamsDashboardView extends GetView<GamsDashboardController> {
                                       color: palette.textMuted,
                                     ),
                                   ),
+                                  // Withdraw it while the server allows (D-06).
+                                  if (vb.canCancel)
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: TextButton(
+                                        onPressed: () async {
+                                          final done = await confirmGamsCancellation(
+                                            context,
+                                            title:
+                                                'Batalkan peminjaman kendaraan?',
+                                            consequence:
+                                                'Kendaraan dilepas untuk pemohon lain.',
+                                            reasonRequired: false,
+                                            onCancel: (reason) =>
+                                                controller.cancelBooking(
+                                                  vehicle: true,
+                                                  id: vb.id,
+                                                  reason: reason,
+                                                ),
+                                          );
+                                          if (done) {
+                                            showSuccessSnackbar(
+                                              'Pembatalan berhasil.',
+                                            );
+                                          }
+                                        },
+                                        child: const Text('Batalkan'),
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),

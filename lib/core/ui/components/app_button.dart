@@ -27,6 +27,7 @@ class AppButton extends StatelessWidget {
     this.busy = false,
     this.variant = AppButtonVariant.filled,
     this.expand = true,
+    this.wrapLabel = false,
   });
 
   final String label;
@@ -45,6 +46,15 @@ class AppButton extends StatelessWidget {
   /// matikan bila tombol berdiri berdampingan dengan tombol lain dalam satu
   /// baris.
   final bool expand;
+
+  /// Let the label wrap onto more lines instead of being cut off (UX-C32).
+  ///
+  /// Off by default, so every existing screen keeps its one-line buttons. On
+  /// for actions whose name must survive a 320dp phone with the system text
+  /// size raised — at 150-200% a one-line "Masukkan Kode Aktivasi" loses its
+  /// last word, and an action nobody can read in full is one nobody can be sure
+  /// of. The button grows taller; it never gets narrower than 48dp.
+  final bool wrapLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -77,15 +87,25 @@ class AppButton extends StatelessWidget {
       children: [
         if (leading != null) ...[leading, const SizedBox(width: AppSpacing.sm)],
         Flexible(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-          ),
+          child: wrapLabel
+              ? Text(label, textAlign: TextAlign.center)
+              : Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
         ),
       ],
     );
+
+    // A wrapped label grows the button; keep air above and below the lines.
+    final Widget content = wrapLabel
+        ? Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.snug),
+            child: body,
+          )
+        : body;
 
     final Size minimumSize = expand
         ? const Size.fromHeight(_minHeight)
@@ -96,12 +116,12 @@ class AppButton extends StatelessWidget {
       AppButtonVariant.filled => FilledButton(
         onPressed: effectiveOnPressed,
         style: FilledButton.styleFrom(minimumSize: minimumSize),
-        child: body,
+        child: content,
       ),
       AppButtonVariant.outlined => OutlinedButton(
         onPressed: effectiveOnPressed,
         style: OutlinedButton.styleFrom(minimumSize: minimumSize),
-        child: body,
+        child: content,
       ),
       AppButtonVariant.text => TextButton(
         onPressed: effectiveOnPressed,
@@ -109,7 +129,7 @@ class AppButton extends StatelessWidget {
           minimumSize: minimumSize,
           disabledForegroundColor: palette.textMuted,
         ),
-        child: body,
+        child: content,
       ),
     };
   }

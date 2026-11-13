@@ -1,5 +1,6 @@
 import '../../../../core/config/api_routes.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/idempotency_key.dart';
 
 class ItmsApiService {
   const ItmsApiService(this._client);
@@ -21,11 +22,12 @@ class ItmsApiService {
     required int serviceId,
     required String subject,
     String? description,
+    String? idempotencyKey,
   }) => _client.postObject(ApiRoutes.itmsTickets, {
     'service_id': serviceId,
     'subject': subject,
     if (description != null) 'description': description,
-  });
+  }, headers: IdempotencyKey.headerFor(idempotencyKey));
 
   Future<Map<String, dynamic>> knowledgeArticles({
     String? query,

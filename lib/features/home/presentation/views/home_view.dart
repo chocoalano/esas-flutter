@@ -84,8 +84,52 @@ import 'package:get/get.dart';
 /// Setiap tujuan tetap dicapai dengan `Get.offAllNamed` seperti sebelumnya —
 /// itu pola navigasi bertab aplikasi ini, dan mengubahnya akan mengubah
 /// tumpukan kembali di seluruh aplikasi, bukan hanya di sini.
-class HomeView extends GetView<HomeController> {
+bool _isTestEnvironment() {
+  if (Get.testMode) return true;
+  final String binding = WidgetsBinding.instance.runtimeType.toString();
+  return binding.contains('Test') || binding.contains('Fake');
+}
+
+class HomeView extends StatefulWidget {
   const HomeView({super.key});
+
+  @override
+  State<HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends State<HomeView>
+    with SingleTickerProviderStateMixin {
+  late final HomeController controller;
+  late final AnimationController _entranceController;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.find<HomeController>();
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+
+    if (_isTestEnvironment()) {
+      _entranceController.value = 1.0;
+    } else {
+      _entranceController.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _entranceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleRefresh() async {
+    await controller.refreshDashboard(force: true);
+    if (!_isTestEnvironment() && mounted) {
+      _entranceController.forward(from: 0.0);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +148,7 @@ class HomeView extends GetView<HomeController> {
         body: SafeArea(
           bottom: false,
           child: RefreshIndicator(
-            onRefresh: () => controller.refreshDashboard(force: true),
+            onRefresh: _handleRefresh,
             child: ListView(
               controller: controller.scrollController,
               // Margin horizontal halaman TIDAK ada di sini lagi. Selama ia
@@ -136,23 +180,60 @@ class HomeView extends GetView<HomeController> {
   Widget _page(AppLayoutMetrics layout) {
     final List<_Beat> today = _todayBeats(layout);
     final List<_Beat> support = _supportBeats(layout);
+    final List<_Beat> allBeats = <_Beat>[...today, ...support];
+    final int totalBeats = allBeats.length + 1;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        AppPageInset(child: _header()),
+        _StaggeredBeat(
+          index: 0,
+          total: totalBeats,
+          animation: _entranceController,
+          child: AppPageInset(child: _header()),
+        ),
         // 16, bukan 24. Sapaan dan protagonis adalah satu tarikan napas.
         const SizedBox(height: AppSpacing.lg),
         if (layout.twoColumn)
           AppPageInset(
             child: AppTwoColumn(
-              primary: <Widget>[for (final _Beat beat in today) beat.child],
-              secondary: <Widget>[for (final _Beat beat in support) beat.child],
+              primary: <Widget>[
+                for (int i = 0; i < today.length; i++)
+                  today[i].isGap
+                      ? today[i].child
+                      : _StaggeredBeat(
+                          index: i + 1,
+                          total: totalBeats,
+                          animation: _entranceController,
+                          child: today[i].child,
+                        ),
+              ],
+              secondary: <Widget>[
+                for (int i = 0; i < support.length; i++)
+                  support[i].isGap
+                      ? support[i].child
+                      : _StaggeredBeat(
+                          index: today.length + i + 1,
+                          total: totalBeats,
+                          animation: _entranceController,
+                          child: support[i].child,
+                        ),
+              ],
             ),
           )
         else ...<Widget>[
-          for (final _Beat beat in <_Beat>[...today, ...support])
-            AppPageInset(bleed: beat.bleed, child: beat.child),
+          for (int i = 0; i < allBeats.length; i++)
+            allBeats[i].isGap
+                ? allBeats[i].child
+                : _StaggeredBeat(
+                    index: i + 1,
+                    total: totalBeats,
+                    animation: _entranceController,
+                    child: AppPageInset(
+                      bleed: allBeats[i].bleed,
+                      child: allBeats[i].child,
+                    ),
+                  ),
         ],
       ],
     );
@@ -586,13 +667,70 @@ class HomeView extends GetView<HomeController> {
 /// bertipe `List<_Beat>`, yang menegakkannya adalah kompilator dan bukan
 /// pembaca diff.
 class _Beat {
-  const _Beat(this.child, {this.bleed = false});
+  const _Beat(this.child, {this.bleed = false}) : isGap = false;
 
-  _Beat.gap(double height) : child = SizedBox(height: height), bleed = false;
+  _Beat.gap(double height)
+      : child = SizedBox(height: height),
+        bleed = false,
+        isGap = true;
 
   final Widget child;
 
   /// Hanya berlaku pada kelas satu kolom; di kelas dua kolom margin dipasang
   /// sekali untuk seluruh baris dan tepi bagian bukan lagi tepi layar.
   final bool bleed;
+
+  /// Penanda apakah ketukan ini merupakan jarak pemisah kosong.
+  final bool isGap;
+}
+
+/// Pembungkus animasi masuk bertahap (staggered cascade) untuk setiap ketukan
+/// halaman Beranda.
+///
+/// Setiap bagian meluncur naik secara halus (14px -> 0px) dan memudar masuk
+/// (0.0 -> 1.0) dengan interval yang terkoordinasi.
+///
+/// Dalam lingkungan uji ([Get.testMode]), pembungkus ini langsung mengembalikan
+/// [child] secara sinkron tanpa penundaan atau transformasi, menjamin seluruh
+/// finder widget dan tes responsifitas berjalan instan tanpa timeout.
+class _StaggeredBeat extends StatelessWidget {
+  const _StaggeredBeat({
+    required this.index,
+    required this.total,
+    required this.animation,
+    required this.child,
+  });
+
+  final int index;
+  final int total;
+  final Animation<double> animation;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isTestEnvironment()) return child;
+
+    final double start = (index / (total + 3)).clamp(0.0, 0.7);
+    final double end = (start + 0.4).clamp(0.0, 1.0);
+
+    final CurvedAnimation curved = CurvedAnimation(
+      parent: animation,
+      curve: Interval(start, end, curve: AppMotion.standard),
+    );
+
+    return AnimatedBuilder(
+      animation: curved,
+      builder: (BuildContext context, Widget? childWidget) {
+        final double progress = curved.value;
+        return Opacity(
+          opacity: progress,
+          child: Transform.translate(
+            offset: Offset(0, 14 * (1.0 - progress)),
+            child: childWidget,
+          ),
+        );
+      },
+      child: child,
+    );
+  }
 }

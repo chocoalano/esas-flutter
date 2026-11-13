@@ -118,17 +118,32 @@ class AppTheme {
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
-          vertical: AppSpacing.md + 2,
+          vertical: AppSpacing.md,
         ),
-        hintStyle: textTheme.bodyMedium?.copyWith(color: palette.textMuted),
+        hintStyle: textTheme.bodyMedium?.copyWith(
+          color: palette.textMuted,
+          fontSize: 13.5,
+        ),
         labelStyle: textTheme.bodyMedium?.copyWith(
           color: scheme.onSurfaceVariant,
+          fontSize: 13.5,
         ),
         floatingLabelStyle: textTheme.labelMedium?.copyWith(
           color: scheme.primary,
+          fontSize: 12,
         ),
-        helperStyle: textTheme.bodySmall?.copyWith(color: palette.textMuted),
-        errorStyle: textTheme.bodySmall?.copyWith(color: scheme.error),
+        helperStyle: textTheme.bodySmall?.copyWith(
+          color: palette.textMuted,
+          fontSize: 11.5,
+          height: 1.25,
+        ),
+        helperMaxLines: 3,
+        errorStyle: textTheme.bodySmall?.copyWith(
+          color: scheme.error,
+          fontSize: 11.5,
+          height: 1.25,
+        ),
+        errorMaxLines: 3,
         prefixIconColor: palette.textMuted,
         suffixIconColor: palette.textMuted,
         // Outline sebuah input adalah batas yang menyatakan keadaan, bukan

@@ -1,6 +1,7 @@
 import 'package:esas/core/theme/app_dimens.dart';
 import 'package:esas/core/theme/app_palette.dart';
 import 'package:esas/core/ui/components/app_button.dart';
+import 'package:esas/core/ui/components/app_card.dart';
 import 'package:esas/core/ui/components/app_input_decoration.dart';
 import 'package:esas/core/ui/components/app_section_header.dart';
 import 'package:flutter/material.dart';
@@ -48,50 +49,75 @@ class ProfileBugReportView extends GetView<ProfileBugReportController> {
                   color: theme.palette.textMuted,
                 ),
               ),
-              const SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpacing.md),
 
-              TextFormField(
-                controller: controller.titleController,
-                decoration: appInputDecoration(
-                  theme,
-                  'Judul Laporan',
-                  hintText: 'Cth: Aplikasi crash saat membuka profil',
+              AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const AppSectionHeader(
+                      title: 'Detail Kendala',
+                      subtitle: 'Informasi masalah yang ditemukan pada aplikasi',
+                      dense: true,
+                      naturalCase: true,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    TextFormField(
+                      controller: controller.titleController,
+                      decoration: appInputDecoration(
+                        theme,
+                        'Judul Laporan',
+                        hintText: 'Cth: Aplikasi crash saat membuka profil',
+                        helperText:
+                            'Tulis ringkasan singkat kendala yang Anda temukan.',
+                        helperMaxLines: 2,
+                      ),
+                      validator: controller.validateTitle,
+                      maxLength: 255,
+                      textInputAction: TextInputAction.next,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    TextFormField(
+                      controller: controller.messageController,
+                      decoration: appInputDecoration(
+                        theme,
+                        'Deskripsi Detail kronologi Bug',
+                        hintText:
+                            'Langkah-langkah reproduksi, pesan error, kapan '
+                            'terjadi, dll.',
+                        helperText:
+                            'Jelaskan kronologi langkah sebelum error, pesan galat yang muncul, dan frekuensi terjadinya.',
+                        helperMaxLines: 3,
+                      ),
+                      validator: controller.validateMessage,
+                      maxLines: null,
+                      minLines: 3,
+                      keyboardType: TextInputType.multiline,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    _PlatformField(controller: controller),
+                  ],
                 ),
-                validator: controller.validateTitle,
-                maxLength: 255,
-                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: AppSpacing.md),
+
+              AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const AppSectionHeader(
+                      title: 'Lampirkan screenshot (wajib)',
+                      subtitle: 'Sertakan bukti visual untuk investigasi',
+                      dense: true,
+                      naturalCase: true,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    _AttachmentSection(controller: controller),
+                  ],
+                ),
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              TextFormField(
-                controller: controller.messageController,
-                decoration: appInputDecoration(
-                  theme,
-                  'Deskripsi Detail kronologi Bug',
-                  hintText:
-                      'Langkah-langkah reproduksi, pesan error, kapan '
-                      'terjadi, dll.',
-                ),
-                validator: controller.validateMessage,
-                maxLines: null,
-                minLines: 3,
-                keyboardType: TextInputType.multiline,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-
-              _PlatformField(controller: controller),
-              const SizedBox(height: AppSpacing.xl),
-
-              const AppSectionHeader(
-                title: 'Lampirkan screenshot (wajib)',
-                dense: true,
-              ),
-              _AttachmentSection(controller: controller),
-              const SizedBox(height: AppSpacing.xl),
-
-              // No "Bug Aktif" box (PROF-08): it was never sent, and the
-              // server sets a report's status itself — a reporter does not
-              // get to open or close their own report.
               Obx(
                 () => AppButton(
                   label: 'Kirim Laporan Bug',
@@ -141,11 +167,15 @@ class _PlatformField extends StatelessWidget {
 
     return Obx(
       () => DropdownButtonFormField<String>(
+        isExpanded: true,
         initialValue: controller.selectedPlatform.value,
         decoration: appInputDecoration(
           theme,
           'Platform ditemukan',
           hintText: 'android',
+          helperText:
+              'Pilih sistem operasi atau lingkungan tempat kendala ini terjadi.',
+          helperMaxLines: 2,
         ),
         items: controller.platforms.map((String platform) {
           return DropdownMenuItem<String>(
@@ -158,9 +188,14 @@ class _PlatformField extends StatelessWidget {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: AppSpacing.md),
-                Text(
-                  platform.capitalizeFirst!,
-                  style: theme.textTheme.bodyLarge,
+                // Shrinks with large text on a 320dp screen instead of
+                // overflowing the field.
+                Flexible(
+                  child: Text(
+                    platform.capitalizeFirst!,
+                    style: theme.textTheme.bodyLarge,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),

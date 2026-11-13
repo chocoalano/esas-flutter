@@ -492,4 +492,59 @@ void main() {
       verify(() => identity.signOut()).called(1);
     });
   });
+
+  group('requestPasswordReset', () {
+    test('returns server message on success', () async {
+      when(
+        () => api.forgotPassword(identifier: any(named: 'identifier')),
+      ).thenAnswer(
+        (_) async => {'message': 'Tautan reset telah dikirim ke email.'},
+      );
+
+      final msg = await auth.requestPasswordReset(identifier: '20240113');
+
+      expect(msg, 'Tautan reset telah dikirim ke email.');
+      verify(() => api.forgotPassword(identifier: '20240113')).called(1);
+    });
+
+    test('maps 404 endpoint not found to HR guidance', () async {
+      when(
+        () => api.forgotPassword(identifier: any(named: 'identifier')),
+      ).thenThrow(const ApiException('Not Found', status: 404));
+
+      expect(
+        () => auth.requestPasswordReset(identifier: '20240113'),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('Hubungi HR atau admin IT'), isNot(contains('perusahaan.'))),
+          ),
+        ),
+      );
+    });
+
+    test('rethrows validation failures (422)', () async {
+      when(
+        () => api.forgotPassword(identifier: any(named: 'identifier')),
+      ).thenThrow(
+        const ApiException(
+          'Email tidak ditemukan.',
+          status: 422,
+          errors: {'identifier': 'Email tidak terdaftar'},
+        ),
+      );
+
+      expect(
+        () => auth.requestPasswordReset(identifier: 'unknown@example.com'),
+        throwsA(
+          isA<ApiException>().having(
+            (e) => e.message,
+            'message',
+            'Email tidak ditemukan.',
+          ),
+        ),
+      );
+    });
+  });
 }

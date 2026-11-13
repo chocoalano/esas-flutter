@@ -7,6 +7,7 @@ import 'package:esas/core/theme/app_palette.dart';
 import 'package:esas/core/theme/app_typography.dart';
 import 'package:esas/core/theme/theme_controller.dart';
 import 'package:esas/core/ui/components/app_badge.dart';
+import 'package:esas/core/ui/components/app_button.dart';
 import 'package:esas/core/ui/components/app_card.dart';
 import 'package:esas/core/ui/components/app_metric_tile.dart';
 import 'package:esas/core/ui/components/app_progress.dart';
@@ -429,6 +430,10 @@ class _PerformanceCard extends StatelessWidget {
           return const _PerformanceSkeleton();
         }
 
+        if (controller.summaryFailed.value) {
+          return _SummaryUnavailable(onRetry: controller.loadSummary);
+        }
+
         final double value = controller.points.value;
         final double ratio = (value > 1 ? value / 100 : value).clamp(0.0, 1.0);
         final int percent = (ratio * 100).round();
@@ -557,6 +562,12 @@ class _AttendanceStats extends StatelessWidget {
     return Obx(() {
       if (controller.isLoadingInitial.value) {
         return const _StatsSkeleton();
+      }
+
+      // The performance card already says the summary did not load; zeros
+      // here would read as a real record of no attendance (UX-C16).
+      if (controller.summaryFailed.value) {
+        return const SizedBox.shrink();
       }
 
       final int total = controller.attendance.value;
@@ -833,7 +844,9 @@ class _WorkspaceFooter extends StatelessWidget {
             ),
             const SizedBox(width: AppSpacing.tight),
             Text(
-              'Workspace ${controller.workspace}',
+              controller.environmentLabel.isEmpty
+                  ? 'Workspace ${controller.workspace}'
+                  : 'Workspace ${controller.workspace} • ${controller.environmentLabel}',
               style: theme.textTheme.labelSmall?.copyWith(
                 color: palette.textMuted,
                 letterSpacing: 0.2,
@@ -855,3 +868,47 @@ class _WorkspaceFooter extends StatelessWidget {
     );
   }
 }
+
+/// UX-C16: when the summary could not be read, say so and offer a retry,
+/// rather than a "0%" and a "Perlu perhatian" badge that look like a real,
+/// poor record.
+class _SummaryUnavailable extends StatelessWidget {
+  const _SummaryUnavailable({required this.onRetry});
+
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'PERFORMA KEHADIRAN',
+          style: theme.textTheme.labelSmall?.copyWith(color: palette.textMuted),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          '—',
+          style: AppTypography.dataLarge(color: theme.colorScheme.onSurface),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          'Data kehadiran belum bisa dimuat. Periksa koneksi, lalu coba lagi.',
+          style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        AppButton(
+          label: 'Coba lagi',
+          icon: Icons.refresh_rounded,
+          variant: AppButtonVariant.text,
+          expand: false,
+          onPressed: () => onRetry(),
+        ),
+      ],
+    );
+  }
+}
+

@@ -12,6 +12,14 @@ class GamsServiceRequest {
     this.facility,
     this.createdAt,
     this.resolvedAt,
+    this.serverStatusLabel,
+    this.submittedAt,
+    this.triagedAt,
+    this.closedAt,
+    this.cancelledAt,
+    this.resolutionNote,
+    this.answers = const {},
+    this.canCancel = false,
   });
 
   factory GamsServiceRequest.fromJson(Map<String, dynamic> json) {
@@ -22,12 +30,25 @@ class GamsServiceRequest {
       description: asString(json['description']),
       priority: asString(json['priority']) ?? 'medium',
       status: asString(json['status']) ?? 'draft',
-      serviceDefinition: asString(json['service_definition']),
-      facility: asString(json['facility']),
+      serviceDefinition: _named(json['service_definition'], 'title'),
+      facility: _named(json['facility'], 'name'),
       createdAt: asString(json['created_at']),
       resolvedAt: asString(json['resolved_at']),
+      serverStatusLabel: asString(json['status_label']),
+      submittedAt: asString(json['submitted_at']),
+      triagedAt: asString(json['triaged_at']),
+      closedAt: asString(json['closed_at']),
+      cancelledAt: asString(json['cancelled_at']),
+      resolutionNote: asString(json['resolution_note']),
+      answers: asObject(asObject(json['field_data'])['fields']),
+      canCancel: json['can_cancel'] == true,
     );
   }
+
+  /// The detail endpoint names the service and the building as objects; the
+  /// list names them as text. Both are read (FUNC-D05).
+  static String? _named(Object? value, String key) =>
+      value is Map ? asString(value[key]) : asString(value);
 
   final int id;
   final String number;
@@ -40,15 +61,35 @@ class GamsServiceRequest {
   final String? createdAt;
   final String? resolvedAt;
 
+  /// The status in the panel's words, from the server (UX-D06).
+  final String? serverStatusLabel;
+
+  // Detail only (FUNC-D05).
+  final String? submittedAt;
+  final String? triagedAt;
+  final String? closedAt;
+  final String? cancelledAt;
+  final String? resolutionNote;
+
+  /// What the requester answered for the service's own fields, by key.
+  final Map<String, dynamic> answers;
+
+  /// Whether the server lets the requester withdraw it now (D-06).
+  final bool canCancel;
+
   // `cancelled` is finished too (backend ServiceRequestStatus) — UAT review H4.
   bool get isClosed =>
       status == 'closed' || status == 'resolved' || status == 'cancelled';
   bool get isDraft => status == 'draft';
 
-  String get statusLabel => switch (status.toLowerCase()) {
+  String get statusLabel => serverStatusLabel ?? _fallbackStatusLabel;
+
+  String get _fallbackStatusLabel => switch (status.toLowerCase()) {
     'draft' => 'Draft',
     'submitted' => 'Terkirim',
-    'triage' => 'Dalam Peninjauan',
+    // The server sends `triaged` (ServiceRequestStatus::Triaged); `triage`
+    // stays for anything cached before that was matched (FUNC-A08).
+    'triaged' || 'triage' => 'Dalam Peninjauan',
     'in_progress' || 'assigned' => 'Sedang Dikerjakan',
     'resolved' => 'Selesai',
     'closed' => 'Ditutup',
@@ -64,6 +105,9 @@ class GamsServiceDefinition {
     required this.code,
     this.category,
     this.description,
+    this.requiresFacility = false,
+    this.requiresDescription = false,
+    this.fields = const [],
   });
 
   factory GamsServiceDefinition.fromJson(Map<String, dynamic> json) {
@@ -73,6 +117,13 @@ class GamsServiceDefinition {
       code: asString(json['code']) ?? '',
       category: asString(json['category']),
       description: asString(json['description']),
+      requiresFacility: json['requires_facility'] == true,
+      requiresDescription: json['requires_description'] == true,
+      fields: [
+        for (final raw in asList(json['fields']))
+          if (GamsRequestField.tryFromJson(asObject(raw)) case final field?)
+            field,
+      ],
     );
   }
 
@@ -81,6 +132,77 @@ class GamsServiceDefinition {
   final String code;
   final String? category;
   final String? description;
+
+  /// The service's own rules (FUNC-A01): the building and the description
+  /// are required only when the service says so.
+  final bool requiresFacility;
+  final bool requiresDescription;
+
+  /// The other fields this service asks for, in the server's order.
+  final List<GamsRequestField> fields;
+
+  /// Whether this app can draw every required field. A service with one it
+  /// cannot is never offered: it would be refused after sending.
+  bool get isRequestable =>
+      fields.every((f) => !f.required || f.type != GamsFieldType.unknown);
+}
+
+/// The input types a GA service may declare for a request field.
+enum GamsFieldType {
+  text,
+  textarea,
+  number,
+  boolean,
+  date,
+  datetime,
+  select,
+  multiSelect,
+  unknown;
+
+  static GamsFieldType parse(String? raw) => switch (raw) {
+    'text' => text,
+    'textarea' => textarea,
+    'number' => number,
+    'boolean' => boolean,
+    'date' => date,
+    'datetime' => datetime,
+    'select' => select,
+    'multi_select' => multiSelect,
+    _ => unknown,
+  };
+}
+
+/// One field a GA service asks the requester to fill (FUNC-A01).
+class GamsRequestField {
+  const GamsRequestField({
+    required this.key,
+    required this.label,
+    required this.type,
+    required this.required,
+    this.options = const [],
+  });
+
+  static GamsRequestField? tryFromJson(Map<String, dynamic> json) {
+    final key = asString(json['key']);
+    if (key == null || key.isEmpty) return null;
+
+    return GamsRequestField(
+      key: key,
+      label: asString(json['label']) ?? key,
+      type: GamsFieldType.parse(asString(json['type'])),
+      required: json['required'] == true,
+      options: [
+        for (final option in asList(json['options']))
+          if (asString(option) case final value?) value,
+      ],
+    );
+  }
+
+  final String key;
+  final String label;
+  final GamsFieldType type;
+  final bool required;
+  final List<String> options;
 }
 
 class GamsFacility {

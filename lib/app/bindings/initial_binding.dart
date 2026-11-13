@@ -1,6 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/server_config.dart';
+import '../../core/services/app_version_service.dart';
+import '../../features/app_update/data/app_version_api_service.dart';
+import '../../features/app_update/presentation/app_update_controller.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/auth_interceptor.dart';
 import '../../core/storage/local_storage.dart';
@@ -203,6 +208,34 @@ class InitialBinding extends Bindings {
     // Registered here; `initialize()` is awaited by bootstrap, which can decide
     // what a failure means. A binding cannot await.
     Get.put(NotificationService(), permanent: true);
+
+    // ── App version ────────────────────────────────────────────────────────
+    // Asks tenancy-app which version the Console superadmin made active, and
+    // drives the update alert shown by AppUpdateGate (app.dart). Android and
+    // iOS only: those are the platforms a version is published for.
+    final platform = switch (defaultTargetPlatform) {
+      _ when kIsWeb => null,
+      TargetPlatform.android => 'android',
+      TargetPlatform.iOS => 'ios',
+      _ => null,
+    };
+
+    if (platform != null) {
+      final versions = AppVersionApiService(Get.find<ApiClient>());
+
+      Get.put<AppUpdateController>(
+        AppUpdateController(
+          fetchLatest: () => versions.fetch(application: 'selfservice', platform: platform),
+          installedBuild: () async {
+            await AppVersionService.load();
+            return int.tryParse(AppVersionService.buildNumber);
+          },
+          openUrl: (url) => launchUrl(url, mode: LaunchMode.externalApplication),
+          storage: localStorage,
+        ),
+        permanent: true,
+      );
+    }
   }
 
   /// Registered after `NotificationService.initialize()` has been awaited,

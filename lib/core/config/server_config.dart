@@ -35,6 +35,7 @@ class ServerConfig {
 
   static const _domainKey = 'esas.server_domain';
   static const _subdomainModeKey = 'esas.server_subdomain_mode';
+  static const _environmentKey = 'esas.server_environment';
 
   /// The platform address, normalised to `scheme://host[:port]` with no
   /// workspace on the front. Null until this handset has been configured.
@@ -42,6 +43,15 @@ class ServerConfig {
 
   /// Whether the workspace is a subdomain of [domain] rather than a header.
   bool subdomainMode = true;
+
+  /// The runtime environment this server is configured for (production, staging, development).
+  String? environment;
+
+  AppEnvironment get appEnvironment => AppEnvironment.fromString(environment);
+  bool get isProduction => appEnvironment == AppEnvironment.production;
+  bool get isDevelopment => appEnvironment == AppEnvironment.development;
+  bool get isStaging => appEnvironment == AppEnvironment.staging;
+  String get environmentLabel => appEnvironment.label;
 
   bool get isConfigured => domain != null;
 
@@ -57,11 +67,14 @@ class ServerConfig {
     domain = await _store.read(_domainKey) ?? normalise(Env.apiBaseUrl);
     subdomainMode =
         (await _store.read(_subdomainModeKey) ?? _defaultMode) == 'true';
+    environment = await _store.read(_environmentKey) ??
+        (domain != null ? inferEnvironment(domain!) : Env.environment);
   }
 
   Future<void> save({
     required String domain,
     required bool subdomainMode,
+    String? environment,
   }) async {
     final normalised = normalise(domain);
 
@@ -69,11 +82,33 @@ class ServerConfig {
       throw ArgumentError.value(domain, 'domain', 'not an address');
     }
 
+    final env = environment ?? inferEnvironment(normalised);
+
     this.domain = normalised;
     this.subdomainMode = subdomainMode;
+    this.environment = env;
 
     await _store.write(_domainKey, normalised);
     await _store.write(_subdomainModeKey, subdomainMode.toString());
+    await _store.write(_environmentKey, env);
+  }
+
+  /// Infer the target environment from a host or domain string.
+  static String inferEnvironment(String hostOrUrl) {
+    var raw = hostOrUrl.trim();
+    if (!raw.contains('://')) {
+      raw = 'http://$raw';
+    }
+    final parsed = Uri.tryParse(raw);
+    final host = parsed?.host ?? raw;
+
+    if (isDevelopmentHost(host)) {
+      return 'development';
+    }
+    if (host.contains('staging') || hostOrUrl.contains('staging')) {
+      return 'staging';
+    }
+    return 'production';
   }
 
   /// The origin a request for [tenant] goes to, or null when this handset has

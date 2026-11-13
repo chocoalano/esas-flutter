@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../../core/config/env.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/theme/app_palette.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -86,27 +87,41 @@ class SetupView extends GetView<SetupController> {
                         color: theme.palette.textMuted,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.xxl),
+                    const SizedBox(height: AppSpacing.md),
 
-                    TextFormField(
-                      controller: controller.domainController,
-                      textInputAction: TextInputAction.next,
-                      autocorrect: false,
-                      keyboardType: TextInputType.url,
-                      decoration: const InputDecoration(
-                        labelText: 'Alamat server',
-                        hintText: 'hrms.perusahaan.co.id',
-                        helperText:
-                            'Alamat platform, tanpa kode workspace di depannya.',
-                        helperMaxLines: 2,
-                        prefixIcon: Icon(
-                          Icons.language_outlined,
-                          size: AppIconSizes.xl,
-                        ),
-                      ),
-                      validator: controller.validateDomain,
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
+                    const _EnvironmentSelector(),
+
+                    Obx(() {
+                      if (controller.selectedEnvironment.value ==
+                          AppEnvironment.production) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextFormField(
+                            controller: controller.domainController,
+                            textInputAction: TextInputAction.next,
+                            autocorrect: false,
+                            keyboardType: TextInputType.url,
+                            decoration: const InputDecoration(
+                              labelText: 'Alamat server',
+                              hintText: '10.0.2.2:8000',
+                              helperText:
+                                  'Masukkan host dan port server backend (contoh: 10.0.2.2:8000 untuk emulator atau IP jaringan lokal).',
+                              helperMaxLines: 2,
+                              prefixIcon: Icon(
+                                Icons.language_outlined,
+                                size: AppIconSizes.xl,
+                              ),
+                            ),
+                            validator: controller.validateDomain,
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                        ],
+                      );
+                    }),
 
                     TextFormField(
                       controller: controller.workspaceController,
@@ -117,7 +132,7 @@ class SetupView extends GetView<SetupController> {
                         labelText: 'Kode workspace',
                         hintText: 'acme',
                         helperText:
-                            'Subdomain perusahaan Anda. Tanya HR bila belum tahu.',
+                            'Masukkan identitas subdomain perusahaan Anda (contoh: "acme" untuk acme.absensas.com). Hubungi HR bila belum tahu.',
                         helperMaxLines: 2,
                         prefixIcon: Icon(
                           Icons.badge_outlined,
@@ -126,12 +141,12 @@ class SetupView extends GetView<SetupController> {
                       ),
                       validator: controller.validateWorkspace,
                     ),
-                    const SizedBox(height: AppSpacing.sm),
+                    const SizedBox(height: AppSpacing.xs),
 
                     const _SubdomainSwitch(),
-                    const SizedBox(height: AppSpacing.md),
+                    const SizedBox(height: AppSpacing.sm),
                     const _AddressPreview(),
-                    const SizedBox(height: AppSpacing.xxl),
+                    const SizedBox(height: AppSpacing.md),
 
                     Obx(
                       () => AppButton(
@@ -175,6 +190,10 @@ class _SubdomainSwitch extends GetView<SetupController> {
     final theme = Theme.of(context);
 
     return Obx(() {
+      if (controller.selectedEnvironment.value == AppEnvironment.production) {
+        return const SizedBox.shrink();
+      }
+
       // Rebuilt as the address is typed: an IP cannot carry a workspace on its
       // front, so the switch turns itself off and says why rather than offering
       // a host that resolves to nothing.
@@ -228,14 +247,39 @@ class _AddressPreview extends GetView<SetupController> {
       controller.edits.value;
 
       final insecure = controller.isInsecure;
+      final env = controller.selectedEnvironment.value;
+      final envTone = env == AppEnvironment.production
+          ? palette.success
+          : (env == AppEnvironment.development
+                ? palette.warning
+                : palette.info);
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const AppSectionHeader(
+          AppSectionHeader(
             title: 'Alamat yang dihubungi',
             dense: true,
-            padding: EdgeInsets.only(bottom: AppSpacing.tight),
+            padding: const EdgeInsets.only(bottom: AppSpacing.tight),
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: 2,
+              ),
+              decoration: BoxDecoration(
+                color: envTone.background,
+                borderRadius: AppRadii.smAll,
+                border: Border.all(color: envTone.border),
+              ),
+              child: Text(
+                env.label.toUpperCase(),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: envTone.foreground,
+                  fontSize: 10,
+                ),
+              ),
+            ),
           ),
           Container(
             width: double.infinity,
@@ -410,5 +454,128 @@ class _Banner extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Selector for switching between Production, Development, and Staging workspace modes.
+class _EnvironmentSelector extends GetView<SetupController> {
+  const _EnvironmentSelector();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
+
+    return Obx(() {
+      final currentEnv = controller.selectedEnvironment.value;
+      final envTone = currentEnv == AppEnvironment.production
+          ? palette.success
+          : (currentEnv == AppEnvironment.development
+                ? palette.warning
+                : palette.info);
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const AppSectionHeader(
+            title: 'Mode Lingkungan (Environment)',
+            dense: true,
+            padding: EdgeInsets.only(bottom: AppSpacing.sm),
+          ),
+          SegmentedButton<AppEnvironment>(
+            segments: const [
+              ButtonSegment<AppEnvironment>(
+                value: AppEnvironment.production,
+                label: Text('Produksi'),
+                icon: Icon(Icons.verified_user_outlined, size: 16),
+              ),
+              ButtonSegment<AppEnvironment>(
+                value: AppEnvironment.development,
+                label: Text('Development'),
+                icon: Icon(Icons.developer_mode_outlined, size: 16),
+              ),
+              ButtonSegment<AppEnvironment>(
+                value: AppEnvironment.staging,
+                label: Text('Staging'),
+                icon: Icon(Icons.science_outlined, size: 16),
+              ),
+            ],
+            selected: {currentEnv},
+            onSelectionChanged: (selected) {
+              if (selected.isNotEmpty) {
+                controller.selectEnvironment(selected.first);
+              }
+            },
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            decoration: BoxDecoration(
+              color: envTone.background,
+              borderRadius: AppRadii.mdAll,
+              border: Border.all(color: envTone.border),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  currentEnv == AppEnvironment.production
+                      ? Icons.lock_outline_rounded
+                      : (currentEnv == AppEnvironment.development
+                            ? Icons.code_rounded
+                            : Icons.science_outlined),
+                  size: AppIconSizes.md,
+                  color: envTone.foreground,
+                ),
+                const SizedBox(width: AppSpacing.tight),
+                Expanded(
+                  child: Text(
+                    currentEnv == AppEnvironment.production
+                        ? 'Mode Produksi: Komunikasi aman wajib HTTPS dengan subdomain korporat.'
+                        : (currentEnv == AppEnvironment.development
+                              ? 'Mode Development: Pengujian lokal via HTTP & emulator diizinkan.'
+                              : 'Mode Staging: Pengujian pra-rilis pada server staging terisolasi.'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: envTone.foreground,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (currentEnv == AppEnvironment.development) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: [
+                ActionChip(
+                  avatar: const Icon(Icons.phone_android, size: 14),
+                  label: const Text('Emulator (10.0.2.2:8000)'),
+                  onPressed: () =>
+                      controller.applyDevPreset(Env.defaultEmulatorDomain),
+                ),
+                ActionChip(
+                  avatar: const Icon(Icons.laptop, size: 14),
+                  label: const Text('172.16.2.233 (:8000)'),
+                  onPressed: () =>
+                      controller.applyDevPreset(Env.defaultLocalhostDomain),
+                ),
+                ActionChip(
+                  avatar: const Icon(Icons.dns_outlined, size: 14),
+                  label: const Text('esas.test (:8000)'),
+                  onPressed: () =>
+                      controller.applyDevPreset(Env.defaultLocalDnsDomain),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: AppSpacing.md),
+        ],
+      );
+    });
   }
 }

@@ -298,6 +298,41 @@ class PermitCreateController extends GetxController {
     // schedule ([buildFields]) — clearing the choice here would also hide the
     // date fields that show only once a schedule is chosen.
     if (match != null) selectedScheduleId.value = match.id;
+
+    _keepEndOnOrAfterStart(date);
+  }
+
+  /// Tanggal selesai ikut maju bila tanggal mulai melewatinya (FUNC-C02).
+  ///
+  /// Mengubah tanggal mulai dulu membiarkan tanggal selesai di tempat lama,
+  /// sehingga formulir berisi rentang terbalik yang baru ditolak saat kirim.
+  /// Rentang yang masih utuh (selesai ≥ mulai) tidak disentuh.
+  void _keepEndOnOrAfterStart(DateTime? start) {
+    if (start == null) return;
+
+    final end = DateTime.tryParse(endDateC.text.trim());
+
+    if (end == null || end.isBefore(start)) {
+      endDateC.text = startDateC.text.trim();
+    }
+  }
+
+  /// Jadwal yang dipilihkan saat formulir terbuka (FUNC-C02).
+  ///
+  /// Jendela roster mencakup 30 hari ke belakang (izin sakit kemarin), jadi
+  /// jadwal pertama bisa sebulan lalu. Yang dipilihkan adalah jadwal pertama
+  /// mulai hari ini; hanya bila semuanya sudah lewat, jadwal pertama.
+  Schedule _initialSchedule() {
+    final today = _today;
+
+    return scheduleList.firstWhereOrNull(
+          (s) => !DateTime(
+            s.workDay.year,
+            s.workDay.month,
+            s.workDay.day,
+          ).isBefore(today),
+        ) ??
+        scheduleList.first;
   }
 
   /// Why [startDate] cannot carry a request, or null (PRMT-16).
@@ -351,7 +386,7 @@ class PermitCreateController extends GetxController {
         // sebelumnya memilihkan jadwal pertama tanpa mengisi tanggalnya, jadi
         // formulir terbuka dengan dua field wajib yang kosong padahal
         // dropdown di atasnya sudah terisi.
-        onScheduleChanged(scheduleList.first.id);
+        onScheduleChanged(_initialSchedule().id);
       }
 
       // Kedua dropdown shift sengaja dibiarkan kosong. Mengisinya dengan shift

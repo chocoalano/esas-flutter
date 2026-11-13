@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "skills": {
+    "design-polish": {
+      "source": "ChunkyTofuStudios/flutter-skills",
+      "sourceType": "github",
+      "skillPath": "skills/design-polish/SKILL.md",
+      "computedHash": "6f8a7015d0c916a7b3ca9574ffedb4b2beb243a9687bc046cf487428c41d6e4b"
+    },
+    "flutter-build-responsive-layout": {
+      "source": "flutter/agent-plugins",
+      "sourceType": "github",
+      "skillPath": "skills/flutter-build-responsive-layout/SKILL.md",
+      "computedHash": "bdb7ab7ca812ee719237a718376a5f2e15b659201ff66818f1012c5d13751487"
+    },
+    "flutter-design-system": {
+      "source": "gabuldev/flutter-skills",
+      "sourceType": "github",
+      "skillPath": "skills/flutter-design-system/SKILL.md",
+      "computedHash": "84f82abe33e99bdffef1e1e460984f16f8f92091088115b0ad24ff0a65d2c704"
+    },
+    "flutter-improve-design": {
+      "source": "kamranbekirovyz/skills",
+      "sourceType": "github",
+      "skillPath": "flutter-improve-design/SKILL.md",
+      "computedHash": "d521db7a1389a9e75b9561dabc74e08a3dc5fb190d3593d50e9397fe2ecad7ca"
+    }
+  }
+}

@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:esas/features/auth/presentation/routes/auth_routes.dart';
 import 'package:esas/features/setup/presentation/routes/setup_routes.dart';
+import '../../../../core/config/server_config.dart';
 import '../../../../core/tenancy/tenant_context.dart';
 import '../../../../core/ui/dialogs/app_snackbar.dart';
 import '../../../../core/network/api_exception.dart';
@@ -31,6 +32,14 @@ class ProfileController extends GetxController {
   /// The workspace this handset is signed in to, for the profile screen to show.
   String get workspace => _tenantContext.tenant ?? '—';
 
+  /// The active environment label (Produksi, Development, Staging).
+  String get environmentLabel {
+    if (Get.isRegistered<ServerConfig>()) {
+      return Get.find<ServerConfig>().environmentLabel;
+    }
+    return '';
+  }
+
   final RxString avatar = ''.obs;
   final RxString name = '—'.obs;
   final RxString jobTitle = '—'.obs;
@@ -46,6 +55,10 @@ class ProfileController extends GetxController {
   final RxDouble points = 0.0.obs;
 
   final RxBool isLoadingInitial = false.obs;
+
+  /// The attendance summary could not be read (UX-C16). A failed load is not
+  /// a score of zero, so the cards show that it failed instead of "0%".
+  final RxBool summaryFailed = false.obs;
   final RxBool isUploading = false.obs;
 
   final Rxn<File> pickedImageFile = Rxn<File>();
@@ -91,7 +104,9 @@ class ProfileController extends GetxController {
       late.value = summary.late;
       attendance.value = summary.attendance;
       unlate.value = summary.onTime;
+      summaryFailed.value = false;
     } on ApiException catch (error) {
+      summaryFailed.value = true;
       AppLogger.warning(
         'Could not load the attendance summary: ${error.status}',
       );

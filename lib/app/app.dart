@@ -6,6 +6,7 @@ import '../core/ui/controllers/bottom_nav_controller.dart';
 
 import '../core/theme/app_theme.dart';
 import '../core/theme/theme_controller.dart';
+import '../features/app_update/presentation/app_update_gate.dart';
 import 'routing/app_pages.dart';
 
 /// The application widget.
@@ -28,7 +29,9 @@ class EsasApp extends StatelessWidget {
         // AnnouncementCarousel) already adapt individually when scale grows
         // beyond their breakpoints, so a blanket cap is not needed and would
         // prevent users from exercising their system accessibility settings.
-        builder: (context, child) => child!,
+        // AppUpdateGate covers every route when the Console makes an update
+        // mandatory, and offers an optional one on top of it.
+        builder: (context, child) => AppUpdateGate(child: child!),
         initialRoute: AppPages.initial,
         getPages: AppPages.routes,
         unknownRoute: AppPages.unknownRoute,

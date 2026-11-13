@@ -5,6 +5,7 @@ import '../../../../features/auth/data/repositories/session_repository.dart';
 import '../../../permit/data/models/leave_list.dart';
 import '../models/activity_log.dart';
 import '../models/announcement.dart';
+import '../models/attendance_device_step.dart';
 import '../models/schedule_calendar.dart';
 import '../services/home_api_service.dart';
 
@@ -313,6 +314,8 @@ class HomeRepository {
       return const DashboardTimes(attendanceEnabled: false);
     }
     if (user?.canRecordAttendance == false) {
+      final deviceStep = attendanceDeviceStepOf(user);
+      if (deviceStep != null) throw deviceStep;
       throw AttendanceAccessException(
         isRegisteredDevice: user?.isRegisteredDevice,
       );
@@ -555,7 +558,21 @@ class HomeRepository {
   }
 
   /// Jadwal kerja karyawan beserta informasi libur nasional / perusahaan.
+  ///
+  /// `/me/schedule` berada di balik ability `attendance` yang sama dengan
+  /// absensi, jadi sesi tanpa ability itu (ponsel yang bukan perangkat
+  /// terdaftar) dijelaskan di sini — persis seperti [todayAttendance] — alih-alih
+  /// menerima 403 yang menyuruh masuk kembali, yang tidak akan menolong.
   Future<ScheduleCalendar> scheduleCalendar({String? from, String? to}) async {
+    final user = _session.user;
+    if (user?.canRecordAttendance == false) {
+      final deviceStep = attendanceDeviceStepOf(user);
+      if (deviceStep != null) throw deviceStep;
+      throw AttendanceAccessException(
+        isRegisteredDevice: user?.isRegisteredDevice,
+      );
+    }
+
     final body = await _api.schedule(from: from, to: to);
     return ScheduleCalendar.fromJson(body);
   }

@@ -81,7 +81,7 @@ class _AnnouncementCarouselState extends State<AnnouncementCarousel> {
         return AppSkeleton(
           height: height,
           width: double.infinity,
-          borderRadius: AppRadii.xlAll,
+          borderRadius: AppRadii.xxlAll,
         );
       }
 
@@ -101,22 +101,48 @@ class _AnnouncementCarouselState extends State<AnnouncementCarousel> {
 
       if (items.isEmpty) {
         return AppCard(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.lg,
-          ),
+          borderRadius: AppRadii.xxlAll,
+          padding: const EdgeInsets.all(AppSpacing.lg),
           child: Row(
             children: <Widget>[
-              Icon(
-                Icons.campaign_outlined,
-                size: AppIconSizes.lg,
-                color: palette.textMuted,
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: palette.surfaceSubtle,
+                  borderRadius: AppRadii.mdAll,
+                  border: Border.all(color: palette.borderSubtle),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.campaign_outlined,
+                  size: AppIconSizes.lg,
+                  color: palette.textMuted,
+                ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
-                child: Text(
-                  'Belum ada pengumuman baru.',
-                  style: theme.textTheme.bodyMedium,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      'Belum ada pengumuman baru.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Informasi dan kebijakan penting akan muncul di sini.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: palette.textMuted,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -169,14 +195,24 @@ class _AnnouncementCarouselState extends State<AnnouncementCarousel> {
               children: List<Widget>.generate(items.length, (int i) {
                 final bool active = i == _current;
 
-                return AnimatedContainer(
-                  duration: AppDurations.fast,
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  width: active ? 18 : 6,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: active ? palette.borderStrong : palette.trackSubtle,
-                    borderRadius: AppRadii.pillAll,
+                return GestureDetector(
+                  onTap: () => _pageController.animateToPage(
+                    i,
+                    duration: AppDurations.normal,
+                    curve: AppMotion.standard,
+                  ),
+                  child: AnimatedContainer(
+                    duration: AppDurations.fast,
+                    curve: AppMotion.standard,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: active ? 22 : 6,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: active
+                          ? theme.colorScheme.primary
+                          : palette.trackSubtle,
+                      borderRadius: AppRadii.pillAll,
+                    ),
                   ),
                 );
               }),
@@ -226,13 +262,18 @@ class _AnnouncementCard extends StatelessWidget {
       onTap: () =>
           // Pushed, so back returns to the home screen (HOME-02).
           Get.toNamed(HomeRoutes.announcementDetail, arguments: item.id),
+      borderRadius: AppRadii.xxlAll,
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
             title,
-            style: theme.textTheme.titleMedium,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: theme.colorScheme.onSurface,
+              height: 1.25,
+            ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -249,13 +290,14 @@ class _AnnouncementCard extends StatelessWidget {
                 : Align(
                     alignment: Alignment.topLeft,
                     child: Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.sm),
+                      padding: const EdgeInsets.only(top: AppSpacing.xs),
                       child: Text(
                         snippet,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
+                          height: 1.35,
                         ),
                       ),
                     ),
@@ -275,9 +317,25 @@ class _AnnouncementCard extends StatelessWidget {
                   _metaLine(item) ?? 'Pengumuman perusahaan',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: palette.textMuted,
+                    fontWeight: FontWeight.w500,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: palette.brandSubtle,
+                  borderRadius: AppRadii.smAll,
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  size: AppIconSizes.xs,
+                  color: theme.colorScheme.primary,
                 ),
               ),
             ],

@@ -1145,18 +1145,8 @@ class _RangeStrip extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            ShaderMask(
-              shaderCallback: (Rect bounds) {
-                return const LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [Colors.white, Colors.white, Colors.transparent],
-                  stops: [0.0, 0.85, 1.0],
-                ).createShader(bounds);
-              },
-              blendMode: BlendMode.dstIn,
-              child: SizedBox(
-                height: 48,
+            SizedBox(
+              height: 48,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(
@@ -1215,7 +1205,6 @@ class _RangeStrip extends StatelessWidget {
                   ],
                 ),
               ),
-            ),
           ],
         ),
       );

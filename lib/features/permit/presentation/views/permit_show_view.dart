@@ -681,9 +681,8 @@ class _ApprovalBar extends StatelessWidget {
                   child: SizedBox(
                     height: 46,
                     child: FilledButton.icon(
-                      onPressed: busy
-                          ? null
-                          : () => controller.submitApproval(approve: true),
+                      // Asked first (UX-C12): one tap used to approve.
+                      onPressed: busy ? null : () => _confirmApproval(context),
                       icon: busy
                           ? const SizedBox.square(
                               dimension: AppIconSizes.lg,
@@ -703,6 +702,29 @@ class _ApprovalBar extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmApproval(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Setujui pengajuan ini?'),
+        content: const Text(
+          'Keputusan langsung dikirim dan tidak dapat dibatalkan dari aplikasi.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Setujui'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await controller.submitApproval(approve: true);
   }
 
   void _askReason(BuildContext context) {
@@ -729,7 +751,8 @@ class _ApprovalBar extends StatelessWidget {
 class _RejectForm extends StatefulWidget {
   const _RejectForm({required this.onSubmit});
 
-  final void Function(String notes) onSubmit;
+  /// Sends the rejection; true once it was recorded.
+  final Future<bool> Function(String notes) onSubmit;
 
   @override
   State<_RejectForm> createState() => _RejectFormState();
@@ -738,6 +761,7 @@ class _RejectForm extends StatefulWidget {
 class _RejectFormState extends State<_RejectForm> {
   final TextEditingController _notes = TextEditingController();
   bool _valid = false;
+  bool _sending = false;
 
   @override
   void dispose() {
@@ -761,7 +785,11 @@ class _RejectFormState extends State<_RejectForm> {
           keyboardType: TextInputType.multiline,
           textCapitalization: TextCapitalization.sentences,
           decoration: const InputDecoration(
+            labelText: 'Alasan Penolakan',
             hintText: 'Contoh: kuota cuti tahun ini sudah habis.',
+            helperText:
+                'Tuliskan alasan penolakan secara spesifik agar karyawan memahami dasar keputusan ini.',
+            helperMaxLines: 2,
             alignLabelWithHint: true,
           ),
           // Galat baru muncul setelah pengguna sempat mengetik. Versi lama
@@ -786,10 +814,18 @@ class _RejectFormState extends State<_RejectForm> {
               child: SizedBox(
                 height: 46,
                 child: FilledButton(
-                  onPressed: _valid
-                      ? () {
-                          Navigator.of(context).pop();
-                          widget.onSubmit(_notes.text.trim());
+                  // Closes only once the rejection went through: the reason
+                  // used to be lost with a sheet that closed before sending
+                  // (UX-C12).
+                  onPressed: _valid && !_sending
+                      ? () async {
+                          setState(() => _sending = true);
+                          final sent = await widget.onSubmit(
+                            _notes.text.trim(),
+                          );
+                          if (!mounted) return;
+                          setState(() => _sending = false);
+                          if (sent) Navigator.of(this.context).pop();
                         }
                       : null,
                   style: FilledButton.styleFrom(

@@ -87,35 +87,72 @@ class HomeHeader extends StatelessWidget {
     // Yang dikorbankan adalah baris, bukan informasi.
     final List<Widget> lines = <Widget>[
       if (!tight)
-        Text(
-          DateFormatter.greeting(),
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: palette.textMuted,
-          ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: palette.success.foreground,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Flexible(
+              child: Text(
+                DateFormatter.greeting(),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: palette.textMuted,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       Text(
         formattedName,
-        style: theme.textTheme.headlineSmall,
+        style: theme.textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: theme.colorScheme.onSurface,
+        ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
       if (dateLine != null)
-        Text(
-          tight ? '${DateFormatter.greeting()} · $dateLine' : dateLine,
-          style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              Icons.calendar_today_outlined,
+              size: 12,
+              color: palette.textMuted,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Flexible(
+              child: Text(
+                tight ? '${DateFormatter.greeting()} · $dateLine' : dateLine,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: palette.textMuted,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
     ];
 
     return Row(
       children: <Widget>[
-        AppAvatar(
-          userName: formattedName,
-          imageUrl: avatarUrl,
+        _SpringAvatar(
+          formattedName: formattedName,
+          avatarUrl: avatarUrl,
           size: tight ? 40 : 48,
+          borderColor: palette.borderSubtle,
           onTap: onAvatarTap,
         ),
         const SizedBox(width: AppSpacing.md),
@@ -140,19 +177,77 @@ class HomeHeader extends StatelessWidget {
   }
 }
 
+/// Avatar pengguna dengan respon pegas taktil saat diketuk.
+class _SpringAvatar extends StatefulWidget {
+  const _SpringAvatar({
+    required this.formattedName,
+    required this.avatarUrl,
+    required this.size,
+    required this.borderColor,
+    this.onTap,
+  });
+
+  final String formattedName;
+  final String avatarUrl;
+  final double size;
+  final Color borderColor;
+  final VoidCallback? onTap;
+
+  @override
+  State<_SpringAvatar> createState() => _SpringAvatarState();
+}
+
+class _SpringAvatarState extends State<_SpringAvatar> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedScale(
+      scale: _pressed ? 0.93 : 1.0,
+      duration: AppDurations.fast,
+      curve: AppMotion.standard,
+      child: Listener(
+        onPointerDown: widget.onTap == null ? null : (_) => setState(() => _pressed = true),
+        onPointerUp: widget.onTap == null ? null : (_) => setState(() => _pressed = false),
+        onPointerCancel: widget.onTap == null ? null : (_) => setState(() => _pressed = false),
+        child: Container(
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: widget.borderColor, width: 1.5),
+          ),
+          child: AppAvatar(
+            userName: widget.formattedName,
+            imageUrl: widget.avatarUrl,
+            size: widget.size,
+            onTap: widget.onTap,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Lonceng notifikasi, dengan penanda kecil bila ada yang belum dibaca.
-class _NotificationBell extends StatelessWidget {
+class _NotificationBell extends StatefulWidget {
   const _NotificationBell({required this.count, required this.onTap});
 
   final int? count;
   final VoidCallback onTap;
 
   @override
+  State<_NotificationBell> createState() => _NotificationBellState();
+}
+
+class _NotificationBellState extends State<_NotificationBell> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = theme.palette;
 
-    final int unread = count ?? 0;
+    final int unread = widget.count ?? 0;
     final bool showBadge = unread > 0;
 
     return Semantics(
@@ -164,58 +259,72 @@ class _NotificationBell extends StatelessWidget {
       // tanpa ini pembaca layar mengucapkan "Notifikasi, 3 belum dibaca" lalu
       // "3", dan yang kedua tidak menambah apa pun.
       excludeSemantics: true,
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: AppRadii.pillAll,
-          child: Container(
-            // 48dp: lantai target sentuh, dijaga terpisah dari ukuran ikonnya.
-            // Angkanya 48 dan bukan 44 karena lonceng ini digambar di baris
-            // paling atas layar, tempat ibu jari paling sering meleset, dan
-            // karena tidak ada satu pun tata letak di sini yang membayar
-            // tingginya — barisnya sudah lebih tinggi daripada 48 di setiap
-            // kelas ukuran, jadi empat piksel itu gratis.
-            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-            alignment: Alignment.center,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: <Widget>[
-                Icon(
-                  Icons.notifications_none_rounded,
-                  size: AppIconSizes.xxl,
-                  color: theme.colorScheme.onSurface,
-                ),
-                if (showBadge)
-                  Positioned(
-                    top: -AppSpacing.xxs,
-                    right: -AppSpacing.xs,
-                    child: Container(
-                      constraints: const BoxConstraints(
-                        minWidth: AppSpacing.md,
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.xs,
-                        vertical: 1,
-                      ),
-                      decoration: BoxDecoration(
-                        color: palette.danger.background,
-                        borderRadius: AppRadii.pillAll,
-                        border: Border.all(color: palette.danger.border),
-                      ),
-                      child: Text(
-                        unread > 99 ? '99+' : '$unread',
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: palette.danger.foreground,
-                          letterSpacing: 0,
-                          fontWeight: FontWeight.w700,
+      child: AnimatedScale(
+        scale: _pressed ? 0.92 : 1.0,
+        duration: AppDurations.fast,
+        curve: AppMotion.standard,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: AppRadii.lgAll,
+            onHighlightChanged: (val) {
+              if (_pressed != val) {
+                setState(() => _pressed = val);
+              }
+            },
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: AppRadii.lgAll,
+                border: Border.all(color: palette.borderSubtle),
+              ),
+              alignment: Alignment.center,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: <Widget>[
+                  Icon(
+                    Icons.notifications_none_rounded,
+                    size: AppIconSizes.xl,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                  if (showBadge)
+                    Positioned(
+                      top: -AppSpacing.xs,
+                      right: -AppSpacing.xs,
+                      child: AnimatedScale(
+                        scale: showBadge ? 1.0 : 0.0,
+                        duration: AppDurations.normal,
+                        curve: Curves.easeOutBack,
+                        child: Container(
+                          constraints: const BoxConstraints(
+                            minWidth: AppSpacing.md,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.xs,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: palette.danger.background,
+                            borderRadius: AppRadii.pillAll,
+                            border: Border.all(color: palette.danger.border),
+                          ),
+                          child: Text(
+                            unread > 99 ? '99+' : '$unread',
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: palette.danger.foreground,
+                              letterSpacing: 0,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

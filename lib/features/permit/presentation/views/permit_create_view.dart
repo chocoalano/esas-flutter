@@ -99,29 +99,25 @@ class PermitCreateView extends GetView<PermitCreateController> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const AppSectionHeader(title: 'Jadwal kerja'),
+            const AppSectionHeader(title: 'Jadwal kerja', dense: true),
             _Field(
               label: 'Jadwal kerja',
               required: true,
-              description: controller.scheduleList.isEmpty
-                  ? 'Tidak ada jadwal kerja yang bisa dipakai. Hubungi HR '
-                        'sebelum mengajukan.'
-                  : 'Pilih jadwal kerja yang menjadi acuan pengajuan ini. '
-                        'Tanggal di bawah mengikuti pilihan ini.',
               child: _buildDropdownSchedule(theme),
             ),
 
             if (isShiftAdjustment) ...[
-              const SizedBox(height: AppSpacing.lg),
-              const AppSectionHeader(title: 'Penyesuaian shift'),
+              const SizedBox(height: AppSpacing.md),
+              const AppSectionHeader(title: 'Penyesuaian shift', dense: true),
               _Field(
                 label: 'Shift saat ini',
                 required: true,
-                description: 'Shift yang berlaku sebelum penyesuaian.',
                 child: _buildDropdownShift(
                   theme,
                   'Shift Saat Ini',
                   controller.selectedCurrentShiftId,
+                  helperText:
+                      'Pilih shift yang sedang aktif berlaku sebelum dilakukan penyesuaian.',
                   validator: (v) =>
                       v == null ? 'Shift saat ini wajib diisi' : null,
                 ),
@@ -129,11 +125,12 @@ class PermitCreateView extends GetView<PermitCreateController> {
               _Field(
                 label: 'Shift penyesuaian',
                 required: true,
-                description: 'Shift yang diminta setelah penyesuaian.',
                 child: _buildDropdownShift(
                   theme,
                   'Shift Penyesuaian',
                   controller.selectedAdjustShiftId,
+                  helperText:
+                      'Pilih shift baru yang diminta (harus berbeda dari shift saat ini).',
                   validator: (v) {
                     if (v == null) return 'Shift penyesuaian wajib diisi';
                     // Tukar shift dengan shift yang sama bukan pengajuan; dulu
@@ -148,33 +145,30 @@ class PermitCreateView extends GetView<PermitCreateController> {
               ),
             ],
 
-            const SizedBox(height: AppSpacing.lg),
-            const AppSectionHeader(title: 'Waktu'),
+            const SizedBox(height: AppSpacing.md),
+            const AppSectionHeader(title: 'Waktu', dense: true),
 
             if (isTimeAdjustment) ...[
               _Field(
                 label: 'Jam masuk penyesuaian',
-                description:
-                    'Format 24 jam, misalnya 08:30. Jam ini menjadi acuan '
-                    'penyesuaian data absensi masuk. Isi minimal salah satu '
-                    'dari dua jam penyesuaian.',
                 child: _buildTimePickerField(
                   context,
                   theme,
                   'Jam Masuk Penyesuaian',
                   controller.timeinAdjustC,
+                  helperText:
+                      'Format 24 jam (JJ:mm). Jam masuk kerja baru yang diajukan.',
                 ),
               ),
               _Field(
                 label: 'Jam pulang penyesuaian',
-                description:
-                    'Format 24 jam, misalnya 17:00. Harus setelah jam masuk '
-                    'penyesuaian.',
                 child: _buildTimePickerField(
                   context,
                   theme,
                   'Jam Pulang Penyesuaian',
                   controller.timeoutAdjustC,
+                  helperText:
+                      'Format 24 jam (JJ:mm). Jam pulang baru yang diajukan (setelah jam masuk).',
                   validateAfter: controller.timeinAdjustC,
                 ),
               ),
@@ -184,25 +178,25 @@ class PermitCreateView extends GetView<PermitCreateController> {
               _Field(
                 label: 'Tanggal mulai',
                 required: true,
-                description: 'Hari pertama izin ini berlaku.',
                 child: _buildDatePickerField(
                   context,
                   theme,
                   'Tanggal Mulai',
                   controller.startDateC,
+                  helperText:
+                      'Format YYYY-MM-DD. Tanggal awal berlakunya izin sesuai roster kerja.',
                 ),
               ),
               _Field(
                 label: 'Tanggal selesai',
                 required: true,
-                description:
-                    'Hari terakhir izin ini berlaku. Untuk izin sehari, '
-                    'sama dengan tanggal mulai.',
                 child: _buildDatePickerField(
                   context,
                   theme,
                   'Tanggal Selesai',
                   controller.endDateC,
+                  helperText:
+                      'Format YYYY-MM-DD. Tanggal akhir izin (sama dengan tanggal mulai jika izin 1 hari).',
                   notBeforeDate: controller.startDateC,
                 ),
               ),
@@ -211,24 +205,26 @@ class PermitCreateView extends GetView<PermitCreateController> {
             _Field(
               label: 'Jam mulai',
               required: true,
-              description: 'Format 24 jam, misalnya 08:30.',
               child: _buildTimePickerField(
                 context,
                 theme,
                 'Jam Mulai',
                 controller.startTimeC,
+                helperText:
+                    'Format 24 jam (JJ:mm), contoh: 08:30. Jam dimulainya izin kerja.',
                 isRequired: true,
               ),
             ),
             _Field(
               label: 'Jam selesai',
               required: true,
-              description: 'Format 24 jam, misalnya 17:00.',
               child: _buildTimePickerField(
                 context,
                 theme,
                 'Jam Selesai',
                 controller.endTimeC,
+                helperText:
+                    'Format 24 jam (JJ:mm), contoh: 17:00. Jam berakhirnya izin kerja.',
                 isRequired: true,
                 validateAfter: controller.startTimeC,
                 // Hanya untuk izin sehari. Izin yang melewati tengah malam sah
@@ -237,18 +233,17 @@ class PermitCreateView extends GetView<PermitCreateController> {
               ),
             ),
 
-            const SizedBox(height: AppSpacing.lg),
-            const AppSectionHeader(title: 'Keterangan'),
+            const SizedBox(height: AppSpacing.md),
+            const AppSectionHeader(title: 'Keterangan', dense: true),
             _Field(
               label: 'Catatan',
-              description:
-                  'Opsional. Jelaskan alasan pengajuan agar penyetuju tidak '
-                  'perlu bertanya ulang.',
               child: _buildTextFormField(
                 controller.notesC,
                 theme,
                 'Catatan',
-                maxLines: 4,
+                helperText:
+                    'Jelaskan keperluan atau alasan pengajuan izin secara lengkap kepada atasan.',
+                maxLines: 3,
                 // Sepanjang yang diterima `StorePermitRequest`. Batas 255 yang
                 // lama memotong catatan yang sebenarnya sah.
                 maxLength: 2000,
@@ -280,7 +275,12 @@ class PermitCreateView extends GetView<PermitCreateController> {
   Widget _buildDropdownSchedule(ThemeData theme) => Obx(
     () => DropdownButtonFormField<int>(
       initialValue: controller.selectedScheduleId.value,
-      decoration: appInputDecoration(theme, ''),
+      decoration: appInputDecoration(
+        theme,
+        '',
+        helperText:
+            'Pilih jadwal shift kerja yang menjadi rujukan permohonan izin ini.',
+      ),
       isExpanded: true,
       hint: const Text('Pilih jadwal kerja'),
       items: controller.scheduleList
@@ -305,10 +305,11 @@ class PermitCreateView extends GetView<PermitCreateController> {
     ThemeData theme,
     String label,
     Rx<int?> selectedValue, {
+    String? helperText,
     String? Function(int?)? validator,
   }) => DropdownButtonFormField<int>(
     initialValue: selectedValue.value,
-    decoration: appInputDecoration(theme, ''),
+    decoration: appInputDecoration(theme, '', helperText: helperText),
     isExpanded: true,
     hint: Text('Pilih $label'.toLowerCase()),
     items: controller.shiftList
@@ -327,6 +328,7 @@ class PermitCreateView extends GetView<PermitCreateController> {
     TextEditingController ctrl,
     ThemeData theme,
     String label, {
+    String? helperText,
     String? Function(String?)? validator,
     int maxLines = 1,
     int? maxLength,
@@ -334,7 +336,7 @@ class PermitCreateView extends GetView<PermitCreateController> {
   }) {
     return TextFormField(
       controller: ctrl,
-      decoration: appInputDecoration(theme, '').copyWith(
+      decoration: appInputDecoration(theme, '', helperText: helperText).copyWith(
         hintText: label,
         // Penghitung karakter disembunyikan: ia menambah satu baris di bawah
         // setiap field padahal batasnya sudah dipaksakan oleh `maxLength`.
@@ -353,12 +355,13 @@ class PermitCreateView extends GetView<PermitCreateController> {
     ThemeData theme,
     String label,
     TextEditingController controller, {
+    String? helperText,
     TextEditingController? notBeforeDate,
   }) => TextFormField(
     controller: controller,
     readOnly: true,
     onTap: () async => await this.controller.pickDate(context, controller),
-    decoration: appInputDecoration(theme, '').copyWith(
+    decoration: appInputDecoration(theme, '', helperText: helperText).copyWith(
       hintText: 'YYYY-MM-DD',
       suffixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
     ),
@@ -420,6 +423,7 @@ class PermitCreateView extends GetView<PermitCreateController> {
     ThemeData theme,
     String label,
     TextEditingController controller, {
+    String? helperText,
     bool isRequired = false,
     TextEditingController? validateAfter,
     bool sameDayOnly = false,
@@ -427,7 +431,7 @@ class PermitCreateView extends GetView<PermitCreateController> {
     controller: controller,
     readOnly: true,
     onTap: () => this.controller.pickTime(context, controller),
-    decoration: appInputDecoration(theme, '').copyWith(
+    decoration: appInputDecoration(theme, '', helperText: helperText).copyWith(
       hintText: 'HH:mm',
       suffixIcon: const Icon(Icons.access_time_rounded, size: 18),
     ),
@@ -482,18 +486,19 @@ class _Field extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AppFieldLabel(label, required: required),
           child,
           if (description != null) ...[
-            const SizedBox(height: AppSpacing.sm - 2),
+            const SizedBox(height: AppSpacing.xxs),
             Text(
               description!,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.palette.textMuted,
+                fontSize: 11,
               ),
             ),
           ],

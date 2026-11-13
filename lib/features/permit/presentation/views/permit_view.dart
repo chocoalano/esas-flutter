@@ -2,6 +2,7 @@ import 'package:esas/core/theme/app_dimens.dart';
 import 'package:esas/core/theme/app_palette.dart';
 import 'package:esas/core/theme/app_typography.dart';
 import 'package:esas/core/ui/components/app_empty_state.dart';
+import 'package:esas/core/ui/components/app_error_state.dart';
 import 'package:esas/core/ui/components/app_section_header.dart';
 import 'package:esas/core/ui/components/app_skeleton.dart';
 import 'package:esas/core/ui/components/custom_bottom_navbar.dart';
@@ -58,7 +59,13 @@ class PermitView extends GetView<PermitController> {
                 if (loading) ...[
                   const AppSectionHeader(title: 'Jenis perizinan'),
                   const AppSkeletonList(count: 5, padding: EdgeInsets.zero),
-                ] else if (leaveTypes.isEmpty)
+                ] else if (controller.loadError.value case final failed?)
+                  AppErrorState(
+                    title: 'Jenis perizinan belum dapat dimuat',
+                    message: failed.message,
+                    onRetry: controller.fetchLeaveTypes,
+                  )
+                else if (leaveTypes.isEmpty)
                   AppEmptyState(
                     icon: Icons.inbox_outlined,
                     title: 'Belum ada jenis perizinan',

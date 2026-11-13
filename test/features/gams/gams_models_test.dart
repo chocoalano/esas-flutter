@@ -28,6 +28,17 @@ void main() {
       expect(req.isClosed, isFalse);
     });
 
+    test('the status the server actually sends is labelled (FUNC-A08)', () {
+      final req = GamsServiceRequest.fromJson({
+        'id': 102,
+        'number': 'SR-00000102',
+        'subject': 'Lampu koridor mati',
+        'status': 'triaged',
+      });
+
+      expect(req.statusLabel, 'Dalam Peninjauan');
+    });
+
     test('parses GamsSpaceReservation json correctly', () {
       final json = {
         'id': 55,

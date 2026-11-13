@@ -22,6 +22,11 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        // The attendance device key (ADR-D): a separate channel, so the CORE-03
+        // identifier above is left exactly as it was.
+        DeviceKeyChannel(applicationContext)
+            .register(flutterEngine.dartExecutor.binaryMessenger)
     }
 
     @SuppressLint("HardwareIds")

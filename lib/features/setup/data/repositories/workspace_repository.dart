@@ -1,3 +1,4 @@
+import '../../../../core/config/env.dart';
 import '../../../../core/config/server_config.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/tenancy/tenant_context.dart';
@@ -42,6 +43,12 @@ class WorkspaceRepository {
   bool get subdomainMode => _serverConfig.subdomainMode;
 
   String? get workspace => _tenantContext.tenant;
+
+  AppEnvironment get appEnvironment => _serverConfig.appEnvironment;
+
+  String get environmentLabel => _serverConfig.environmentLabel;
+
+  String? get environment => _serverConfig.environment;
 
   /// Point this handset at [domain]/[workspace], if the server agrees it exists.
   ///
@@ -103,16 +110,21 @@ class WorkspaceRepository {
       _tenantContext.tenant == candidate.code &&
       _serverConfig.subdomainMode == candidate.subdomainMode;
 
-  Future<void> adopt(WorkspaceCandidate candidate) async {
+  Future<void> adopt(
+    WorkspaceCandidate candidate, {
+    String? environment,
+  }) async {
+    final env = environment ?? candidate.workspace.environment;
     await _serverConfig.save(
       domain: candidate.address,
       subdomainMode: candidate.subdomainMode,
+      environment: env,
     );
     await _tenantContext.remember(candidate.code);
 
     AppLogger.info(
       'Workspace configured: ${candidate.workspace.subdomain} at '
-      '${candidate.address}.',
+      '${candidate.address} [${env ?? 'auto'}].',
     );
   }
 

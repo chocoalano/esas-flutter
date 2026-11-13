@@ -36,6 +36,9 @@ class SetupController extends GetxController {
   final RxBool subdomainMode = true.obs;
   final RxBool isChecking = false.obs;
 
+  /// The active environment selection (production, staging, development).
+  final Rx<AppEnvironment> selectedEnvironment = AppEnvironment.production.obs;
+
   /// Bumped on every keystroke.
   ///
   /// The two things this screen shows about what is being typed — the address a
@@ -113,13 +116,66 @@ class SetupController extends GetxController {
   void onInit() {
     super.onInit();
 
-    domainController.text = _repository.domain ?? '';
-    workspaceController.text = _repository.workspace ?? '';
-    subdomainMode.value = _repository.subdomainMode;
+    if (_repository.isConfigured) {
+      selectedEnvironment.value = _repository.appEnvironment;
+      domainController.text = _repository.domain ?? '';
+      workspaceController.text = _repository.workspace ?? '';
+      subdomainMode.value = _repository.subdomainMode;
+    } else {
+      selectedEnvironment.value = Env.appEnvironment;
+      domainController.text =
+          selectedEnvironment.value == AppEnvironment.production
+              ? Env.defaultProductionDomain
+              : (Env.apiBaseUrl.isNotEmpty
+                  ? Env.apiBaseUrl
+                  : Env.defaultEmulatorDomain);
+      workspaceController.text = Env.defaultTenant;
+      subdomainMode.value =
+          selectedEnvironment.value == AppEnvironment.production
+              ? true
+              : _repository.subdomainMode;
+    }
+
+    if (selectedEnvironment.value == AppEnvironment.production) {
+      domainController.text = Env.defaultProductionDomain;
+      subdomainMode.value = true;
+    }
 
     // Any edit invalidates a confirmation that was about the old values.
     domainController.addListener(_invalidate);
     workspaceController.addListener(_invalidate);
+  }
+
+  void selectEnvironment(AppEnvironment env) {
+    selectedEnvironment.value = env;
+    edits.value++;
+
+    switch (env) {
+      case AppEnvironment.production:
+        domainController.text = Env.defaultProductionDomain;
+        subdomainMode.value = true;
+      case AppEnvironment.staging:
+        domainController.text = Env.defaultStagingDomain;
+        subdomainMode.value = true;
+      case AppEnvironment.development:
+        final currentNorm = ServerConfig.normalise(domainController.text);
+        if (domainController.text.trim().isEmpty ||
+            (currentNorm != null &&
+                !ServerConfig.isDevelopmentHost(Uri.parse(currentNorm).host))) {
+          domainController.text = Env.defaultEmulatorDomain;
+        }
+        subdomainMode.value = false;
+    }
+    _invalidate();
+  }
+
+  void applyDevPreset(String presetUrl) {
+    domainController.text = presetUrl;
+    final parsed = Uri.tryParse(presetUrl);
+    final host = parsed?.host ?? '';
+    subdomainMode.value =
+        !ServerConfig.isIpLiteral(host) && host != 'localhost';
+    _invalidate();
   }
 
   @override
@@ -132,13 +188,21 @@ class SetupController extends GetxController {
   }
 
   String? validateDomain(String? value) {
+    // Pada Mode Produksi, pengguna tidak perlu mengisi alamat server (ditangani otomatis).
+    if (selectedEnvironment.value == AppEnvironment.production) {
+      return null;
+    }
+
     if ((value ?? '').trim().isEmpty) {
       return 'Alamat server wajib diisi.';
     }
 
-    return ServerConfig.normalise(value) == null
-        ? 'Alamat server tidak dikenali. Contoh: hrms.perusahaan.co.id'
-        : null;
+    final normalised = ServerConfig.normalise(value);
+    if (normalised == null) {
+      return 'Alamat server tidak dikenali. Contoh: 10.0.2.2:8000';
+    }
+
+    return null;
   }
 
   String? validateWorkspace(String? value) {
@@ -158,6 +222,11 @@ class SetupController extends GetxController {
   /// (SETUP-01).
   Future<void> check() async {
     if (isChecking.value) return;
+
+    if (selectedEnvironment.value == AppEnvironment.production) {
+      domainController.text = Env.defaultProductionDomain;
+      subdomainMode.value = true;
+    }
 
     // Paints the messages under the fields when there is a form on screen. The
     // values are checked again below regardless: a controller that refuses bad
@@ -216,7 +285,10 @@ class SetupController extends GetxController {
     // before the switch, so the sign-out still reaches the old server.
     if (!_repository.isCurrent(candidate)) await _endSession?.call();
 
-    await _repository.adopt(candidate);
+    await _repository.adopt(
+      candidate,
+      environment: selectedEnvironment.value.key,
+    );
     Get.offAllNamed(AuthRoutes.login);
   }
 

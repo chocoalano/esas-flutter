@@ -104,6 +104,66 @@ void main() {
     },
   );
 
+  // `/me/schedule` sits behind the same `attendance` ability as the clock, so
+  // a handset signed in without it is refused with a 403 that tells the person
+  // to sign in again — which never helps on a phone that is not registered.
+  test('unregistered device is told why before the schedule request', () async {
+    signInWith({
+      'attendance_enabled': true,
+      'abilities': ['profile', 'permits', 'payroll'],
+      'device': {'can_record_attendance': false, 'is_registered_device': false},
+    });
+
+    await expectLater(
+      repository.scheduleCalendar(from: '2026-11-01', to: '2026-11-30'),
+      throwsA(
+        isA<AttendanceAccessException>()
+            .having((error) => error.isRegisteredDevice, 'device', false)
+            .having(
+              (error) => error.code,
+              'code',
+              'attendance_device_unregistered',
+            ),
+      ),
+    );
+    verifyNever(
+      () => api.schedule(
+        from: any(named: 'from'),
+        to: any(named: 'to'),
+      ),
+    );
+  });
+
+  test('allowed device still requests the schedule', () async {
+    signInWith({
+      'attendance_enabled': true,
+      'device': {'can_record_attendance': true},
+    });
+    when(
+      () => api.schedule(
+        from: any(named: 'from'),
+        to: any(named: 'to'),
+      ),
+    ).thenAnswer(
+      (_) async => {
+        'from': '2026-11-01',
+        'to': '2026-11-30',
+        'holidays': <dynamic>[],
+        'schedule': [
+          {'date': '2026-11-11', 'shift': 'Pagi', 'day_type': 'working'},
+        ],
+      },
+    );
+
+    final calendar = await repository.scheduleCalendar(
+      from: '2026-11-01',
+      to: '2026-11-30',
+    );
+
+    expect(calendar.schedule.single.shift, 'Pagi');
+    verify(() => api.schedule(from: '2026-11-01', to: '2026-11-30')).called(1);
+  });
+
   test(
     'allowed device requests context and honors its disabled flag',
     () async {

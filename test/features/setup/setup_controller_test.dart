@@ -37,6 +37,7 @@ void main() {
 
   setUp(() async {
     controller = await _controller();
+    controller.selectEnvironment(AppEnvironment.development);
   });
 
   tearDown(() {

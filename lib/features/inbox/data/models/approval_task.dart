@@ -14,6 +14,10 @@ class ApprovalTask {
     this.createdAt,
     this.actionUrl,
     this.canDecide = true,
+    this.canReject = true,
+    this.facts = const [],
+    this.detailRoute,
+    this.detailId,
   });
 
   factory ApprovalTask.fromJson(Map<String, dynamic> json) {
@@ -30,10 +34,34 @@ class ApprovalTask {
       createdAt: asString(json['created_at']),
       actionUrl: asString(json['action_url']),
       canDecide: asBool(json['can_decide']) ?? true,
+      canReject: asBool(json['can_reject']) ?? true,
+      facts: [
+        for (final raw in asList(json['facts']))
+          if ((
+                asString(asObject(raw)['label']),
+                asString(asObject(raw)['value']),
+              )
+              case (final String label, final String value))
+            (label: label, value: value),
+      ],
+      detailRoute: asString(asObject(json['detail'])['route']),
+      detailId: asInt(asObject(json['detail'])['id']),
     );
   }
 
   final String id;
+
+  /// What the approver may see before deciding, as the server words it
+  /// (UX-A08): kind, dates, duration, reason, the goods on a gate pass.
+  final List<({String label, String value})> facts;
+
+  /// False where the owning domain has no rejection for this item (a draft
+  /// gate pass), so no button that is bound to fail is offered (FUNC-D19).
+  final bool canReject;
+
+  /// The screen that shows the whole request, when the app has one.
+  final String? detailRoute;
+  final int? detailId;
 
   /// Whether this task can be decided from the app (INBOX-02). The server
   /// says no for an ITMS ticket, whose decision lives elsewhere; offering

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
@@ -43,6 +45,11 @@ class GamsCreateController extends GetxController {
   final RxBool isSubmitting = false.obs;
   final RxnString error = RxnString();
 
+  /// Why the options (services, rooms, vehicles) could not be loaded, kept
+  /// apart from a submit error so the form can offer a retry instead of an
+  /// empty dropdown (UX-A07).
+  final Rxn<ApiException> loadError = Rxn<ApiException>();
+
   final RxList<GamsServiceDefinition> definitions =
       <GamsServiceDefinition>[].obs;
   final RxList<GamsFacility> facilities = <GamsFacility>[].obs;
@@ -66,13 +73,38 @@ class GamsCreateController extends GetxController {
   final TextEditingController visitorPhoneC = TextEditingController();
   final TextEditingController visitorCompanyC = TextEditingController();
 
+  /// What the requester typed into the chosen service's own fields
+  /// (FUNC-A01), by field key. Cleared when another service is chosen.
+  final RxMap<String, Object?> fieldValues = <String, Object?>{}.obs;
+
   String? _intentKey;
   String? _intentFingerprint;
 
   @override
   void onInit() {
     super.onInit();
+    ever<int?>(optionId, (_) {
+      if (kind == GamsCreateKind.serviceRequest) fieldValues.clear();
+    });
     loadOptions();
+  }
+
+  /// The service chosen on a service request, or null.
+  GamsServiceDefinition? get selectedDefinition {
+    final id = optionId.value;
+    return id == null ? null : definitions.firstWhereOrNull((d) => d.id == id);
+  }
+
+  void setField(String key, Object? value) {
+    final empty =
+        value == null ||
+        (value is String && value.trim().isEmpty) ||
+        (value is List && value.isEmpty);
+    if (empty) {
+      fieldValues.remove(key);
+    } else {
+      fieldValues[key] = value;
+    }
   }
 
   @override
@@ -92,13 +124,18 @@ class GamsCreateController extends GetxController {
   Future<void> loadOptions() async {
     isLoading.value = true;
     error.value = null;
+    loadError.value = null;
 
     try {
       switch (kind) {
         case GamsCreateKind.serviceRequest:
         case GamsCreateKind.visit:
           final catalog = await _repository.definitions();
-          definitions.assignAll(catalog.definitions);
+          // Only services whose required fields this app can draw: any other
+          // would be refused after sending (FUNC-A01).
+          definitions.assignAll(
+            catalog.definitions.where((d) => d.isRequestable),
+          );
           facilities.assignAll(catalog.facilities);
         case GamsCreateKind.spaceReservation:
           spaces.assignAll(await _repository.spaces());
@@ -106,7 +143,7 @@ class GamsCreateController extends GetxController {
           vehicles.assignAll(await _repository.vehicles());
       }
     } on ApiException catch (e) {
-      error.value = e.message;
+      loadError.value = e;
     } finally {
       isLoading.value = false;
     }
@@ -120,6 +157,21 @@ class GamsCreateController extends GetxController {
       case GamsCreateKind.serviceRequest:
         if (optionId.value == null) return 'Pilih layanan yang diminta.';
         if (subject.isEmpty) return 'Isi judul permintaan.';
+        final definition = selectedDefinition;
+        if (definition != null) {
+          if (definition.requiresFacility && facilityId.value == null) {
+            return 'Layanan ini memerlukan lokasi gedung.';
+          }
+          if (definition.requiresDescription &&
+              descriptionC.text.trim().isEmpty) {
+            return 'Layanan ini memerlukan keterangan.';
+          }
+          for (final field in definition.fields) {
+            if (field.required && !fieldValues.containsKey(field.key)) {
+              return 'Isi "${field.label}".';
+            }
+          }
+        }
       case GamsCreateKind.spaceReservation:
         if (optionId.value == null) return 'Pilih ruang yang dipesan.';
       case GamsCreateKind.vehicleBooking:
@@ -194,6 +246,7 @@ class GamsCreateController extends GetxController {
         subject: subject,
         description: description.isEmpty ? null : description,
         priority: priority.value,
+        fields: fieldPayload(),
         idempotencyKey: key,
       ),
       GamsCreateKind.spaceReservation => _repository.createSpaceReservation(
@@ -207,6 +260,9 @@ class GamsCreateController extends GetxController {
         purpose: subject,
         startsAt: workspaceInstant(startAt.value!),
         endsAt: workspaceInstant(endAt.value!),
+        // A retry after a lost answer replays the first booking (FUNC-A04)
+        // instead of meeting "vehicle already booked" for one's own booking.
+        idempotencyKey: key,
       ),
       GamsCreateKind.visit => _repository.createVisit(
         facilityId: facilityId.value!,
@@ -214,6 +270,7 @@ class GamsCreateController extends GetxController {
         visitorPhone: _orNull(visitorPhoneC.text),
         visitorCompany: _orNull(visitorCompanyC.text),
         purpose: subject,
+        idempotencyKey: key,
       ),
     };
   }
@@ -230,7 +287,32 @@ class GamsCreateController extends GetxController {
     visitorNameC.text.trim(),
     visitorPhoneC.text.trim(),
     visitorCompanyC.text.trim(),
+    jsonEncode(fieldPayload() ?? const {}),
   ].join('|');
+
+  /// The chosen service's fields as the server reads them: dates as
+  /// `yyyy-MM-dd`, date-times on the workspace's clock, only fields the
+  /// service declares, and nothing at all when none was filled.
+  Map<String, Object?>? fieldPayload() {
+    final definition = selectedDefinition;
+    if (definition == null || fieldValues.isEmpty) return null;
+
+    final payload = <String, Object?>{};
+    for (final field in definition.fields) {
+      final value = fieldValues[field.key];
+      if (value == null) continue;
+      payload[field.key] = switch ((field.type, value)) {
+        (GamsFieldType.date, DateTime d) =>
+          '${d.year.toString().padLeft(4, '0')}-'
+              '${d.month.toString().padLeft(2, '0')}-'
+              '${d.day.toString().padLeft(2, '0')}',
+        (GamsFieldType.datetime, DateTime d) => workspaceInstant(d),
+        _ => value,
+      };
+    }
+
+    return payload.isEmpty ? null : payload;
+  }
 
   static String? _orNull(String raw) {
     final value = raw.trim();

@@ -39,6 +39,7 @@ class GamsSpaceReservation {
     required this.startAt,
     required this.endAt,
     required this.status,
+    this.canCancel = false,
     this.createdAt,
   });
 
@@ -52,9 +53,13 @@ class GamsSpaceReservation {
       startAt: asString(json['start_at']) ?? '',
       endAt: asString(json['end_at']) ?? '',
       status: asString(json['status']) ?? 'confirmed',
+      canCancel: json['can_cancel'] == true,
       createdAt: asString(json['created_at']),
     );
   }
+
+  /// Whether the server lets the requester withdraw it now (D-06).
+  final bool canCancel;
 
   final int id;
   final int spaceId;

@@ -51,17 +51,17 @@ class NotificationView extends GetView<NotificationController> {
         },
         child: Scaffold(
           appBar: AppBar(title: const Text('Notifikasi')),
-        body: Column(
-          children: [
-            const _InboxStrip(),
-            Expanded(child: Obx(() => _body(context))),
-          ],
-        ),
-        bottomNavigationBar: Obx(
-          () => CustomBottomNavBar(notificationCount: controller.unreadCount),
+          body: Column(
+            children: [
+              const _InboxStrip(),
+              Expanded(child: Obx(() => _body(context))),
+            ],
+          ),
+          bottomNavigationBar: Obx(
+            () => CustomBottomNavBar(notificationCount: controller.unreadCount),
+          ),
         ),
       ),
-    ),
     );
   }
 
@@ -128,60 +128,60 @@ class NotificationView extends GetView<NotificationController> {
       child: Scrollbar(
         controller: controller.scrollController,
         child: ListView.builder(
-        controller: controller.scrollController,
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.page,
-          AppSpacing.lg,
-          AppSpacing.page,
-          AppSpacing.bottomSafe,
-        ),
-        itemCount: entries.length + (showTail ? 1 : 0),
-        itemBuilder: (context, index) {
-          if (index == entries.length) {
-            return const Padding(
-              padding: EdgeInsets.only(top: AppSpacing.sm),
-              child: AppSkeletonRow(),
-            );
-          }
+          controller: controller.scrollController,
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.page,
+            AppSpacing.lg,
+            AppSpacing.page,
+            AppSpacing.bottomSafe,
+          ),
+          itemCount: entries.length + (showTail ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index == entries.length) {
+              return const Padding(
+                padding: EdgeInsets.only(top: AppSpacing.sm),
+                child: AppSkeletonRow(),
+              );
+            }
 
-          final entry = entries[index];
+            final entry = entries[index];
 
-          return switch (entry) {
-            _DayHeader(:final label, :final count) => Padding(
-              padding: EdgeInsets.only(
-                top: index == 0 ? 0 : AppSpacing.xl,
-                bottom: AppSpacing.sm,
-              ),
-              child: AppSectionHeader(
-                title: label,
-                dense: true,
-                showDivider: true,
-                padding: EdgeInsets.zero,
-                trailing: Text(
-                  '$count',
-                  style: AppTypography.dataSmall(
-                    color: Theme.of(context).palette.textMuted,
+            return switch (entry) {
+              _DayHeader(:final label, :final count) => Padding(
+                padding: EdgeInsets.only(
+                  top: index == 0 ? 0 : AppSpacing.xl,
+                  bottom: AppSpacing.sm,
+                ),
+                child: AppSectionHeader(
+                  title: label,
+                  dense: true,
+                  showDivider: true,
+                  padding: EdgeInsets.zero,
+                  trailing: Text(
+                    '$count',
+                    style: AppTypography.dataSmall(
+                      color: Theme.of(context).palette.textMuted,
+                    ),
                   ),
                 ),
               ),
-            ),
-            _InboxRow(:final notification) => Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: _NotificationTile(
-                notification: notification,
-                onTap: () async {
-                  await controller.markAsRead(notification.id);
-                  if (Get.isRegistered<NotificationSyncService>()) {
-                    Get.find<NotificationSyncService>().open(
-                      notification.data.payload,
-                      refresh: false,
-                    );
-                  }
-                },
+              _InboxRow(:final notification) => Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: _NotificationTile(
+                  notification: notification,
+                  onTap: () async {
+                    await controller.markAsRead(notification.id);
+                    if (Get.isRegistered<NotificationSyncService>()) {
+                      Get.find<NotificationSyncService>().open(
+                        notification.data.payload,
+                        refresh: false,
+                      );
+                    }
+                  },
+                ),
               ),
-            ),
-          };
-        },
+            };
+          },
         ),
       ),
     );

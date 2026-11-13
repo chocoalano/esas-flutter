@@ -10,6 +10,7 @@ import 'package:esas/features/notification/data/services/notification_sync_servi
 import 'package:esas/features/notification/presentation/controllers/notification_controller.dart';
 import 'package:esas/features/notification/presentation/routes/notification_routes.dart';
 import 'package:esas/features/permit/presentation/routes/permit_routes.dart';
+import 'package:esas/features/tasks/presentation/routes/tasks_routes.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FakeNotifications extends Fake implements NotificationRepository {
@@ -172,4 +173,44 @@ void main() {
       expect(controller.isLoading.value, isFalse);
     },
   );
+
+  group('field task notifications (FUNC-D01)', () {
+    test('an MTMS assignment push opens the work order in Tugas Saya', () {
+      final destination = NotificationDestination.fromData({
+        'source_domain': 'mtcms',
+        'work_order_id': 42,
+        'number': 'WO-MT-42',
+      });
+
+      expect(destination.route, TasksRoutes.detail);
+      expect(destination.arguments, {'domain': 'mtms', 'id': 42});
+    });
+
+    test(
+      'an in-app row about a GAMS work order or ITMS ticket opens that task',
+      () {
+        expect(
+          NotificationDestination.fromData({
+            'about': {'subject': 'itms.ticket', 'id': 7},
+          }).arguments,
+          {'domain': 'itms', 'id': 7},
+        );
+        expect(
+          NotificationDestination.fromData({
+            'about': {'subject': 'gams.work_order', 'id': 3},
+          }).route,
+          TasksRoutes.detail,
+        );
+      },
+    );
+
+    test('an unknown subject still lands on the list', () {
+      expect(
+        NotificationDestination.fromData({
+          'about': {'subject': 'hrms.something', 'id': 1},
+        }).route,
+        NotificationRoutes.notification,
+      );
+    });
+  });
 }

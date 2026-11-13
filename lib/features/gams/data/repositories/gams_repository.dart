@@ -37,12 +37,19 @@ class GamsRepository {
         .toList();
   }
 
+  /// One of the requester's own service requests (FUNC-D05).
+  Future<GamsServiceRequest> serviceRequest(int id) async {
+    final response = await _api.serviceRequest(id);
+    return GamsServiceRequest.fromJson(asObject(response['data']));
+  }
+
   Future<void> createServiceRequest({
     required int serviceDefinitionId,
     int? facilityId,
     required String subject,
     String? description,
     String priority = 'medium',
+    Map<String, Object?>? fields,
     String? idempotencyKey,
   }) async {
     await _api.createServiceRequest(
@@ -51,6 +58,7 @@ class GamsRepository {
       subject: subject,
       description: description,
       priority: priority,
+      fields: fields,
       idempotencyKey: idempotencyKey,
     );
   }
@@ -84,8 +92,26 @@ class GamsRepository {
     );
   }
 
-  Future<void> cancelSpaceReservation(int id, {String? reason}) =>
-      _api.cancelSpaceReservation(id, reason: reason);
+  Future<void> cancelSpaceReservation(
+    int id, {
+    String? reason,
+    String? idempotencyKey,
+  }) => _api.cancelSpaceReservation(
+    id,
+    reason: reason,
+    idempotencyKey: idempotencyKey,
+  );
+
+  /// The requester withdraws their own service request (D-06).
+  Future<void> cancelServiceRequest(
+    int id, {
+    required String reason,
+    String? idempotencyKey,
+  }) => _api.cancelServiceRequest(
+    id,
+    reason: reason,
+    idempotencyKey: idempotencyKey,
+  );
 
   // ── Vehicle Bookings ──
   Future<List<GamsVehicle>> vehicles() async {
@@ -107,15 +133,24 @@ class GamsRepository {
     required String purpose,
     required String startsAt,
     required String endsAt,
+    String? idempotencyKey,
   }) => _api.createVehicleBooking(
     vehicleId: vehicleId,
     purpose: purpose,
     startsAt: startsAt,
     endsAt: endsAt,
+    idempotencyKey: idempotencyKey,
   );
 
-  Future<void> cancelVehicleBooking(int id, {String? reason}) =>
-      _api.cancelVehicleBooking(id, reason: reason);
+  Future<void> cancelVehicleBooking(
+    int id, {
+    String? reason,
+    String? idempotencyKey,
+  }) => _api.cancelVehicleBooking(
+    id,
+    reason: reason,
+    idempotencyKey: idempotencyKey,
+  );
 
   // ── Visitor Passes ──
   Future<List<GamsVisitorPass>> visits({int page = 1}) async {
@@ -133,6 +168,7 @@ class GamsRepository {
     String? visitorCompany,
     String? visitorIdNumber,
     required String purpose,
+    String? idempotencyKey,
   }) => _api.createVisit(
     facilityId: facilityId,
     visitorName: visitorName,
@@ -140,6 +176,7 @@ class GamsRepository {
     visitorCompany: visitorCompany,
     visitorIdNumber: visitorIdNumber,
     purpose: purpose,
+    idempotencyKey: idempotencyKey,
   );
 
   // ── Packages ──

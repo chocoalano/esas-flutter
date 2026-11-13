@@ -153,6 +153,36 @@ class ModuleRegistry {
       icon: Icons.badge_outlined,
       route: '/gams/visitor-passes',
     ),
+    // One tap to everything already asked of GA (UX-A03, FUNC-D05): the
+    // dashboard used to be reachable only from a form's history icon.
+    EnterpriseServiceItem(
+      id: 'gams_history',
+      module: EsasModules.gams,
+      title: 'Riwayat GA',
+      description: 'Status permintaan, ruang, kendaraan dan tamu',
+      icon: Icons.history,
+      route: '/gams',
+    ),
+    // Phase 3 (D-02): office supplies asked for and confirmed on receipt,
+    // and the GA officer's desk that works them. The desk tile is shown to
+    // every GAMS tenant; the server refuses anyone who is not a GA officer
+    // and the screen says so.
+    EnterpriseServiceItem(
+      id: 'gams_atk_requests',
+      module: EsasModules.gams,
+      title: 'Permintaan ATK',
+      description: 'Minta alat tulis kantor dan konfirmasi penerimaannya',
+      icon: Icons.inventory_2_outlined,
+      route: '/atk',
+    ),
+    EnterpriseServiceItem(
+      id: 'gams_atk_desk',
+      module: EsasModules.gams,
+      title: 'Meja ATK',
+      description: 'Khusus petugas GA: proses permintaan ATK karyawan',
+      icon: Icons.inventory_outlined,
+      route: '/atk/desk',
+    ),
 
     // ── ITMS Services (IT Service Management) ──
     EnterpriseServiceItem(
@@ -181,10 +211,42 @@ class ModuleRegistry {
     ),
 
     // ── MTMS Operational Services ──
-    // MTMS has no page in this app yet (CORE-06). Its tile pointed at
-    // `/mtms/work-orders`, which nothing answers, and did nothing when tapped.
-    // Re-add it in the same change that adds the page; the registry test
-    // fails if a tile points anywhere the route table does not.
+    // Any employee reports broken equipment and follows it (FUNC-D02);
+    // MTMS had a worker tile only.
+    EnterpriseServiceItem(
+      id: 'mtms_report',
+      module: EsasModules.mtms,
+      title: 'Lapor Kerusakan',
+      description: 'Laporkan mesin atau peralatan yang rusak',
+      icon: Icons.build_outlined,
+      route: '/mtms/reports',
+    ),
+    EnterpriseServiceItem(
+      id: 'mtms_my_work_orders',
+      module: EsasModules.mtms,
+      title: 'Perintah Kerja Saya',
+      description: 'Pekerjaan maintenance yang ditugaskan kepada Anda',
+      icon: Icons.build_circle_outlined,
+      route: '/tasks/mtms',
+    ),
+
+    // ── Field work assigned to the worker (Tugas Saya) ──
+    EnterpriseServiceItem(
+      id: 'gams_my_tasks',
+      module: EsasModules.gams,
+      title: 'Tugas Saya',
+      description: 'Pekerjaan GA / OB yang ditugaskan kepada Anda',
+      icon: Icons.assignment_turned_in_outlined,
+      route: '/tasks/gams',
+    ),
+    EnterpriseServiceItem(
+      id: 'itms_assigned_tickets',
+      module: EsasModules.itms,
+      title: 'Tiket Ditugaskan',
+      description: 'Tiket IT yang ditugaskan kepada Anda',
+      icon: Icons.support_agent_rounded,
+      route: '/tasks/itms',
+    ),
 
     // ── Cross-Panel Unified Approval Inbox ──
     EnterpriseServiceItem(
@@ -236,4 +298,3 @@ class ModuleRegistry {
     return grouped;
   }
 }
-

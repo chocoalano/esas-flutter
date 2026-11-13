@@ -27,15 +27,32 @@ class LoginController extends GetxController {
 
   final RxBool isLoading = false.obs;
   final RxBool isGoogleLoading = false.obs;
+  final RxBool isAppleLoading = false.obs;
   final RxBool isPasswordHidden = true.obs;
 
   /// False when Firebase did not come up at boot; the screen then shows only
   /// the NIP form rather than a button that can only fail.
-  bool get canSignInWithGoogle => _auth.canSignInWithGoogle;
+  bool get canSignInWithGoogle {
+    try {
+      return _auth.canSignInWithGoogle;
+    } catch (_) {
+      return false;
+    }
+  }
 
-  /// Either door is mid-flight. Both buttons wait for it, so two sign-ins
+  /// False when Firebase is unavailable or the platform is not iOS/macOS.
+  bool get canSignInWithApple {
+    try {
+      return _auth.canSignInWithApple;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Any door is mid-flight. All buttons wait for it, so two sign-ins
   /// cannot race to write the session.
-  bool get isBusy => isLoading.value || isGoogleLoading.value;
+  bool get isBusy =>
+      isLoading.value || isGoogleLoading.value || isAppleLoading.value;
 
   @override
   void onReady() {
@@ -128,6 +145,45 @@ class LoginController extends GetxController {
     }
   }
 
+  Future<void> loginWithApple() async {
+    if (isBusy) return;
+
+    isAppleLoading.value = true;
+
+    try {
+      final user = await _auth.loginWithApple(
+        deviceId: await _deviceInfo.deviceId(),
+        legacyDeviceId: await _deviceInfo.legacyDeviceId(),
+      );
+
+      if (user == null) return;
+
+      _enterApp();
+    } on ApiException catch (error) {
+      showErrorSnackbar(_appleRefusalMessage(error));
+    } finally {
+      isAppleLoading.value = false;
+    }
+  }
+
+  /// Request password reset instructions for [identifier] (NIP or email).
+  ///
+  /// UX-C34: once the request is accepted, the identifier the person just
+  /// typed in the reset sheet is put back into the sign-in field, so it is not
+  /// typed twice. Only their own input comes back — nothing from the server,
+  /// which answers every identifier with the same generic sentence — and the
+  /// password field is never touched. The field belongs to this controller,
+  /// which a workspace switch replaces (`SetupController.proceed` →
+  /// `Get.offAllNamed(AuthRoutes.login)`), so the value cannot follow the
+  /// person into another workspace.
+  Future<String> requestPasswordReset(String identifier) async {
+    final message = await _auth.requestPasswordReset(identifier: identifier);
+
+    nipController.text = identifier;
+
+    return message;
+  }
+
   /// What to say when `POST /auth/firebase` says no.
   ///
   /// The server refuses an unknown Google account the same way login refuses a
@@ -177,6 +233,22 @@ class LoginController extends GetxController {
   static String _googleRefusalMessage(ApiException error) {
     const notRegistered =
         'Akun Google ini tidak terdaftar sebagai karyawan. Gunakan email yang '
+        'terdaftar di HR, atau masuk dengan NIP.';
+
+    if (error.isUnauthenticated) return notRegistered;
+
+    if (error.isValidationFailure && error.errors.containsKey('id_token')) {
+      return error.message.startsWith('These credentials')
+          ? notRegistered
+          : error.message;
+    }
+
+    return error.message;
+  }
+
+  static String _appleRefusalMessage(ApiException error) {
+    const notRegistered =
+        'Akun Apple ini tidak terdaftar sebagai karyawan. Gunakan email yang '
         'terdaftar di HR, atau masuk dengan NIP.';
 
     if (error.isUnauthenticated) return notRegistered;

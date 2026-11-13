@@ -12,6 +12,7 @@ class Workspace {
     required this.name,
     required this.clock,
     this.apiVersion,
+    this.environment,
     this.activeModules = const ['hrms'],
   });
 
@@ -20,6 +21,9 @@ class Workspace {
 
   /// The company's display name, shown back to the person setting up.
   final String name;
+
+  /// The environment reported by the server (e.g. production, staging, local, development).
+  final String? environment;
 
   /// The active modules entitled for this workspace (e.g. hrms, gams, itms).
   final List<String> activeModules;
@@ -60,6 +64,7 @@ class Workspace {
       subdomain: subdomain == null || subdomain.isEmpty ? fallback : subdomain,
       name: name == null || name.isEmpty ? fallback : name,
       apiVersion: asString(json['api_version']),
+      environment: asString(json['environment']),
       clock: WorkspaceClock.fromJson(json['timezone']),
       activeModules: activeModules,
     );

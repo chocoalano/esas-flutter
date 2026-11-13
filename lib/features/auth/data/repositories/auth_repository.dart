@@ -65,6 +65,9 @@ class AuthRepository {
 
   bool get canSignInWithGoogle => _identity != null;
 
+  bool get canSignInWithApple =>
+      _identity != null && isAppleSignInAvailable;
+
   /// Sign in and persist the session.
   ///
   /// `identifier` is an employee number **or** an email address, which is why
@@ -90,6 +93,27 @@ class AuthRepository {
     );
 
     return _establishSession(body);
+  }
+
+  /// Request a password reset for [identifier] (NIP or email).
+  ///
+  /// Returns the server's success message, or a standard confirmation message.
+  /// Throws [ApiException] with clear guidance in Indonesian.
+  Future<String> requestPasswordReset({required String identifier}) async {
+    try {
+      final body = await _api.forgotPassword(identifier: identifier);
+      return body['message'] as String? ??
+          'Instruksi reset kata sandi telah dikirim ke email terdaftar Anda.';
+    } on ApiException catch (e) {
+      if (e.status == 404 || e.status == 405 || e.status == 501) {
+        throw const ApiException(
+          'Reset kata sandi lewat aplikasi belum tersedia. '
+          'Hubungi HR atau admin IT untuk mengatur ulang kata sandi Anda.',
+          status: 404,
+        );
+      }
+      rethrow;
+    }
   }
 
   /// Sign in with Google and persist the session.
@@ -146,6 +170,39 @@ class AuthRepository {
     }
 
     return user;
+  }
+
+  /// Sign in with Apple and persist the session.
+  ///
+  /// Returns null when the user cancels the Apple dialog.
+  /// Throws [ApiException] for everything else.
+  Future<AuthUser?> loginWithApple({
+    required String deviceId,
+    String? legacyDeviceId,
+  }) async {
+    final identity = _identity;
+
+    if (identity == null) {
+      throw const ApiException(
+        'Masuk dengan Apple belum tersedia di perangkat ini.',
+        code: 'apple_unavailable',
+      );
+    }
+
+    final apple = await identity.signInWithApple();
+    if (apple == null) return null;
+
+    try {
+      final body = await _api.loginWithFirebase(
+        idToken: apple.idToken,
+        deviceId: deviceId,
+        legacyDeviceId: legacyDeviceId,
+      );
+      return await _establishSession(body);
+    } on Object {
+      await identity.signOut();
+      rethrow;
+    }
   }
 
   /// Read a login reply — from either door — and persist what it grants.

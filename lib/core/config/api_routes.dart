@@ -59,6 +59,9 @@ class ApiRoutes {
   /// `identifier` (NIP **or** email) + `password` + `device_id`.
   static const String login = '/auth/login';
 
+  /// Request password reset via identifier (email or NIP).
+  static const String forgotPassword = '/auth/forgot-password';
+
   /// `id_token` (a Firebase ID token from Google sign-in) + `device_id`.
   /// Answers exactly what [login] answers: the server verifies the token,
   /// matches the verified Google email to an existing account, and issues the
@@ -80,6 +83,21 @@ class ApiRoutes {
   /// Where this account is signed in, and releasing a handset it no longer has.
   static const String devices = '/auth/devices';
   static const String forgetDevice = '/auth/devices/forget';
+
+  /// Attendance device proof of possession (ADR-D §7). `{purpose, public_key?}`;
+  /// `public_key` is required for `enroll`.
+  static const String deviceChallenge = '/auth/device-challenge';
+
+  /// `{enrollment_code, public_key, challenge, signature, platform,
+  /// hardware_backed?}`. Answers the login shape with a NEW token; the calling
+  /// token is deleted server-side.
+  static const String deviceEnrollment = '/auth/device-enrollment';
+
+  /// `{challenge, signature}`. Answers the login shape with a NEW token.
+  static const String deviceProof = '/auth/device-proof';
+
+  /// `{data: <device>}`.
+  static const String deviceStatus = '/auth/device-status';
 
   // ── Push ─────────────────────────────────────────────────────────────────
 
@@ -254,6 +272,29 @@ class ApiRoutes {
   static const String gamsInventoryItems = '/gams/inventory-items';
   static const String gamsInventoryLocations = '/gams/inventory-locations';
   static const String gamsInventoryRequests = '/gams/inventory-requests';
+
+  /// One of the requester's own ATK requests, with its handovers (D-02).
+  static String gamsInventoryRequest(Object id) =>
+      '/gams/inventory-requests/$id';
+
+  /// The requester confirms receiving one handover. **POST**, idempotent.
+  static String gamsInventoryAcknowledge(Object requestId, Object issueId) =>
+      '/gams/inventory-requests/$requestId/issues/$issueId/acknowledge';
+
+  /// The GA officer's ATK desk (Phase 3). Refused with 403 `DESK_NOT_ALLOWED`
+  /// for an account without the GAMS inventory permission.
+  static const String gamsInventoryDesk = '/gams/inventory-desk';
+  static String gamsInventoryDeskRequest(Object id) =>
+      '/gams/inventory-desk/$id';
+
+  /// `reserve`, `reject` or `issue` on one request. **POST**.
+  static String gamsInventoryDeskAction(Object id, String action) =>
+      '/gams/inventory-desk/$id/$action';
+
+  /// The officer records goods brought back against one handover. **POST**,
+  /// idempotent.
+  static String gamsInventoryDeskReturn(Object id, Object issueId) =>
+      '/gams/inventory-desk/$id/issues/$issueId/return';
   static const String gamsSecurityIncidents = '/gams/security-incidents';
   static const String gamsKeyRegisters = '/gams/key-registers';
   static const String gamsMyWorkOrders = '/gams/my-work-orders';
@@ -270,6 +311,17 @@ class ApiRoutes {
   static const String itmsMyAssets = '/itms/my-assets';
   static String itmsAcknowledgeAsset(Object id) =>
       '/itms/my-assets/$id/acknowledge';
+
+  /// Tickets assigned to the signed-in IT technician (Tugas Saya).
+  static const String itmsAssignedTickets = '/itms/assigned-tickets';
+
+  // ── MTMS (Maintenance) ────────────────────────────────────────────────────
+  /// Work orders assigned to the signed-in maintenance technician (Tugas Saya).
+  static const String mtmsMyWorkOrders = '/mtms/my-work-orders';
+
+  // Damage reports filed by an employee (FUNC-D02).
+  static const String mtmsEquipment = '/mtms/equipment';
+  static const String mtmsMaintenanceRequests = '/mtms/maintenance-requests';
 
   // ── Unified Approval Inbox ────────────────────────────────────────────────
   static const String tasksInbox = '/tasks/inbox';

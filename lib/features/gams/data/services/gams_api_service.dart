@@ -26,6 +26,7 @@ class GamsApiService {
     required String subject,
     String? description,
     String priority = 'medium',
+    Map<String, Object?>? fields,
     String? idempotencyKey,
   }) => _client.postObject(
     ApiRoutes.gamsServiceRequests,
@@ -35,6 +36,7 @@ class GamsApiService {
       'subject': subject,
       if (description != null) 'description': description,
       'priority': priority,
+      if (fields != null && fields.isNotEmpty) 'fields': fields,
     },
     headers: IdempotencyKey.headerFor(idempotencyKey),
   );
@@ -63,9 +65,22 @@ class GamsApiService {
   Future<Map<String, dynamic>> cancelSpaceReservation(
     int id, {
     String? reason,
+    String? idempotencyKey,
   }) => _client.deleteObject(
     ApiRoutes.gamsSpaceReservation(id),
     query: {if (reason != null) 'reason': reason},
+    headers: IdempotencyKey.headerFor(idempotencyKey),
+  );
+
+  /// The requester withdraws their own service request (D-06).
+  Future<Map<String, dynamic>> cancelServiceRequest(
+    int id, {
+    required String reason,
+    String? idempotencyKey,
+  }) => _client.postObject(
+    '${ApiRoutes.gamsServiceRequests}/$id/cancel',
+    {'reason': reason},
+    headers: IdempotencyKey.headerFor(idempotencyKey),
   );
 
   // ── Vehicle Bookings ──
@@ -83,18 +98,27 @@ class GamsApiService {
     required String purpose,
     required String startsAt,
     required String endsAt,
-  }) => _client.postObject(ApiRoutes.gamsVehicleBookings, {
-    'vehicle_id': vehicleId,
-    'purpose': purpose,
-    'starts_at': startsAt,
-    'ends_at': endsAt,
-  });
+    String? idempotencyKey,
+  }) => _client.postObject(
+    ApiRoutes.gamsVehicleBookings,
+    {
+      'vehicle_id': vehicleId,
+      'purpose': purpose,
+      'starts_at': startsAt,
+      'ends_at': endsAt,
+    },
+    headers: IdempotencyKey.headerFor(idempotencyKey),
+  );
 
-  Future<Map<String, dynamic>> cancelVehicleBooking(int id, {String? reason}) =>
-      _client.deleteObject(
-        ApiRoutes.gamsVehicleBooking(id),
-        query: {if (reason != null) 'reason': reason},
-      );
+  Future<Map<String, dynamic>> cancelVehicleBooking(
+    int id, {
+    String? reason,
+    String? idempotencyKey,
+  }) => _client.deleteObject(
+    ApiRoutes.gamsVehicleBooking(id),
+    query: {if (reason != null) 'reason': reason},
+    headers: IdempotencyKey.headerFor(idempotencyKey),
+  );
 
   // ── Visitor Passes ──
   Future<Map<String, dynamic>> visits({int page = 1}) => _client.getObject(
@@ -109,6 +133,7 @@ class GamsApiService {
     String? visitorCompany,
     String? visitorIdNumber,
     required String purpose,
+    String? idempotencyKey,
   }) => _client.postObject(ApiRoutes.gamsVisits, {
     'facility_id': facilityId,
     'visitor_name': visitorName,
@@ -116,7 +141,7 @@ class GamsApiService {
     if (visitorCompany != null) 'visitor_company': visitorCompany,
     if (visitorIdNumber != null) 'visitor_id_number': visitorIdNumber,
     'purpose': purpose,
-  });
+  }, headers: IdempotencyKey.headerFor(idempotencyKey));
 
   // ── Packages / Mailroom ──
   Future<Map<String, dynamic>> packages({int page = 1}) => _client.getObject(

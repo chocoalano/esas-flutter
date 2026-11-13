@@ -117,10 +117,9 @@ class UnifiedInboxView extends GetView<UnifiedInboxController> {
                       final task = displayList[index];
                       return _TaskCard(
                         task: task,
-                        onApprove: () => controller.decideTask(
-                          taskId: task.id,
-                          decision: 'approved',
-                        ),
+                        // Asked first, with the facts in view (FUNC-D19):
+                        // one tap used to approve.
+                        onApprove: () => _confirmApproval(context, task),
                         onReject: () => _promptRejection(context, task),
                       );
                     },
@@ -170,7 +169,11 @@ class UnifiedInboxView extends GetView<UnifiedInboxController> {
             TextField(
               controller: textController,
               decoration: const InputDecoration(
+                labelText: 'Alasan Penolakan',
                 hintText: 'Alasan penolakan...',
+                helperText:
+                    'Wajib diisi: Berikan alasan yang jelas mengapa tugas atau pengajuan ini ditolak.',
+                helperMaxLines: 2,
                 border: OutlineInputBorder(),
               ),
               maxLines: 2,
@@ -181,7 +184,7 @@ class UnifiedInboxView extends GetView<UnifiedInboxController> {
       textConfirm: 'Tolak',
       textCancel: 'Batal',
       confirmTextColor: Colors.white,
-      onConfirm: () {
+      onConfirm: () async {
         final reason = textController.text.trim();
         if (reason.isEmpty) {
           Get.snackbar('Validasi', 'Alasan penolakan tidak boleh kosong');
@@ -193,12 +196,42 @@ class UnifiedInboxView extends GetView<UnifiedInboxController> {
         // too (UAT review H1). Snackbars are overlay entries, not routes, so
         // once they are dismissed the top route is the dialog.
         if (Get.isSnackbarOpen) Get.closeAllSnackbars();
-        Navigator.of(Get.overlayContext ?? context).pop();
-        controller.decideTask(
+        // The dialog, and the reason typed into it, stay until the decision
+        // went through (FUNC-D19): it used to close first, so a failed send
+        // lost the reason.
+        final sent = await controller.decideTask(
           taskId: task.id,
           decision: 'rejected',
           note: reason,
         );
+        if (sent) Navigator.of(Get.overlayContext ?? context).pop();
+      },
+    );
+  }
+
+  void _confirmApproval(BuildContext context, ApprovalTask task) {
+    Get.defaultDialog(
+      title: 'Setujui pengajuan?',
+      content: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              task.title,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            Text('Pemohon: ${task.requesterName}'),
+            for (final fact in task.facts) Text('${fact.label}: ${fact.value}'),
+          ],
+        ),
+      ),
+      textConfirm: 'Setujui',
+      textCancel: 'Batal',
+      confirmTextColor: Colors.white,
+      onConfirm: () {
+        Navigator.of(Get.overlayContext ?? context).pop();
+        controller.decideTask(taskId: task.id, decision: 'approved');
       },
     );
   }
@@ -277,7 +310,16 @@ class _TaskCard extends StatelessWidget {
               color: palette.textMuted,
             ),
           ),
-          if (task.notes != null && task.notes!.isNotEmpty) ...[
+          // The facts to decide on (UX-A08); the bare note only when the
+          // server sent none.
+          if (task.facts.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.tight),
+            for (final fact in task.facts)
+              Text(
+                '${fact.label}: ${fact.value}',
+                style: theme.textTheme.bodyMedium,
+              ),
+          ] else if (task.notes != null && task.notes!.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.tight),
             Text(
               task.notes!,
@@ -286,6 +328,15 @@ class _TaskCard extends StatelessWidget {
               style: theme.textTheme.bodyMedium,
             ),
           ],
+          if (task.detailRoute case final route?)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () =>
+                    Get.toNamed(route, arguments: {'id': task.detailId}),
+                child: const Text('Lihat detail'),
+              ),
+            ),
           // Only where the server says it can be decided here (INBOX-02).
           if (!task.canDecide) ...[
             const SizedBox(height: AppSpacing.sm),
@@ -300,22 +351,32 @@ class _TaskCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                OutlinedButton.icon(
-                  onPressed: onReject,
-                  icon: Icon(
-                    Icons.close,
-                    size: 16,
-                    color: palette.danger.foreground,
+                if (!task.canReject)
+                  Expanded(
+                    child: Text(
+                      'Penolakan belum tersedia untuk jenis ini.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: palette.textMuted,
+                      ),
+                    ),
+                  )
+                else
+                  OutlinedButton.icon(
+                    onPressed: onReject,
+                    icon: Icon(
+                      Icons.close,
+                      size: 16,
+                      color: palette.danger.foreground,
+                    ),
+                    label: Text(
+                      'Tolak',
+                      style: TextStyle(color: palette.danger.foreground),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: palette.danger.foreground),
+                      visualDensity: VisualDensity.compact,
+                    ),
                   ),
-                  label: Text(
-                    'Tolak',
-                    style: TextStyle(color: palette.danger.foreground),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: palette.danger.foreground),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ),
                 const SizedBox(width: 8),
                 FilledButton.icon(
                   onPressed: onApprove,

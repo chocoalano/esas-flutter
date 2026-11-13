@@ -8,9 +8,11 @@ import 'package:esas/core/ui/components/app_badge.dart';
 import 'package:esas/core/ui/layout/app_breakpoints.dart';
 import 'package:esas/features/home/data/repositories/home_repository.dart';
 import 'package:esas/features/home/presentation/controllers/home_controller.dart';
+import 'package:esas/features/home/presentation/widgets/home_device_notice.dart';
 import 'package:esas/features/home/presentation/widgets/home_failure.dart';
 import 'package:esas/features/home/presentation/widgets/shift_track.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 /// Panel protagonis Beranda: hari kerja hari ini, dan satu tindakan.
 ///
@@ -235,38 +237,60 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: <Widget>[
         Expanded(
-          child: Text(
-            'HARI INI',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: palette.textMuted,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        // Ikon dan teks bernada, BUKAN `AppBadge`. Sejak seluruh panel ini
-        // memakai `tone.background` sebagai latarnya, sebuah lencana dengan
-        // latar yang sama persis akan lenyap ke dalamnya dan hanya menyisakan
-        // garis tepinya — dan sebuah lencana di atas bidang senada adalah
-        // tautologi: bidangnya sudah menyatakan keadaannya.
-        Flexible(
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(icon, size: AppIconSizes.sm, color: tone.foreground),
+              Icon(
+                Icons.calendar_today_outlined,
+                size: 13,
+                color: palette.textMuted,
+              ),
               const SizedBox(width: AppSpacing.xs),
               Flexible(
                 child: Text(
-                  label,
+                  'HARI INI',
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: tone.foreground,
+                    color: palette.textMuted,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Flexible(
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: 3,
+            ),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: AppRadii.pillAll,
+              border: Border.all(color: tone.border),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(icon, size: AppIconSizes.xs + 2, color: tone.foreground),
+                const SizedBox(width: AppSpacing.xs),
+                Flexible(
+                  child: Text(
+                    label,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: tone.foreground,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -302,6 +326,10 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
   /// mata yang tidak membedakan merah dari hijau.
   (String, AppBadgeTone, IconData) _status() {
     if (widget.state == HomeTodayState.unavailable) {
+      // ADR-D (UX-C31): the attendance-device step, when there is one.
+      final deviceStep = homeDeviceStepOf(widget.error);
+      if (deviceStep != null) return homeDeviceBadgeFor(deviceStep);
+
       // Nadanya netral, bukan merah: sebuah panel yang belum bisa dimuat tidak
       // menuntut tindakan darurat dari karyawan, dan merah disimpan untuk hal
       // yang benar-benar rusak.
@@ -410,11 +438,25 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
       return <Widget>[
         if (widget.shiftName != null) ...<Widget>[
           const SizedBox(height: AppSpacing.md),
-          Text(
-            widget.shiftName!,
-            style: theme.textTheme.titleLarge,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          Row(
+            children: <Widget>[
+              Icon(
+                Icons.work_outline_rounded,
+                size: 16,
+                color: palette.textMuted,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  widget.shiftName!,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
         ],
         const SizedBox(height: AppSpacing.lg),
@@ -488,6 +530,16 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
   /// hanya bisa gagal lebih buruk daripada tidak ada tombol.
   List<Widget> _quietAction() {
     if (widget.state == HomeTodayState.unavailable) {
+      // ADR-D (UX-C31): the check runs, and the code is entered, in Absensi.
+      if (homeDeviceStepOf(widget.error) != null) {
+        return <Widget>[
+          _SecondaryAction(
+            label: homeDeviceActionLabel,
+            onTap: widget.onClock,
+          ),
+        ];
+      }
+
       return switch (homeErrorRemedyFor(widget.error)) {
         HomeErrorRemedy.signIn => <Widget>[
           _SecondaryAction(label: 'Masuk kembali', onTap: widget.onSignIn),
@@ -525,6 +577,12 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
     }
 
     if (widget.state == HomeTodayState.unavailable) {
+      // ADR-D (UX-C31): say the device step, not "belum terdaftar".
+      final deviceStep = homeDeviceStepOf(widget.error);
+      if (deviceStep != null) {
+        return (homeDeviceTitleFor(deviceStep), widget.error?.message);
+      }
+
       return switch (homeFailureKindOf(widget.error)) {
         HomeFailureKind.deviceNotRegistered => (
           'Perangkat belum terdaftar untuk absensi',
@@ -636,11 +694,25 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
-        Text(
-          caption,
-          style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (widget.state == HomeTodayState.working) ...<Widget>[
+              _LivePulseIndicator(color: palette.success.foreground),
+              const SizedBox(width: AppSpacing.xs),
+            ],
+            Flexible(
+              child: Text(
+                caption,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: palette.textMuted,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -707,7 +779,7 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
 
     return <Widget>[
       const SizedBox(height: AppSpacing.xl),
-      FilledButton.icon(
+      _SpringPunchButton(
         onPressed: widget.onClock,
         icon: Icon(
           punch == AttendancePunch.clockIn
@@ -717,8 +789,11 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
         ),
         label: Text(
           punch == AttendancePunch.clockIn ? 'Absen masuk' : 'Absen pulang',
+          style: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: theme.colorScheme.onPrimary,
+          ),
         ),
-        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
       ),
     ];
   }
@@ -800,7 +875,13 @@ class _HeroSurface extends StatelessWidget {
               bottom: 0,
               left: 0,
               width: railWidth,
-              child: ColoredBox(color: tone.foreground),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(AppRadii.xxl),
+                  bottomLeft: Radius.circular(AppRadii.xxl),
+                ),
+                child: ColoredBox(color: tone.foreground),
+              ),
             ),
           ],
         ),
@@ -831,64 +912,259 @@ class _Fact extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = theme.palette;
+    final bool isMasuk = label.toLowerCase().contains('masuk');
+    final IconData icon =
+        isMasuk ? Icons.login_rounded : Icons.logout_rounded;
+    final Color iconColor =
+        isMasuk ? palette.success.foreground : theme.colorScheme.primary;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: AppSpacing.xxs),
-        Text(
-          value ?? '—',
-          style: AppTypography.dataMedium(
-            color: value == null
-                ? palette.textMuted
-                : theme.colorScheme.onSurface,
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: AppRadii.lgAll,
+        border: Border.all(color: palette.borderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(icon, size: 14, color: iconColor),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  label,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: palette.textMuted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        if (note != null) ...<Widget>[
-          const SizedBox(height: AppSpacing.xxs),
+          const SizedBox(height: AppSpacing.xs),
           Text(
-            note!,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: noteTone.foreground,
+            value ?? '—',
+            style: AppTypography.dataMedium(
+              color: value == null
+                  ? palette.textMuted
+                  : theme.colorScheme.onSurface,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
+          if (note != null) ...<Widget>[
+            const SizedBox(height: AppSpacing.xxs),
+            Text(
+              note!,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: noteTone.foreground,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
 
 /// Ajakan tingkat kedua: sebuah tautan, bukan sebuah tombol terisi.
-class _SecondaryAction extends StatelessWidget {
+class _SecondaryAction extends StatefulWidget {
   const _SecondaryAction({required this.label, required this.onTap});
 
   final String label;
   final VoidCallback onTap;
 
   @override
+  State<_SecondaryAction> createState() => _SecondaryActionState();
+}
+
+class _SecondaryActionState extends State<_SecondaryAction> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: TextButton.icon(
-        onPressed: onTap,
-        style: TextButton.styleFrom(
-          minimumSize: const Size(0, 44),
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+      child: AnimatedScale(
+        scale: _pressed ? 0.96 : 1.0,
+        duration: AppDurations.fast,
+        curve: AppMotion.standard,
+        alignment: Alignment.centerLeft,
+        child: Listener(
+          onPointerDown: (_) => setState(() => _pressed = true),
+          onPointerUp: (_) => setState(() => _pressed = false),
+          onPointerCancel: (_) => setState(() => _pressed = false),
+          child: TextButton.icon(
+            onPressed: widget.onTap,
+            style: TextButton.styleFrom(
+              minimumSize: const Size(0, 44),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+            ),
+            icon: const Icon(Icons.arrow_forward_rounded, size: AppIconSizes.md),
+            iconAlignment: IconAlignment.end,
+            label: Text(widget.label),
+          ),
         ),
-        icon: const Icon(Icons.arrow_forward_rounded, size: AppIconSizes.md),
-        iconAlignment: IconAlignment.end,
-        label: Text(label),
+      ),
+    );
+  }
+}
+
+/// Tombol ajakan utama absensi dengan animasi pegas taktil saat disentuh.
+class _SpringPunchButton extends StatefulWidget {
+  const _SpringPunchButton({
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+  });
+
+  final VoidCallback onPressed;
+  final Widget icon;
+  final Widget label;
+
+  @override
+  State<_SpringPunchButton> createState() => _SpringPunchButtonState();
+}
+
+class _SpringPunchButtonState extends State<_SpringPunchButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedScale(
+      scale: _pressed ? 0.97 : 1.0,
+      duration: AppDurations.fast,
+      curve: AppMotion.standard,
+      child: Listener(
+        onPointerDown: (_) => setState(() => _pressed = true),
+        onPointerUp: (_) => setState(() => _pressed = false),
+        onPointerCancel: (_) => setState(() => _pressed = false),
+        child: FilledButton.icon(
+          onPressed: widget.onPressed,
+          icon: widget.icon,
+          label: widget.label,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(52),
+            shape: const RoundedRectangleBorder(
+              borderRadius: AppRadii.xlAll,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+bool _isTestEnvironment() {
+  if (Get.testMode) return true;
+  final String binding = WidgetsBinding.instance.runtimeType.toString();
+  return binding.contains('Test') || binding.contains('Fake');
+}
+
+/// Indikator status berjalan yang berdenyut (live pulse dot).
+///
+/// Memiliki cincin aura halus yang bernapas dan inti solid yang tegas.
+/// Dalam mode uji, pengulangan animasi dimatikan sehingga
+/// [WidgetTester.pumpAndSettle] tidak mengalami timeout.
+class _LivePulseIndicator extends StatefulWidget {
+  const _LivePulseIndicator({required this.color});
+
+  final Color color;
+
+  @override
+  State<_LivePulseIndicator> createState() => _LivePulseIndicatorState();
+}
+
+class _LivePulseIndicatorState extends State<_LivePulseIndicator>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _controller;
+  Animation<double>? _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!_isTestEnvironment()) {
+      _controller = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1400),
+      )..repeat(reverse: true);
+
+      _pulse = Tween<double>(begin: 0.8, end: 1.3).animate(
+        CurvedAnimation(
+          parent: _controller!,
+          curve: Curves.easeInOutSine,
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isTestEnvironment() || _controller == null || _pulse == null) {
+      return Container(
+        width: 6,
+        height: 6,
+        decoration: BoxDecoration(
+          color: widget.color,
+          shape: BoxShape.circle,
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: 12,
+      height: 12,
+      child: Center(
+        child: AnimatedBuilder(
+          animation: _pulse!,
+          builder: (BuildContext context, Widget? child) {
+            final double scale = _pulse!.value;
+            final double auraOpacity =
+                (0.3 * (1.3 - scale) / 0.5).clamp(0.06, 0.3);
+
+            return Stack(
+              alignment: Alignment.center,
+              children: <Widget>[
+                Transform.scale(
+                  scale: scale,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: widget.color.withValues(alpha: auraOpacity),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: widget.color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

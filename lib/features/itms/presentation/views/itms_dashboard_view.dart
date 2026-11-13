@@ -8,6 +8,39 @@ import '../../../../core/ui/components/app_section_header.dart';
 import '../controllers/itms_dashboard_controller.dart';
 import '../routes/itms_routes.dart';
 
+class _SectionError extends StatelessWidget {
+  const _SectionError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Row(
+        children: [
+          Icon(
+            Icons.error_outline_rounded,
+            size: 16,
+            color: theme.palette.danger.foreground,
+          ),
+          const SizedBox(width: AppSpacing.tight),
+          Expanded(
+            child: Text(
+              'Bagian ini belum dapat dimuat: $message',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.palette.danger.foreground,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class ItmsDashboardView extends GetView<ItmsDashboardController> {
   const ItmsDashboardView({super.key});
 
@@ -93,7 +126,9 @@ class ItmsDashboardView extends GetView<ItmsDashboardController> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                if (controller.activeTickets.isEmpty)
+                if (controller.sectionErrors['tickets'] case final failed?)
+                  _SectionError(message: failed.message)
+                else if (controller.activeTickets.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       vertical: AppSpacing.sm,
@@ -109,47 +144,65 @@ class ItmsDashboardView extends GetView<ItmsDashboardController> {
                   for (final ticket in controller.activeTickets.take(3))
                     Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                      child: AppCard(
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: palette.brandSubtle,
-                                borderRadius: AppRadii.mdAll,
+                      // Opens the ticket (FUNC-D04); the card used to be
+                      // read-only.
+                      child: InkWell(
+                        borderRadius: AppRadii.mdAll,
+                        onTap: () => Get.toNamed(
+                          ItmsRoutes.ticketDetail,
+                          arguments: ticket.id,
+                        ),
+                        child: AppCard(
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: palette.brandSubtle,
+                                  borderRadius: AppRadii.mdAll,
+                                ),
+                                alignment: Alignment.center,
+                                child: Icon(
+                                  Icons.confirmation_number_outlined,
+                                  size: 18,
+                                  color: theme.colorScheme.primary,
+                                ),
                               ),
-                              alignment: Alignment.center,
-                              child: Icon(
-                                Icons.confirmation_number_outlined,
-                                size: 18,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.md),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    ticket.subject,
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.w600,
+                              const SizedBox(width: AppSpacing.md),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      ticket.subject,
+                                      style: theme.textTheme.titleSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                     ),
-                                  ),
-                                  Text(
-                                    '${ticket.serviceName ?? 'IT Helpdesk'} • ${ticket.statusLabel}',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: palette.textMuted,
+                                    Text(
+                                      '${ticket.serviceName ?? 'IT Helpdesk'} • ${ticket.statusLabel}',
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(color: palette.textMuted),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
+                // Finished tickets and their outcome live one tap away
+                // (FUNC-D04); they used to vanish once solved.
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: () => Get.toNamed(ItmsRoutes.ticketHistory),
+                    child: const Text('Semua tiket saya'),
+                  ),
+                ),
 
                 const SizedBox(height: AppSpacing.xxl),
 
@@ -162,7 +215,9 @@ class ItmsDashboardView extends GetView<ItmsDashboardController> {
                   naturalCase: true,
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                if (controller.services.isEmpty)
+                if (controller.sectionErrors['services'] case final failed?)
+                  _SectionError(message: failed.message)
+                else if (controller.services.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       vertical: AppSpacing.sm,
@@ -230,7 +285,9 @@ class ItmsDashboardView extends GetView<ItmsDashboardController> {
                   naturalCase: true,
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                if (controller.articles.isEmpty)
+                if (controller.sectionErrors['articles'] case final failed?)
+                  _SectionError(message: failed.message)
+                else if (controller.articles.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       vertical: AppSpacing.sm,

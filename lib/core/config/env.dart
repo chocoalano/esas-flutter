@@ -14,6 +14,28 @@
 /// [ADR-0005]: ../../../docs/adr/0005-subdomain-multi-tenancy.md
 library;
 
+/// The runtime environment modes supported by ESAS.
+enum AppEnvironment {
+  production('production', 'Produksi'),
+  staging('staging', 'Staging'),
+  development('development', 'Development');
+
+  const AppEnvironment(this.key, this.label);
+  final String key;
+  final String label;
+
+  static AppEnvironment fromString(String? value) {
+    final v = (value ?? '').trim().toLowerCase();
+    if (v == 'development' || v == 'local' || v == 'dev') {
+      return AppEnvironment.development;
+    }
+    if (v == 'staging' || v == 'uat') {
+      return AppEnvironment.staging;
+    }
+    return AppEnvironment.production;
+  }
+}
+
 class Env {
   const Env._();
 
@@ -107,15 +129,51 @@ class Env {
     defaultValue: 'absensas',
   );
 
-  /// Which deployment this build is for. Drives the TLS policy and nothing else
-  /// that changes behaviour.
-  static const String environment = String.fromEnvironment(
-    'APP_ENV',
-    defaultValue: 'production',
+  /// Default production server domain.
+  static const String defaultProductionDomain = String.fromEnvironment(
+    'PROD_DOMAIN',
+    defaultValue: 'https://absensas.com',
   );
 
-  static bool get isProduction => environment == 'production';
-  static bool get isDevelopment => environment == 'development';
+  /// Default staging server domain.
+  static const String defaultStagingDomain = String.fromEnvironment(
+    'STAGING_DOMAIN',
+    defaultValue: 'https://staging.absensas.com',
+  );
+
+  /// Default development server domains.
+  static const String defaultEmulatorDomain = 'http://10.0.2.2:8000';
+  static const String defaultLocalhostDomain = 'http://172.16.2.233:8000';
+  static const String defaultLocalDnsDomain = 'http://esas.test:8000';
+
+  /// Which deployment this build is for. Drives the TLS policy and environment behavior.
+  /// Respects both APP_ENV and ENVIRONMENT flags, defaulting to production.
+  static const String environment = String.fromEnvironment(
+    'APP_ENV',
+    defaultValue: String.fromEnvironment(
+      'ENVIRONMENT',
+      defaultValue: 'production',
+    ),
+  );
+
+  static AppEnvironment get appEnvironment =>
+      AppEnvironment.fromString(environment);
+
+  static bool get isProduction => appEnvironment == AppEnvironment.production;
+  static bool get isStaging => appEnvironment == AppEnvironment.staging;
+  static bool get isDevelopment => appEnvironment == AppEnvironment.development;
+
+  /// Default server domain for the specified environment.
+  static String defaultDomainFor(AppEnvironment env) {
+    switch (env) {
+      case AppEnvironment.production:
+        return apiBaseUrl.isNotEmpty ? apiBaseUrl : defaultProductionDomain;
+      case AppEnvironment.staging:
+        return defaultStagingDomain;
+      case AppEnvironment.development:
+        return defaultEmulatorDomain;
+    }
+  }
 
   /// The API root of the compiled-in default.
   ///

@@ -4,6 +4,7 @@ import '../bindings/gams_bindings.dart';
 import '../controllers/gams_create_controller.dart';
 import '../views/gams_create_view.dart';
 import '../views/gams_dashboard_view.dart';
+import '../views/gams_request_tracking_views.dart';
 import 'gams_routes.dart';
 
 class GamsPages {
@@ -31,5 +32,15 @@ class GamsPages {
         page: () => GamsCreateView(kind: kind),
         binding: GamsCreateBinding(kind),
       ),
+    GetPage(
+      name: GamsRoutes.requests,
+      page: () => const GamsRequestListView(),
+      binding: GamsRequestListBinding(),
+    ),
+    GetPage(
+      name: GamsRoutes.requestDetail,
+      page: () => const GamsRequestDetailView(),
+      binding: GamsRequestDetailBinding(),
+    ),
   ];
 }

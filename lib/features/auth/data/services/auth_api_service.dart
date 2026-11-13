@@ -45,6 +45,17 @@ class AuthApiService {
     }, authenticated: false);
   }
 
+  /// Request a password reset link or instructions for an account.
+  ///
+  /// `identifier` accepts an employee number **or** an email address.
+  Future<Map<String, dynamic>> forgotPassword({
+    required String identifier,
+  }) {
+    return _client.postObject(ApiRoutes.forgotPassword, {
+      'identifier': identifier,
+    }, authenticated: false);
+  }
+
   /// Sign in with a Google identity, by exchanging the Firebase ID token for
   /// this server's own token.
   ///

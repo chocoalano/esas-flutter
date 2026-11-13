@@ -168,19 +168,47 @@ class _QuickActionTileState extends State<_QuickActionTile> {
                   scale: _pressed ? 0.94 : 1,
                   duration: AppDurations.fast,
                   curve: AppMotion.standard,
-                  child: Container(
-                    width: 48,
-                    height: 48,
+                  child: AnimatedContainer(
+                    duration: AppDurations.fast,
+                    curve: AppMotion.standard,
+                    width: 52,
+                    height: 52,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: background,
+                      color: _pressed
+                          ? (action.accent ? palette.brandSubtle : palette.surfaceSubtle)
+                          : background,
                       borderRadius: AppRadii.xlAll,
-                      border: Border.all(color: edge),
+                      border: Border.all(
+                        color: _pressed
+                            ? theme.colorScheme.primary.withValues(alpha: 0.4)
+                            : edge,
+                        width: _pressed ? 1.5 : 1.0,
+                      ),
                     ),
-                    child: Icon(
-                      action.icon,
-                      size: AppIconSizes.xxl,
-                      color: foreground,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.center,
+                      children: <Widget>[
+                        Icon(
+                          action.icon,
+                          size: AppIconSizes.xl,
+                          color: foreground,
+                        ),
+                        if (action.accent)
+                          Positioned(
+                            top: 5,
+                            right: 5,
+                            child: Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),

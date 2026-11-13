@@ -2,215 +2,562 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
-import 'package:introduction_screen/introduction_screen.dart';
 
 import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/theme/app_palette.dart';
+import '../../../../core/ui/components/app_badge.dart';
 import '../../../../core/ui/components/app_button.dart';
 import '../controllers/splash_controller.dart';
 
-/// Frame pertama yang dilihat setiap karyawan.
+/// Data representasi satu slide onboarding.
+class _OnboardingSlide {
+  const _OnboardingSlide({
+    required this.badge,
+    required this.badgeTone,
+    required this.badgeIcon,
+    required this.title,
+    required this.description,
+    required this.svgAsset,
+    required this.highlights,
+  });
+
+  final String badge;
+  final AppBadgeTone badgeTone;
+  final IconData badgeIcon;
+  final String title;
+  final String description;
+  final String svgAsset;
+  final List<_SlideHighlight> highlights;
+}
+
+class _SlideHighlight {
+  const _SlideHighlight({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+}
+
+/// Frame pertama yang dilihat setiap karyawan saat membuka aplikasi.
 ///
-/// Onboarding empat halaman ini dipertahankan sebagai keputusan produk, tetapi
-/// dua hal yang membuatnya terasa seperti kecelakaan sudah tidak ada:
-///
-/// * **Tombolnya tidak lagi berlomba dengan pemeriksaan sesi.** Menekan "Mulai
-///   Sekarang!" dulu mengirim siapa pun ke layar masuk, termasuk orang yang
-///   sesinya masih sah dan sedang diperiksa saat itu juga — jadi ketukan yang
-///   sedikit terlalu cepat berarti mengetik ulang NIP di gerbang pabrik.
-///   Sekarang ketukan itu menyerahkan tujuannya kepada pemeriksaan yang sedang
-///   berjalan, dan layar mengatakan bahwa pemeriksaan itu ada.
-/// * **Warnanya berasal dari tema.** Judul memakai warna teks utama, bukan
-///   hijau brand — hijau brand di atas putih adalah kombinasi paling tidak
-///   terbaca yang dipunyai palet ini, dan ia dipakai untuk seluruh judul
-///   onboarding.
+/// Tampilan onboarding dirancang dengan pendekatan enterprise modern:
+/// * **Hierarki Visual Jelas**: Dilengkapi identitas brand ("ABSENSAS") di bagian
+///   header atas, badge kategori semantik, serta micro-chips fitur unggulan.
+/// * **Hero Illustration Card**: Menggunakan bingkai kartu berkedalaman halus
+///   ([AppPalette.surfaceSubtle] & hairline border) dengan ambient glow lembut di
+///   belakang SVG, menghindari kesan gambar mengambang tanpa konteks.
+/// * **Aksi Terpadu & Bebas Tabrakan**: Navigasi slide (dots indikator + tombol
+///   "Lanjutkan"/"Mulai Sekarang") disatukan secara elegan tanpa duplikasi tombol.
+/// * **Umpan Balik Sesi Responsif**: Status pemeriksaan sesi terintegrasi rapi
+///   tanpa memicu layout shift atau balapan navigasi.
 class SplashView extends GetView<SplashController> {
   const SplashView({super.key});
+
+  static const List<_OnboardingSlide> _slides = [
+    _OnboardingSlide(
+      badge: 'PRESENSI CEPAT',
+      badgeTone: AppBadgeTone.brand,
+      badgeIcon: Icons.location_on_outlined,
+      title: 'Presensi Akurat & Terverifikasi',
+      description:
+          'Catat kehadiran masuk dan pulang secara instan dengan verifikasi geofencing GPS presisi dan deteksi wajah biometrik.',
+      svgAsset: 'assets/svg/onboarding_1.svg',
+      highlights: [
+        _SlideHighlight(icon: Icons.pin_drop_outlined, label: 'Geofencing GPS'),
+        _SlideHighlight(icon: Icons.face_outlined, label: 'Biometrik Wajah'),
+        _SlideHighlight(
+          icon: Icons.verified_user_outlined,
+          label: 'Validasi Lokasi',
+        ),
+      ],
+    ),
+    _OnboardingSlide(
+      badge: 'SELF-SERVICE HR',
+      badgeTone: AppBadgeTone.info,
+      badgeIcon: Icons.assignment_outlined,
+      title: 'Pengajuan Izin & Cuti Mudah',
+      description:
+          'Ajukan permohonan cuti, izin sakit, dan lembur langsung dari genggaman. Pantau status persetujuan atasan secara real-time.',
+      svgAsset: 'assets/svg/onboarding_2.svg',
+      highlights: [
+        _SlideHighlight(
+          icon: Icons.event_available_outlined,
+          label: 'Cuti & Lembur',
+        ),
+        _SlideHighlight(icon: Icons.flash_on_outlined, label: 'Approval Cepat'),
+        _SlideHighlight(
+          icon: Icons.notifications_active_outlined,
+          label: 'Notifikasi Otomatis',
+        ),
+      ],
+    ),
+    _OnboardingSlide(
+      badge: 'KOLABORASI TIM',
+      badgeTone: AppBadgeTone.success,
+      badgeIcon: Icons.groups_outlined,
+      title: 'Akses Fleksibel Kapan Saja',
+      description:
+          'Lihat jadwal shift kerja, rekapitulasi jam hadir, dan informasi perusahaan dengan sinkronisasi data yang aman dan terenkripsi.',
+      svgAsset: 'assets/svg/onboarding_3.svg',
+      highlights: [
+        _SlideHighlight(
+          icon: Icons.calendar_today_outlined,
+          label: 'Jadwal Shift',
+        ),
+        _SlideHighlight(icon: Icons.timer_outlined, label: 'Rekap Jam Kerja'),
+        _SlideHighlight(
+          icon: Icons.lock_outline_rounded,
+          label: 'Aman & Terenkripsi',
+        ),
+      ],
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final palette = theme.palette;
+    final isDark = theme.brightness == Brightness.dark;
 
-    // Bilah status mengikuti tema, bukan dipaksa terang. Memaksanya ke
-    // `SystemUiOverlayStyle.light` membuat ikon sistem berwarna terang di atas
-    // latar onboarding yang putih pada mode terang.
-    final bool isDark = theme.brightness == Brightness.dark;
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
-        statusBarColor: theme.scaffoldBackgroundColor,
+        statusBarColor: Colors.transparent,
         statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
     );
 
-    // SVG or PNG image builder
-    Widget buildImage(String assetPath, [double width = 300]) {
-      if (assetPath.endsWith('.svg')) {
-        return SvgPicture.asset(assetPath, width: width, fit: BoxFit.contain);
-      } else {
-        return Image.asset(assetPath, width: width, fit: BoxFit.contain);
-      }
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: _SplashCarousel(slides: _slides, controller: controller),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SplashCarousel extends StatefulWidget {
+  const _SplashCarousel({required this.slides, required this.controller});
+
+  final List<_OnboardingSlide> slides;
+  final SplashController controller;
+
+  @override
+  State<_SplashCarousel> createState() => _SplashCarouselState();
+}
+
+class _SplashCarouselState extends State<_SplashCarousel> {
+  late final PageController _pageController;
+  int _currentPage = 0;
+  bool _hasStarted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onPageChanged(int index) {
+    setState(() {
+      _currentPage = index;
+    });
+  }
+
+  void _handlePrimaryAction() {
+    final isLastPage = _currentPage == widget.slides.length - 1;
+    if (isLastPage) {
+      setState(() {
+        _hasStarted = true;
+      });
+      widget.controller.onIntroEnd();
+    } else {
+      _pageController.nextPage(
+        duration: AppDurations.slow,
+        curve: AppMotion.standard,
+      );
     }
+  }
 
-    final titleStyle = theme.textTheme.headlineSmall;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
+    final isLastPage = _currentPage == widget.slides.length - 1;
 
-    // `withAlpha(20)` — 8% opasitas — membuat seluruh teks penjelas onboarding
-    // praktis tak terbaca. Yang dimaksud jelas warna teks sekunder, jadi itulah
-    // yang dipakai sekarang.
-    final bodyStyle = theme.textTheme.bodyMedium?.copyWith(
-      color: palette.textMuted,
-    );
-
-    final pageDecoration = PageDecoration(
-      titleTextStyle: titleStyle ?? const TextStyle(),
-      bodyTextStyle: bodyStyle ?? const TextStyle(),
-      bodyPadding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        0,
-        AppSpacing.lg,
-        AppSpacing.lg,
-      ),
-      pageColor: theme.scaffoldBackgroundColor,
-      imagePadding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
-      contentMargin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-      titlePadding: const EdgeInsets.only(
-        bottom: AppSpacing.sm,
-        top: AppSpacing.lg,
-      ),
-    );
-
-    return IntroductionScreen(
-      key: controller.introKey,
-      globalBackgroundColor: theme.scaffoldBackgroundColor,
-      allowImplicitScrolling: true,
-      autoScrollDuration: 3000,
-      infiniteAutoScroll: true,
-      globalFooter: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.xxl,
-          AppSpacing.lg,
-          AppSpacing.xxl,
-          AppSpacing.lg,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppButton(
-              label: 'Mulai Sekarang!',
-              onPressed: controller.onIntroEnd,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            // Barisnya selalu memesan tingginya, jadi tombol di atasnya tidak
-            // melompat saat kalimatnya muncul dan hilang.
-            SizedBox(
-              height: 20,
-              child: Obx(() {
-                if (!controller.isLoading.value) {
-                  return const SizedBox.shrink();
-                }
-
-                return Text(
-                  'Memeriksa sesi Anda…',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: palette.textMuted,
-                  ),
-                );
-              }),
-            ),
-          ],
-        ),
-      ),
-
-      pages: [
-        PageViewModel(
-          title: "Kelola Perizinan dan Absensi Anda dengan Mudah",
-          body:
-              "Pantau progres, alokasikan sumber daya, dan capai target pekerjaan Anda dengan efisien.",
-          image: buildImage('assets/svg/onboarding_1.svg'),
-          decoration: pageDecoration,
-        ),
-        PageViewModel(
-          title: "Integrasi Tim yang Mulus",
-          body:
-              "Kolaborasi dengan rekan kerja Anda secara real-time, tingkatkan komunikasi, dan selesaikan tugas bersama.",
-          image: buildImage('assets/svg/onboarding_2.svg'),
-          decoration: pageDecoration,
-        ),
-        PageViewModel(
-          title: "Akses Kapan Saja, Di Mana Saja",
-          body:
-              "Aplikasi kami dirancang untuk membantu Anda bekerja secara fleksibel, dari perangkat apa pun.",
-          image: buildImage('assets/svg/onboarding_3.svg'),
-          decoration: pageDecoration,
-        ),
-        PageViewModel(
-          title: "Siap untuk Memulai?",
-          bodyWidget: Column(
+    return Column(
+      children: [
+        // Top Header: Brand Identity & Skip Action
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.page,
+            AppSpacing.md,
+            AppSpacing.page,
+            AppSpacing.sm,
+          ),
+          child: Row(
             children: [
-              Text(
-                "Rasakan kemudahan mengelola bisnis Anda dalam satu genggaman.",
-                style: bodyStyle,
-                textAlign: TextAlign.center,
+              Container(
+                width: 38,
+                height: 38,
+                padding: const EdgeInsets.all(AppSpacing.xs + 1),
+                decoration: BoxDecoration(
+                  color: palette.surfaceRaised,
+                  borderRadius: AppRadii.lgAll,
+                  border: Border.all(color: palette.borderSubtle),
+                ),
+                child: Image.asset(
+                  'assets/images/logo-square.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) => Icon(
+                    Icons.badge_outlined,
+                    size: AppIconSizes.md,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'ABSENSAS',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  Text(
+                    'Employee Self-Service',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: palette.textMuted,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 10.5,
+                      letterSpacing: 0.1,
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: AppRadii.pillAll,
+                  onTap: () {
+                    setState(() {
+                      _hasStarted = true;
+                    });
+                    widget.controller.onIntroEnd();
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm + 2,
+                      vertical: AppSpacing.xs + 2,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Lewati',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: palette.textMuted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xxs),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: AppIconSizes.md,
+                          color: palette.textMuted,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
-          image: buildImage('assets/svg/onboarding_1.svg', 250),
-          decoration: pageDecoration.copyWith(
-            bodyFlex: 2,
-            imageFlex: 3,
-            bodyAlignment: Alignment.center,
-            imageAlignment: Alignment.center,
-            contentMargin: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.xxl,
-            ),
+        ),
+
+        const SizedBox(height: AppSpacing.xs),
+
+        // Carousel Slider
+        Expanded(
+          child: PageView.builder(
+            controller: _pageController,
+            onPageChanged: _onPageChanged,
+            itemCount: widget.slides.length,
+            itemBuilder: (context, index) {
+              final slide = widget.slides[index];
+
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final h = constraints.maxHeight;
+                  final isCompact = h < 450;
+                  final illustrationHeight = isCompact
+                      ? 130.0
+                      : (h < 550 ? 170.0 : 210.0);
+
+                  return SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.page,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(height: AppSpacing.xs),
+
+                        // Hero Illustration Showcase
+                        Container(
+                          height: illustrationHeight,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: palette.surfaceSubtle,
+                            borderRadius: AppRadii.xxlAll,
+                            border: Border.all(color: palette.borderSubtle),
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Soft ambient radial glow
+                              Container(
+                                width: illustrationHeight * 0.75,
+                                height: illustrationHeight * 0.75,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: palette.brandGlow.withValues(
+                                    alpha: 0.25,
+                                  ),
+                                ),
+                              ),
+                              // Illustration
+                              Padding(
+                                padding: const EdgeInsets.all(AppSpacing.md),
+                                child: SvgPicture.asset(
+                                  slide.svgAsset,
+                                  fit: BoxFit.contain,
+                                  placeholderBuilder: (_) => Center(
+                                    child: SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: palette.brandAccent,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: AppSpacing.md),
+
+                        // Semantic Category Badge
+                        AppBadge(
+                          label: slide.badge,
+                          tone: slide.badgeTone,
+                          icon: slide.badgeIcon,
+                          size: AppBadgeSize.small,
+                        ),
+
+                        const SizedBox(height: AppSpacing.sm),
+
+                        // Title
+                        Text(
+                          slide.title,
+                          textAlign: TextAlign.center,
+                          style:
+                              (isCompact
+                                      ? theme.textTheme.titleMedium
+                                      : theme.textTheme.headlineSmall)
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.3,
+                                    color: theme.colorScheme.onSurface,
+                                  ),
+                        ),
+
+                        const SizedBox(height: AppSpacing.xs),
+
+                        // Description
+                        Text(
+                          slide.description,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: palette.textMuted,
+                            height: 1.4,
+                          ),
+                        ),
+
+                        const SizedBox(height: AppSpacing.md),
+
+                        // Feature Highlight Micro-Pills
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: AppSpacing.xs + 2,
+                          runSpacing: AppSpacing.xs + 2,
+                          children: slide.highlights
+                              .map(
+                                (h) => _HighlightPill(
+                                  highlight: h,
+                                  palette: palette,
+                                  theme: theme,
+                                ),
+                              )
+                              .toList(),
+                        ),
+
+                        const SizedBox(height: AppSpacing.md),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+
+        // Bottom Controls: Page Indicator + Action Button + Session Status
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.page,
+            AppSpacing.xs,
+            AppSpacing.page,
+            AppSpacing.md,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Animated Page Indicator Dots
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(widget.slides.length, (index) {
+                  final isActive = index == _currentPage;
+                  return AnimatedContainer(
+                    duration: AppDurations.normal,
+                    curve: AppMotion.standard,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: isActive ? 22 : 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? theme.colorScheme.primary
+                          : palette.borderStrong,
+                      borderRadius: AppRadii.pillAll,
+                    ),
+                  );
+                }),
+              ),
+
+              const SizedBox(height: AppSpacing.lg),
+
+              // Primary Action Button
+              Obx(() {
+                final isLoading = widget.controller.isLoading.value;
+                final isProbing = _hasStarted && isLoading;
+
+                return AppButton(
+                  label: isLastPage ? 'Mulai Sekarang' : 'Lanjutkan',
+                  icon: isLastPage
+                      ? Icons.arrow_forward_rounded
+                      : Icons.arrow_forward_rounded,
+                  busy: isProbing,
+                  onPressed: _handlePrimaryAction,
+                );
+              }),
+
+              const SizedBox(height: AppSpacing.sm),
+
+              // Session Status Live Indicator
+              SizedBox(
+                height: 20,
+                child: Obx(() {
+                  if (widget.controller.isLoading.value) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: AppIconSizes.xs,
+                          height: AppIconSizes.xs,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.5,
+                            color: palette.brandAccent,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Text(
+                          'Memeriksa sesi Anda…',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: palette.textMuted,
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                  return const SizedBox.shrink();
+                }),
+              ),
+            ],
           ),
         ),
       ],
+    );
+  }
+}
 
-      onDone: controller.onIntroEnd,
-      onSkip: controller.onIntroEnd,
-      showSkipButton: true,
-      showBackButton: false,
-      back: Icon(
-        Icons.arrow_back_ios_new_rounded,
-        size: AppIconSizes.lg,
-        color: theme.colorScheme.onSurface,
-      ),
-      skip: Text(
-        'Lewati',
-        style: theme.textTheme.labelLarge?.copyWith(color: palette.textMuted),
-      ),
-      next: Icon(
-        Icons.arrow_forward_ios_rounded,
-        size: AppIconSizes.lg,
-        color: theme.colorScheme.onSurface,
-      ),
-      done: Text(
-        'Selesai',
-        style: theme.textTheme.labelLarge?.copyWith(
-          color: theme.colorScheme.primary,
-        ),
-      ),
-      curve: AppMotion.standard,
-      controlsMargin: const EdgeInsets.all(AppSpacing.lg),
-      controlsPadding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
+class _HighlightPill extends StatelessWidget {
+  const _HighlightPill({
+    required this.highlight,
+    required this.palette,
+    required this.theme,
+  });
 
-      dotsDecorator: DotsDecorator(
-        size: const Size(AppSpacing.tight, AppSpacing.tight),
-        color: palette.borderStrong,
-        activeSize: const Size(AppSpacing.lg + 2, AppSpacing.tight),
-        activeColor: theme.colorScheme.primary,
-        activeShape: const RoundedRectangleBorder(
-          borderRadius: AppRadii.pillAll,
-        ),
+  final _SlideHighlight highlight;
+  final AppPalette palette;
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm + 2,
+        vertical: AppSpacing.xs + 1,
       ),
-      dotsContainerDecorator: const ShapeDecoration(
-        shape: RoundedRectangleBorder(),
+      decoration: BoxDecoration(
+        color: palette.surfaceSubtle,
+        borderRadius: AppRadii.pillAll,
+        border: Border.all(color: palette.borderSubtle),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            highlight.icon,
+            size: AppIconSizes.sm,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(width: AppSpacing.xs + 1),
+          Text(
+            highlight.label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

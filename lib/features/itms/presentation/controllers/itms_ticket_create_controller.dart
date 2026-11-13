@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/network/idempotency_key.dart';
 import '../../../../core/utils/app_logger.dart';
 import '../../data/models/itms_service.dart';
 import '../../data/repositories/itms_repository.dart';
@@ -19,7 +20,9 @@ class ItmsTicketCreateController extends GetxController {
 
   final ItmsRepository _repository;
 
-  static const int subjectMax = 255;
+  // The server's own limit (ItmsTicketApiController `max:150`): a longer
+  // subject passed here and was refused only after sending (FUNC-A03).
+  static const int subjectMax = 150;
   static const int descriptionMax = 4000;
 
   final RxBool isLoading = true.obs;
@@ -44,15 +47,20 @@ class ItmsTicketCreateController extends GetxController {
     super.onClose();
   }
 
+  /// Why the services could not be loaded, apart from a submit error, so the
+  /// form offers a retry instead of an empty dropdown (UX-A07).
+  final Rxn<ApiException> loadError = Rxn<ApiException>();
+
   Future<void> loadServices() async {
     isLoading.value = true;
     error.value = null;
+    loadError.value = null;
 
     try {
       services.assignAll(await _repository.services());
       if (services.length == 1) serviceId.value = services.first.id;
     } on ApiException catch (e) {
-      error.value = e.message;
+      loadError.value = e;
     } finally {
       isLoading.value = false;
     }
@@ -77,9 +85,16 @@ class ItmsTicketCreateController extends GetxController {
 
   /// File the ticket. True when the server accepted it.
   ///
-  /// Guarded: a second tap while the first is on its way does nothing. The
-  /// endpoint takes no Idempotency-Key, so the guard is the only thing between
-  /// a double tap and two tickets.
+  /// The key of the ticket the user is trying to raise, and the content it
+  /// was minted for: a retry of the same content reuses it, an edit mints a
+  /// new one.
+  String? _intentKey;
+  String? _intentFingerprint;
+
+  /// Guarded: a second tap while the first is on its way does nothing, and a
+  /// retry of the same content - after a timeout too - carries the same
+  /// Idempotency-Key, so the server answers it instead of raising a second
+  /// ticket.
   Future<bool> submit() async {
     if (isSubmitting.value) return false;
 
@@ -92,16 +107,35 @@ class ItmsTicketCreateController extends GetxController {
     error.value = null;
     isSubmitting.value = true;
 
+    final description = descriptionC.text.trim();
+    final fingerprint = [
+      serviceId.value,
+      subjectC.text.trim(),
+      description,
+    ].join('|');
+    if (_intentFingerprint != fingerprint) {
+      _intentKey = IdempotencyKey.mint();
+      _intentFingerprint = fingerprint;
+    }
+
     try {
-      final description = descriptionC.text.trim();
       await _repository.createTicket(
         serviceId: serviceId.value!,
         subject: subjectC.text.trim(),
         description: description.isEmpty ? null : description,
+        idempotencyKey: _intentKey,
       );
+      _intentKey = null;
+      _intentFingerprint = null;
       return true;
     } on ApiException catch (e) {
       error.value = e.firstFieldError ?? e.message;
+      // A definite refusal ends the attempt; no answer (or a server fault)
+      // keeps the key, because the ticket may already exist.
+      if (e.status != null && e.status! < 500 && e.status != 429) {
+        _intentKey = null;
+        _intentFingerprint = null;
+      }
       AppLogger.warning('ITMS ticket refused: ${e.code ?? e.status}');
       return false;
     } finally {
