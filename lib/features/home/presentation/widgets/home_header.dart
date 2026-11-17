@@ -1,185 +1,262 @@
-import 'package:esas/core/config/asset_url.dart';
 import 'package:esas/core/tenancy/workspace_clock.dart';
 import 'package:esas/core/theme/app_dimens.dart';
-import 'package:esas/core/utils/date_formatter.dart';
-import 'package:esas/core/utils/string_utils.dart';
 import 'package:esas/core/theme/app_palette.dart';
 import 'package:esas/core/ui/components/app_avatar.dart';
-import 'package:esas/core/ui/layout/app_breakpoints.dart';
+import 'package:esas/core/utils/date_formatter.dart';
+import 'package:esas/core/utils/string_utils.dart';
+import 'package:esas/features/home/presentation/controllers/home_controller.dart';
+import 'package:esas/features/home/presentation/widgets/home_ui.dart';
 import 'package:flutter/material.dart';
 
-/// Kepala Beranda: siapa yang masuk, hari apa ini, dan apa yang menunggu.
+/// Kepala isi Beranda: seberapa segar layar ini, hari apa ini, dan siapa saya.
 ///
-/// Bukan sebuah `AppBar`. Sebuah app bar menuntut tingginya sendiri, garis
-/// kakinya sendiri, dan seringkali sebuah bayangan — tiga hal yang membuat
-/// bagian teratas layar terbaca sebagai krom aplikasi, padahal isinya adalah
-/// data. Di sini ia adalah baris pertama halaman, menggulir bersama sisanya.
+/// Bilah atasnya (logo, judul, lonceng, avatar) tinggal di `AppBar` milik
+/// layar; yang digambar di sini hanya tiga baris di bawahnya:
 ///
-/// Tiga hal yang sudah tidak ada di sini dan sengaja tidak dikembalikan: logo
-/// perusahaan sebagai watermark 10% (tekstur di balik teks yang tidak
-/// menyampaikan apa pun kepada orang yang sudah tahu di mana ia bekerja),
-/// tombol ganti tema (preferensi yang diubah sekali seumur pemakaian, menempati
-/// sudut termahal di layar yang paling sering dibuka), dan strip tanggal
-/// tersendiri di bawahnya — tanggalnya sekarang baris ketiga di kolom ini,
-/// karena sebuah kartu berisi satu kalimat tanggal adalah kartu yang
-/// membelanjakan 56px untuk sembilan kata.
+/// 1. **Baris status** — pil sinkron di kiri, tanggal di kanan.
+/// 2. **Sapaan** — "Selamat Pagi, Dimas", dengan nama depan.
+/// 3. **Peran** — jabatan (hijau) dan departemen (redup).
 ///
-/// Singkatan zona (WIB/WITA/WIT) ikut karena setiap jam di layar ini digambar
-/// pada jam KANTOR, bukan jam ponsel, dan satu-satunya cara pengguna bisa tahu
-/// itu adalah kalau layarnya mengatakannya.
+/// ## Tidak ada kalimat atau warna yang ditulis mati
+///
+/// Setiap potong teks datang dari data, dan setiap potong yang datanya tidak
+/// ada TIDAK DIGAMBAR — tidak ada pengganti yang dikarang:
+///
+/// * sapaan  ← jam workspace ([DateFormatter.greeting]) dan nama depan;
+/// * peran   ← [position] dan [department] dari sesi;
+/// * pil     ← [syncStatus] dan [syncedAt] milik controller;
+/// * tanggal ← [date], sudah diformat pada jam workspace.
+///
+/// Versi sebelumnya menulis "Tersinkronisasi • Kantor Pusat (WFO)" dan
+/// "Lead UI/UX Engineer • Tech Division" untuk setiap orang, dan menggambar
+/// tanggal contoh bila tanggal aslinya belum ada. Tidak ada payload yang
+/// membawa lokasi kerja atau modenya, jadi kalimat itu adalah klaim tentang
+/// kantor seseorang yang tidak pernah diketahui aplikasi — dan ia tetap terbaca
+/// "tersinkronisasi" bahkan ketika ponselnya sedang luring. Warnanya juga
+/// heksadesimal tetap: teks navy `#0F172A` di atas kanvas gelap tidak terbaca
+/// sama sekali. Sekarang semuanya dari [ThemeData] dan [AppPalette], dan
+/// berpindah bersama tema.
 class HomeHeader extends StatelessWidget {
   const HomeHeader({
     super.key,
     required this.userName,
-    required this.userAvatarUrl,
     this.date,
-    this.notificationCount,
-    this.onNotifications,
-    this.onAvatarTap,
+    this.position,
+    this.department,
+    this.syncStatus,
+    this.syncedAt,
+    this.showRefreshHint = true,
   });
 
   final String userName;
-  final String? userAvatarUrl;
 
-  /// Tanggal hari ini, sudah diformat pada jam workspace. Baris ini hilang
-  /// seluruhnya bila belum ada — sebuah tanggal kosong lebih buruk daripada
-  /// tidak ada tanggal.
+  /// Tanggal hari ini, sudah diformat pada jam workspace. Hilang seluruhnya
+  /// bila belum ada — sebuah tanggal kosong (atau tanggal contoh) lebih buruk
+  /// daripada tidak ada tanggal.
   final String? date;
 
-  /// Jumlah notifikasi belum dibaca.
-  ///
-  /// `null` berarti BELUM DIKETAHUI, dan lencananya tidak digambar sama sekali —
-  /// sebuah nol yang dikarang akan berbohong setiap pagi.
-  ///
-  /// Angkanya datang dari sesi, tidak pernah dari permintaan milik layar ini:
-  /// satu permintaan HTTP untuk sebuah titik merah adalah harga yang salah di
-  /// jaringan pabrik. Sesi mengisinya dari dua sumber yang sudah dibayar —
-  /// `unread_notification_count` pada payload sesi bila backend mengirimnya,
-  /// dan `unread_count` yang memang dibawa setiap halaman daftar notifikasi.
-  final int? notificationCount;
+  /// Jabatan dan departemen dari sesi. Masing-masing boleh `null`; bila
+  /// keduanya `null` barisnya tidak digambar.
+  final String? position;
+  final String? department;
 
-  final VoidCallback? onNotifications;
-  final VoidCallback? onAvatarTap;
+  /// Seberapa segar data di layar; `null` menghilangkan pilnya (dipakai
+  /// pemanggil yang tidak punya controller). Lihat [HomeSyncStatus].
+  final HomeSyncStatus? syncStatus;
+
+  /// Kapan penyegaran terakhir yang berhasil selesai, pada jam workspace.
+  final DateTime? syncedAt;
+
+  /// Petunjuk tarik-untuk-menyegarkan di atas baris status.
+  final bool showRefreshHint;
 
   static const String defaultAvatarPath = 'esas-assets/default.png';
 
+  /// "selamat pagi" → "Selamat Pagi". Sapaan datang dari [DateFormatter] dalam
+  /// kalimat biasa; judul sebesar ini dibaca lebih baik dengan huruf awal tiap
+  /// kata.
+  static String _titleCase(String text) => text
+      .split(' ')
+      .map(
+        (String w) =>
+            w.isEmpty ? w : w[0].toUpperCase() + w.substring(1).toLowerCase(),
+      )
+      .join(' ');
+
+  static String _clock(DateTime t) =>
+      '${t.hour.toString().padLeft(2, '0')}:'
+      '${t.minute.toString().padLeft(2, '0')}';
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final palette = theme.palette;
-    final bool tight = AppLayout.of(context).compactHeader;
+    final ThemeData theme = Theme.of(context);
+    final AppPalette palette = theme.palette;
 
     // `toBeginningOfSentenceCase` adalah jawaban yang salah untuk sebuah NAMA:
-    // ia menghasilkan "Alan gentina" — satu huruf kapital untuk dua kata yang
-    // dua-duanya nama diri. Terlihat di tangkapan layar runtime, tidak terlihat
-    // di satu pun tes.
+    // ia menghasilkan "Alan gentina". `personName` hanya menyentuh nama yang
+    // seluruhnya kapital atau seluruhnya kecil.
     final String formattedName = personName(userName) ?? userName;
 
-    final String avatarUrl =
-        (userAvatarUrl != null && userAvatarUrl!.isNotEmpty)
-        ? assetUrl(userAvatarUrl!)
-        : assetUrl(defaultAvatarPath);
+    final bool hasStatusRow = syncStatus != null || date != null;
 
-    final String zone = WorkspaceClock.current.abbreviation;
-    final String? dateLine = date == null ? null : '$date · $zone';
-
-    // Pada layar yang tingginya langka, sapaan dan tanggal berbagi satu baris.
-    // Yang dikorbankan adalah baris, bukan informasi.
-    final List<Widget> lines = <Widget>[
-      if (!tight)
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
-                color: palette.success.foreground,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            Flexible(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        if (showRefreshHint)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: Center(
               child: Text(
-                DateFormatter.greeting(),
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: palette.textMuted,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.2,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      Text(
-        formattedName,
-        style: theme.textTheme.titleLarge?.copyWith(
-          fontWeight: FontWeight.w700,
-          color: theme.colorScheme.onSurface,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      if (dateLine != null)
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(
-              Icons.calendar_today_outlined,
-              size: 12,
-              color: palette.textMuted,
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            Flexible(
-              child: Text(
-                tight ? '${DateFormatter.greeting()} · $dateLine' : dateLine,
+                '↓ Tarik ke bawah untuk memperbarui',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: palette.textMuted,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
-          ],
-        ),
-    ];
+          ),
 
-    return Row(
-      children: <Widget>[
-        _SpringAvatar(
-          formattedName: formattedName,
-          avatarUrl: avatarUrl,
-          size: tight ? 40 : 48,
-          borderColor: palette.borderSubtle,
-          onTap: onAvatarTap,
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        // ── 1. Baris status ─────────────────────────────────────────────────
+        if (hasStatusRow)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                if (syncStatus != null)
+                  Flexible(child: _syncPill(context, syncStatus!)),
+                if (syncStatus != null && date != null)
+                  const SizedBox(width: AppSpacing.sm),
+                if (date != null)
+                  Flexible(
+                    child: Text(
+                      date!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: palette.textMuted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+        // ── 2. Sapaan ───────────────────────────────────────────────────────
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              for (int i = 0; i < lines.length; i++) ...<Widget>[
-                if (i > 0) const SizedBox(height: AppSpacing.xxs),
-                lines[i],
-              ],
+              Text(
+                '${_titleCase(DateFormatter.greeting())}, ',
+                style: theme.textTheme.headlineLarge?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 22,
+                ),
+              ),
+              Text(
+                formattedName,
+                style: theme.textTheme.headlineLarge?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 22,
+                ),
+              ),
+              Text(
+                ' 👋',
+                style: theme.textTheme.headlineLarge?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 22,
+                ),
+              ),
             ],
           ),
         ),
-        if (onNotifications != null) ...<Widget>[
-          const SizedBox(width: AppSpacing.sm),
-          _NotificationBell(count: notificationCount, onTap: onNotifications!),
+
+        // ── 3. Peran ────────────────────────────────────────────────────────
+        if (_roleLine(theme, palette) case final Widget role) ...<Widget>[
+          const SizedBox(height: AppSpacing.xs),
+          role,
         ],
       ],
     );
   }
+
+  /// "Lead UI/UX Engineer • Tech Division": jabatan hijau, departemen redup.
+  /// `null` bila keduanya tidak ada — baris kosong lebih buruk daripada tidak
+  /// ada baris.
+  Widget? _roleLine(ThemeData theme, AppPalette palette) {
+    final bool hasPosition = position != null && position!.isNotEmpty;
+    final bool hasDepartment = department != null && department!.isNotEmpty;
+
+    if (!hasPosition && !hasDepartment) return null;
+
+    return Text.rich(
+      TextSpan(
+        children: <InlineSpan>[
+          if (hasPosition)
+            TextSpan(
+              text: position,
+              style: TextStyle(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          if (hasPosition && hasDepartment)
+            TextSpan(
+              text: ' • ',
+              style: TextStyle(color: palette.textMuted),
+            ),
+          if (hasDepartment)
+            TextSpan(
+              text: department,
+              style: TextStyle(color: palette.textMuted),
+            ),
+        ],
+      ),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: theme.textTheme.bodyMedium,
+    );
+  }
+
+  /// Pil sinkron. Warnanya mengikuti kenyataan: hijau hanya bila memang
+  /// tersinkronisasi, kuning ketika luring, netral selagi memuat.
+  Widget _syncPill(BuildContext context, HomeSyncStatus status) {
+    final AppPalette palette = Theme.of(context).palette;
+    final String? time = syncedAt == null ? null : _clock(syncedAt!);
+
+    // Jam di sini adalah jam WORKSPACE, bukan jam ponsel, jadi singkatan
+    // zonanya ikut — itu satu-satunya cara orang bisa tahu.
+    final String zone = WorkspaceClock.current.abbreviation;
+
+    final (String label, AppTone tone) = switch (status) {
+      HomeSyncStatus.loading => ('Memuat data…', palette.neutral),
+      HomeSyncStatus.refreshing => ('Memperbarui…', palette.neutral),
+      HomeSyncStatus.offline => (
+        time == null ? 'Luring' : 'Luring • data $time $zone',
+        palette.warning,
+      ),
+      HomeSyncStatus.synced => (
+        time == null ? 'Tersinkronisasi' : 'Tersinkronisasi • $time $zone',
+        palette.success,
+      ),
+    };
+
+    return HomePill(label: label, tone: tone, showDot: true, compact: true);
+  }
 }
 
 /// Avatar pengguna dengan respon pegas taktil saat diketuk.
-class _SpringAvatar extends StatefulWidget {
-  const _SpringAvatar({
+class HomeAvatarButton extends StatefulWidget {
+  const HomeAvatarButton({
+    super.key,
     required this.formattedName,
     required this.avatarUrl,
     required this.size,
@@ -194,10 +271,10 @@ class _SpringAvatar extends StatefulWidget {
   final VoidCallback? onTap;
 
   @override
-  State<_SpringAvatar> createState() => _SpringAvatarState();
+  State<HomeAvatarButton> createState() => _HomeAvatarButtonState();
 }
 
-class _SpringAvatarState extends State<_SpringAvatar> {
+class _HomeAvatarButtonState extends State<HomeAvatarButton> {
   bool _pressed = false;
 
   @override
@@ -207,14 +284,20 @@ class _SpringAvatarState extends State<_SpringAvatar> {
       duration: AppDurations.fast,
       curve: AppMotion.standard,
       child: Listener(
-        onPointerDown: widget.onTap == null ? null : (_) => setState(() => _pressed = true),
-        onPointerUp: widget.onTap == null ? null : (_) => setState(() => _pressed = false),
-        onPointerCancel: widget.onTap == null ? null : (_) => setState(() => _pressed = false),
+        onPointerDown: widget.onTap == null
+            ? null
+            : (_) => setState(() => _pressed = true),
+        onPointerUp: widget.onTap == null
+            ? null
+            : (_) => setState(() => _pressed = false),
+        onPointerCancel: widget.onTap == null
+            ? null
+            : (_) => setState(() => _pressed = false),
         child: Container(
-          padding: const EdgeInsets.all(2),
+          padding: const EdgeInsets.all(1.5),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: widget.borderColor, width: 1.5),
+            border: Border.all(color: widget.borderColor, width: 1.0),
           ),
           child: AppAvatar(
             userName: widget.formattedName,
@@ -228,31 +311,36 @@ class _SpringAvatarState extends State<_SpringAvatar> {
   }
 }
 
-/// Lonceng notifikasi, dengan penanda kecil bila ada yang belum dibaca.
-class _NotificationBell extends StatefulWidget {
-  const _NotificationBell({required this.count, required this.onTap});
+/// Lonceng notifikasi, dengan lencana hitungan merah bila ada yang belum
+/// dibaca.
+class HomeNotificationBell extends StatefulWidget {
+  const HomeNotificationBell({
+    super.key,
+    required this.count,
+    required this.onTap,
+  });
 
   final int? count;
   final VoidCallback onTap;
 
   @override
-  State<_NotificationBell> createState() => _NotificationBellState();
+  State<HomeNotificationBell> createState() => _HomeNotificationBellState();
 }
 
-class _NotificationBellState extends State<_NotificationBell> {
+class _HomeNotificationBellState extends State<HomeNotificationBell> {
   bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final palette = theme.palette;
+    final ThemeData theme = Theme.of(context);
+    final AppPalette palette = theme.palette;
 
     final int unread = widget.count ?? 0;
     final bool showBadge = unread > 0;
 
     return Semantics(
       button: true,
-      // Sebuah titik merah tidak mengatakan apa pun kepada pembaca layar, jadi
+      // Sebuah titik tidak mengatakan apa pun kepada pembaca layar, jadi
       // angkanya ikut dibacakan ketika ia ada.
       label: showBadge ? 'Notifikasi, $unread belum dibaca' : 'Notifikasi',
       // Angka di dalam lencana TIDAK dibacakan lagi sebagai simpul tersendiri:
@@ -267,18 +355,19 @@ class _NotificationBellState extends State<_NotificationBell> {
           type: MaterialType.transparency,
           child: InkWell(
             onTap: widget.onTap,
-            borderRadius: AppRadii.lgAll,
-            onHighlightChanged: (val) {
+            borderRadius: BorderRadius.circular(10),
+            onHighlightChanged: (bool val) {
               if (_pressed != val) {
                 setState(() => _pressed = val);
               }
             },
             child: Container(
-              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
-                borderRadius: AppRadii.lgAll,
-                border: Border.all(color: palette.borderSubtle),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: palette.borderSubtle, width: 1.0),
               ),
               alignment: Alignment.center,
               child: Stack(
@@ -286,38 +375,43 @@ class _NotificationBellState extends State<_NotificationBell> {
                 children: <Widget>[
                   Icon(
                     Icons.notifications_none_rounded,
-                    size: AppIconSizes.xl,
+                    size: 20,
                     color: theme.colorScheme.onSurface,
                   ),
                   if (showBadge)
                     Positioned(
-                      top: -AppSpacing.xs,
-                      right: -AppSpacing.xs,
+                      top: -4,
+                      right: -4,
                       child: AnimatedScale(
-                        scale: showBadge ? 1.0 : 0.0,
+                        scale: 1.0,
                         duration: AppDurations.normal,
                         curve: Curves.easeOutBack,
                         child: Container(
                           constraints: const BoxConstraints(
-                            minWidth: AppSpacing.md,
+                            minWidth: 16,
+                            minHeight: 16,
                           ),
                           padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.xs,
+                            horizontal: 4,
                             vertical: 1,
                           ),
                           decoration: BoxDecoration(
-                            color: palette.danger.background,
-                            borderRadius: AppRadii.pillAll,
-                            border: Border.all(color: palette.danger.border),
+                            color: const Color(0xFFEF4444),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: theme.colorScheme.surface,
+                              width: 1.5,
+                            ),
                           ),
                           child: Text(
                             unread > 99 ? '99+' : '$unread',
                             textAlign: TextAlign.center,
                             maxLines: 1,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: palette.danger.foreground,
-                              letterSpacing: 0,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
                               fontWeight: FontWeight.w700,
+                              height: 1.0,
                             ),
                           ),
                         ),

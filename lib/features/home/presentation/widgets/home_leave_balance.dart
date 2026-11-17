@@ -1,5 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:esas/core/theme/app_dimens.dart';
 import 'package:esas/core/theme/app_palette.dart';
+import 'package:esas/core/theme/app_typography.dart';
 import 'package:esas/core/ui/components/app_card.dart';
 import 'package:esas/core/ui/components/app_skeleton.dart';
 import 'package:esas/features/home/data/repositories/home_repository.dart';
@@ -206,32 +209,391 @@ class _BalanceTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final AppPalette palette = theme.palette;
+    final bool isDark = theme.brightness == Brightness.dark;
 
     final num? quota = balance.quota;
     final bool hasQuota = quota != null && quota > 0;
     final num used = hasQuota ? (quota - balance.remaining).clamp(0, quota) : 0;
 
+    if (wide && hasQuota) {
+      return AppCard(
+        onTap: onTap,
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            // 1. Header Baris Atas: Ikon Cuti, Nama Jenis Izin, dan Status Aktif
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF064E3B)
+                            : const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.beach_access_rounded,
+                        size: 18,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text(
+                      leaveTypeLabel(balance),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        letterSpacing: -0.2,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF064E3B)
+                        : const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: isDark
+                          ? const Color(0xFF059669)
+                          : const Color(0xFFA7F3D0),
+                      width: 0.5,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF34D399)
+                              : const Color(0xFF059669),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Tersedia',
+                        style: TextStyle(
+                          color: isDark
+                              ? const Color(0xFF34D399)
+                              : const Color(0xFF059669),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Divider(height: 1, color: palette.borderSubtle),
+            const SizedBox(height: AppSpacing.md),
+            // 2. Baris Konten: Angka Utama & Bar Kiri + Donut Chart Kanan
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: <Widget>[
+                            Text(
+                              leaveDaysLabel(balance.remaining),
+                              style: AppTypography.dataDisplay(
+                                color: theme.colorScheme.primary,
+                                fontSize: 34,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.xs),
+                            Text(
+                              'hari',
+                              style: AppTypography.dataSmall(
+                                color: palette.textMuted,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: palette.brandSubtle,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'Sisa Kuota',
+                                style: TextStyle(
+                                  color: theme.colorScheme.primary,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      HomeSplitBar(
+                        primary: (used * 2).round(),
+                        secondary: (balance.remaining * 2).round(),
+                        primaryTone: palette.neutral,
+                        secondaryTone: palette.success,
+                        semanticsLabel:
+                            '${leaveDaysLabel(used)} dari ${leaveDaysLabel(quota)} hari '
+                            'terpakai, ${leaveDaysLabel(balance.remaining)} hari tersisa',
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        '$used dari $quota hari terpakai',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: palette.textMuted,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: palette.surfaceSubtle,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: palette.borderSubtle,
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      LeaveDonutChart(
+                        used: used,
+                        remaining: balance.remaining,
+                        total: quota,
+                        size: 68,
+                        strokeWidth: 7.5,
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            'Sisa',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                              color: palette.textMuted,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFFF59E0B)
+                                  : const Color(0xFFD97706),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            'Pakai',
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w600,
+                              color: palette.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            // 3. Mini Info Chips Footer: Informatif (Total Jatah, Telah Diambil, Dapat Diajukan)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+              decoration: BoxDecoration(
+                color: palette.surfaceSubtle,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: _MiniStat(
+                        label: 'Total Jatah',
+                        value: '$quota Hari',
+                        color: palette.textMuted,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 18,
+                    color: palette.borderSubtle,
+                  ),
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: _MiniStat(
+                        label: 'Telah Diambil',
+                        value: '$used Hari',
+                        color: isDark
+                            ? const Color(0xFFF59E0B)
+                            : const Color(0xFFD97706),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 18,
+                    color: palette.borderSubtle,
+                  ),
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: _MiniStat(
+                        label: 'Dapat Diajukan',
+                        value: '${balance.remaining} Hari',
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return AppCard(
       onTap: onTap,
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          HomeMetric(
-            icon: Icons.beach_access_outlined,
-            value: leaveDaysLabel(balance.remaining),
-            unit: 'hari',
-            label: leaveTypeLabel(balance),
-            // Saldo yang tersisa adalah kabar baik selama masih ada; nol
-            // diwarnai netral, bukan merah — habisnya jatah cuti bukan
-            // kesalahan orangnya.
-            tone: accent && balance.remaining > 0 ? palette.success : null,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? (accent ? const Color(0xFF064E3B) : const Color(0xFF1E293B))
+                      : (accent ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.beach_access_rounded,
+                  size: 17,
+                  color: accent
+                      ? theme.colorScheme.primary
+                      : palette.textMuted,
+                ),
+              ),
+              if (hasQuota)
+                LeaveDonutChart(
+                  used: used,
+                  remaining: balance.remaining,
+                  total: quota,
+                  size: 42,
+                  strokeWidth: 4.5,
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: <Widget>[
+                Text(
+                  leaveDaysLabel(balance.remaining),
+                  style: AppTypography.dataDisplay(
+                    color: accent && balance.remaining > 0
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface,
+                    fontSize: 28,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xxs),
+                Text(
+                  'hari',
+                  style: AppTypography.dataSmall(
+                    color: palette.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            leaveTypeLabel(balance),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: palette.textMuted,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           if (hasQuota) ...<Widget>[
-            SizedBox(height: wide ? AppSpacing.lg : AppSpacing.md),
+            const SizedBox(height: AppSpacing.sm),
             HomeSplitBar(
-              // In half days, so a half day still moves the bar.
               primary: (used * 2).round(),
               secondary: (balance.remaining * 2).round(),
               primaryTone: palette.neutral,
@@ -240,19 +602,241 @@ class _BalanceTile extends StatelessWidget {
                   '${leaveDaysLabel(used)} dari ${leaveDaysLabel(quota)} hari '
                   'terpakai, ${leaveDaysLabel(balance.remaining)} hari tersisa',
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               '$used dari $quota hari terpakai',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: palette.textMuted,
+                fontSize: 10.5,
               ),
             ),
           ],
         ],
       ),
     );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  const _MiniStat({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: palette.textMuted,
+            fontSize: 9.5,
+          ),
+        ),
+        const SizedBox(height: 1),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Grafik donat ringkas untuk visualisasi perbandingan kuota cuti terpakai vs tersisa.
+class LeaveDonutChart extends StatelessWidget {
+  const LeaveDonutChart({
+    super.key,
+    required this.used,
+    required this.remaining,
+    required this.total,
+    this.size = 64.0,
+    this.strokeWidth = 7.0,
+  });
+
+  final num used;
+  final num remaining;
+  final num total;
+  final double size;
+  final double strokeWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
+    final bool isDark = theme.brightness == Brightness.dark;
+
+    final double validTotal = total > 0 ? total.toDouble() : 1.0;
+    final double usedFraction = (used / validTotal).clamp(0.0, 1.0);
+    final int percentUsed = (usedFraction * 100).round();
+
+    final Color trackColor = isDark
+        ? const Color(0xFF1E293B)
+        : const Color(0xFFE2E8F0);
+
+    final Color usedColor = isDark
+        ? const Color(0xFFF59E0B)
+        : const Color(0xFFD97706);
+
+    final Color remainingColor = theme.colorScheme.primary;
+
+    return Semantics(
+      label: '$percentUsed% kuota cuti terpakai',
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          alignment: Alignment.center,
+          children: <Widget>[
+            CustomPaint(
+              size: Size(size, size),
+              painter: _DonutChartPainter(
+                usedFraction: usedFraction,
+                trackColor: trackColor,
+                usedColor: usedColor,
+                remainingColor: remainingColor,
+                strokeWidth: strokeWidth,
+              ),
+            ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Text(
+                  '$percentUsed%',
+                  style: TextStyle(
+                    fontSize: size * 0.22,
+                    fontWeight: FontWeight.w800,
+                    color: theme.colorScheme.onSurface,
+                    letterSpacing: -0.5,
+                    height: 1.0,
+                  ),
+                ),
+                if (size >= 50) ...<Widget>[
+                  const SizedBox(height: 2),
+                  Text(
+                    'pakai',
+                    style: TextStyle(
+                      fontSize: size * 0.13,
+                      fontWeight: FontWeight.w600,
+                      color: palette.textMuted,
+                      height: 1.0,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DonutChartPainter extends CustomPainter {
+  const _DonutChartPainter({
+    required this.usedFraction,
+    required this.trackColor,
+    required this.usedColor,
+    required this.remainingColor,
+    required this.strokeWidth,
+  });
+
+  final double usedFraction;
+  final Color trackColor;
+  final Color usedColor;
+  final Color remainingColor;
+  final double strokeWidth;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Offset center = Offset(size.width / 2, size.height / 2);
+    final double radius = (size.width - strokeWidth) / 2;
+
+    final Paint trackPaint = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawCircle(center, radius, trackPaint);
+
+    if (usedFraction <= 0.0) {
+      final Paint remPaint = Paint()
+        ..color = remainingColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round;
+      canvas.drawCircle(center, radius, remPaint);
+      return;
+    }
+
+    if (usedFraction >= 1.0) {
+      final Paint usedPaint = Paint()
+        ..color = usedColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round;
+      canvas.drawCircle(center, radius, usedPaint);
+      return;
+    }
+
+    final Rect rect = Rect.fromCircle(center: center, radius: radius);
+    const double startAngle = -math.pi / 2;
+    const double gapAngle = 0.08;
+    final double remainingFraction = 1.0 - usedFraction;
+
+    if (remainingFraction > 0.0) {
+      final Paint remPaint = Paint()
+        ..color = remainingColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round;
+
+      final double sweepRem = (2 * math.pi * remainingFraction) - gapAngle;
+      if (sweepRem > 0) {
+        canvas.drawArc(rect, startAngle + (gapAngle / 2), sweepRem, false, remPaint);
+      }
+    }
+
+    if (usedFraction > 0.0) {
+      final Paint usedPaint = Paint()
+        ..color = usedColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round;
+
+      final double startUsed = startAngle + (2 * math.pi * remainingFraction) + (gapAngle / 2);
+      final double sweepUsed = (2 * math.pi * usedFraction) - gapAngle;
+      if (sweepUsed > 0) {
+        canvas.drawArc(rect, startUsed, sweepUsed, false, usedPaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DonutChartPainter oldDelegate) {
+    return oldDelegate.usedFraction != usedFraction ||
+        oldDelegate.trackColor != trackColor ||
+        oldDelegate.usedColor != usedColor ||
+        oldDelegate.remainingColor != remainingColor ||
+        oldDelegate.strokeWidth != strokeWidth;
   }
 }
 

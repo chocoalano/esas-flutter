@@ -289,6 +289,17 @@ class HomeRepository {
 
   String get userAvatar => _session.user?.avatar ?? '';
 
+  /// Jabatan, departemen, dan nama perusahaan dari sesi — `null` bila payload
+  /// yang sedang dipegang sesi tidak mengirimnya.
+  ///
+  /// Bertipe nullable dengan sengaja: kepala Beranda menggambar barisnya hanya
+  /// bila nilainya ada, dan ia tidak pernah mengarang pengganti.
+  String? get userPosition => _session.user?.jobPosition;
+
+  String? get userDepartment => _session.user?.departmentName;
+
+  String? get companyName => _session.user?.companyName;
+
   /// Notifikasi belum dibaca yang terakhir diketahui, atau `null`.
   ///
   /// Dibaca dari sesi, BUKAN dari jaringan. Beranda tidak memanggil endpoint

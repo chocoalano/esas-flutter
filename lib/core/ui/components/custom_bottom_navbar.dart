@@ -141,8 +141,10 @@ class _NavItem extends StatelessWidget {
     final theme = Theme.of(context);
     final palette = theme.palette;
     final Color color = selected
-        ? theme.colorScheme.primary
-        : palette.textMuted;
+        ? const Color(0xFF10B981)
+        : (theme.brightness == Brightness.dark
+            ? palette.textMuted
+            : const Color(0xFF94A3B8));
 
     final int count = badgeCount ?? 0;
     final bool showBadge = count > 0;

@@ -3,6 +3,7 @@ import '../../../../core/utils/json_parsers.dart';
 class Salaries {
   int? id;
   int? userId;
+
   /// A decimal: `decimal:2` arrives as `"5000000.00"` (PROF-03).
   num? basicSalary;
   String? paymentType;

@@ -28,9 +28,19 @@ class AppButton extends StatelessWidget {
     this.variant = AppButtonVariant.filled,
     this.expand = true,
     this.wrapLabel = false,
+    this.destructive = false,
   });
 
   final String label;
+
+  /// Aksi yang tidak bisa ditarik kembali (menolak, membatalkan, menghapus):
+  /// warna error alih-alih warna brand. Berlaku untuk [AppButtonVariant.filled]
+  /// dan [AppButtonVariant.outlined]; tombol teks tidak pernah destruktif.
+  ///
+  /// Warna ini datang dari `ColorScheme.error`/`onError`, pasangan yang sudah
+  /// dirancang lolos AA di kedua mode — bukan dari `Colors.red` atau teks putih
+  /// di atas warna brand, yang di mode gelap (hijau terang) nyaris tak terbaca.
+  final bool destructive;
 
   /// Null berarti tombol nonaktif. Saat [busy] bernilai true, tombol
   /// dinonaktifkan sendiri tanpa perlu pemanggil ikut menghitungnya.
@@ -112,15 +122,25 @@ class AppButton extends StatelessWidget {
         : const Size(0, _minHeight);
     final VoidCallback? effectiveOnPressed = busy ? null : onPressed;
 
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+
     return switch (variant) {
       AppButtonVariant.filled => FilledButton(
         onPressed: effectiveOnPressed,
-        style: FilledButton.styleFrom(minimumSize: minimumSize),
+        style: FilledButton.styleFrom(
+          minimumSize: minimumSize,
+          backgroundColor: destructive ? scheme.error : null,
+          foregroundColor: destructive ? scheme.onError : null,
+        ),
         child: content,
       ),
       AppButtonVariant.outlined => OutlinedButton(
         onPressed: effectiveOnPressed,
-        style: OutlinedButton.styleFrom(minimumSize: minimumSize),
+        style: OutlinedButton.styleFrom(
+          minimumSize: minimumSize,
+          foregroundColor: destructive ? palette.danger.foreground : null,
+          side: destructive ? BorderSide(color: palette.danger.border) : null,
+        ),
         child: content,
       ),
       AppButtonVariant.text => TextButton(

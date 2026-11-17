@@ -4,6 +4,8 @@ import 'package:get/get.dart';
 import '../../../../core/theme/app_dimens.dart';
 import '../../../../core/theme/app_palette.dart';
 import '../../../../core/ui/components/app_card.dart';
+import '../../../../core/ui/components/app_input_decoration.dart';
+import '../../../../core/ui/dialogs/app_dialog.dart';
 import '../../data/models/approval_task.dart';
 import '../controllers/unified_inbox_controller.dart';
 
@@ -156,83 +158,173 @@ class UnifiedInboxView extends GetView<UnifiedInboxController> {
     );
   }
 
+  /// Menolak sebuah tugas, dengan alasan.
+  ///
+  /// Dulu `Get.defaultDialog`. Tiga hal di sana yang salah secara desain, bukan
+  /// hanya gaya: teks tombol putih tetap (`confirmTextColor: Colors.white`) di
+  /// atas hijau brand yang di mode gelap adalah hijau terang — 1,9:1;
+  /// `TextEditingController` dibuat di dalam fungsi dan tidak pernah dibuang;
+  /// dan tombol "Tolak" tetap aktif selagi keputusan terkirim, sehingga ketukan
+  /// kedua mengirim keputusan kedua.
   void _promptRejection(BuildContext context, ApprovalTask task) {
-    final textController = TextEditingController();
-    Get.defaultDialog(
-      title: 'Tolak Pengajuan',
-      content: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          children: [
-            Text('Berikan alasan penolakan untuk "${task.title}":'),
-            const SizedBox(height: 8),
-            TextField(
-              controller: textController,
-              decoration: const InputDecoration(
-                labelText: 'Alasan Penolakan',
-                hintText: 'Alasan penolakan...',
-                helperText:
-                    'Wajib diisi: Berikan alasan yang jelas mengapa tugas atau pengajuan ini ditolak.',
-                helperMaxLines: 2,
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-            ),
-          ],
-        ),
-      ),
-      textConfirm: 'Tolak',
-      textCancel: 'Batal',
-      confirmTextColor: Colors.white,
-      onConfirm: () async {
-        final reason = textController.text.trim();
-        if (reason.isEmpty) {
-          Get.snackbar('Validasi', 'Alasan penolakan tidak boleh kosong');
-          return;
-        }
-        // The dialog and nothing else. A bare `Get.back()` closed only the
-        // validation snackbar when one was showing (INBOX-01), and
-        // `closeOverlays: true` pops the dialog and then the inbox under it
-        // too (UAT review H1). Snackbars are overlay entries, not routes, so
-        // once they are dismissed the top route is the dialog.
-        if (Get.isSnackbarOpen) Get.closeAllSnackbars();
-        // The dialog, and the reason typed into it, stay until the decision
-        // went through (FUNC-D19): it used to close first, so a failed send
-        // lost the reason.
-        final sent = await controller.decideTask(
-          taskId: task.id,
-          decision: 'rejected',
-          note: reason,
-        );
-        if (sent) Navigator.of(Get.overlayContext ?? context).pop();
-      },
+    showDialog<void>(
+      context: context,
+      // Alasan yang sudah diketik, dan keputusan yang mungkin sedang terkirim,
+      // hilang bila barrier-nya sempat tersentuh.
+      barrierDismissible: false,
+      builder: (_) => _RejectTaskDialog(task: task, controller: controller),
     );
   }
 
-  void _confirmApproval(BuildContext context, ApprovalTask task) {
-    Get.defaultDialog(
-      title: 'Setujui pengajuan?',
-      content: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              task.title,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+  Future<void> _confirmApproval(BuildContext context, ApprovalTask task) async {
+    final bool? approved = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        final ThemeData theme = Theme.of(dialogContext);
+
+        return AppDialog(
+          icon: Icons.check_circle_outline_rounded,
+          title: 'Setujui pengajuan?',
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                task.title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text('Pemohon: ${task.requesterName}'),
+              for (final fact in task.facts)
+                Text('${fact.label}: ${fact.value}'),
+            ],
+          ),
+          actions: [
+            AppDialog.button(
+              label: 'Batal',
+              primary: false,
+              onPressed: () => Navigator.of(dialogContext).pop(false),
             ),
-            Text('Pemohon: ${task.requesterName}'),
-            for (final fact in task.facts) Text('${fact.label}: ${fact.value}'),
+            AppDialog.button(
+              label: 'Setujui',
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+            ),
           ],
-        ),
-      ),
-      textConfirm: 'Setujui',
-      textCancel: 'Batal',
-      confirmTextColor: Colors.white,
-      onConfirm: () {
-        Navigator.of(Get.overlayContext ?? context).pop();
-        controller.decideTask(taskId: task.id, decision: 'approved');
+        );
       },
+    );
+
+    if (approved == true) {
+      await controller.decideTask(taskId: task.id, decision: 'approved');
+    }
+  }
+}
+
+/// Alasan penolakan sebuah tugas. Tetap terbuka — dengan alasan yang sudah
+/// diketik — sampai keputusannya benar-benar terkirim (FUNC-D19): dulu ia
+/// menutup lebih dulu, sehingga pengiriman yang gagal menghilangkan alasannya.
+///
+/// Sebuah [StatefulWidget] supaya [TextEditingController]-nya punya pemilik
+/// yang membuangnya.
+class _RejectTaskDialog extends StatefulWidget {
+  const _RejectTaskDialog({required this.task, required this.controller});
+
+  final ApprovalTask task;
+  final UnifiedInboxController controller;
+
+  @override
+  State<_RejectTaskDialog> createState() => _RejectTaskDialogState();
+}
+
+class _RejectTaskDialogState extends State<_RejectTaskDialog> {
+  final TextEditingController _reason = TextEditingController();
+  bool _sending = false;
+  String? _problem;
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final String reason = _reason.text.trim();
+
+    // Sebaris di bawah kolomnya, bukan snackbar "Validasi" di atas dialog:
+    // sebuah snackbar adalah overlay di luar rute, dan menutup dialog dengan
+    // `Get.back()` selagi ia tampil hanya menutup snackbar-nya (INBOX-01).
+    if (reason.isEmpty) {
+      setState(() => _problem = 'Alasan penolakan tidak boleh kosong.');
+      return;
+    }
+
+    setState(() {
+      _sending = true;
+      _problem = null;
+    });
+
+    final bool sent = await widget.controller.decideTask(
+      taskId: widget.task.id,
+      decision: 'rejected',
+      note: reason,
+    );
+
+    if (!mounted) return;
+
+    if (sent) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    // Tetap terbuka, dengan alasan apa adanya; controller sudah menyatakan
+    // kegagalannya.
+    setState(() => _sending = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    return AppDialog(
+      tone: AppDialogTone.danger,
+      icon: Icons.do_not_disturb_on_outlined,
+      title: 'Tolak Pengajuan',
+      message: 'Berikan alasan penolakan untuk "${widget.task.title}":',
+      busy: _sending,
+      content: TextField(
+        controller: _reason,
+        enabled: !_sending,
+        autofocus: true,
+        minLines: 2,
+        maxLines: 4,
+        onChanged: (_) {
+          if (_problem != null) setState(() => _problem = null);
+        },
+        decoration: appInputDecoration(
+          theme,
+          'Alasan Penolakan',
+          hintText: 'Alasan penolakan...',
+          helperText:
+              'Wajib diisi: Berikan alasan yang jelas mengapa tugas atau '
+              'pengajuan ini ditolak.',
+          helperMaxLines: 2,
+        ).copyWith(errorText: _problem),
+      ),
+      actions: [
+        AppDialog.button(
+          label: 'Batal',
+          primary: false,
+          onPressed: _sending ? null : () => Navigator.of(context).pop(),
+        ),
+        AppDialog.button(
+          label: 'Tolak',
+          destructive: true,
+          busy: _sending,
+          onPressed: _sending ? null : _submit,
+        ),
+      ],
     );
   }
 }

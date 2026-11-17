@@ -17,7 +17,8 @@ class DeviceSession {
       deviceId: asString(json['device_id']) ?? '',
       isRegisteredDevice: json['is_registered_device'] == true,
       isCurrent: json['is_current'] == true,
-      abilities: (json['abilities'] as List<dynamic>?)
+      abilities:
+          (json['abilities'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
@@ -34,4 +35,3 @@ class DeviceSession {
   final String? lastUsedAt;
   final String? createdAt;
 }
-

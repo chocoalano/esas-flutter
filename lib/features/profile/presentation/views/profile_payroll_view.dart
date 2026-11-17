@@ -11,6 +11,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/ui/dialogs/app_snackbar.dart';
 import '../../data/models/payslip.dart';
 import '../controllers/profile_tab_controllers.dart';
+import 'payslip_password_dialog.dart';
 
 final _money = NumberFormat.currency(
   locale: 'id_ID',
@@ -208,7 +209,11 @@ class _ProfilePayrollViewState extends State<ProfilePayrollView> {
       // The app's snackbars, not this page's ScaffoldMessenger: the slip sheet
       // is open over the page, and a snackbar under it is one nobody sees
       // (PROF-07).
-      if (path != null) showSuccessSnackbar('Slip gaji tersimpan.');
+      if (path != null) {
+        showSuccessSnackbar('Slip gaji tersimpan.');
+        // WP-01 Final, G6: the file is encrypted; its password is shown once.
+        await showPayslipPdfPassword(pdf.password);
+      }
     } on ApiException catch (error) {
       // The server's reason — a slip not issued yet, a session that changed —
       // is the one worth reading.

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../theme/app_dimens.dart';
-import '../../theme/app_palette.dart';
+import 'app_dialog.dart';
 
 /// Informasi yang perlu dibaca sebelum melanjutkan dari halaman saat ini.
+///
+/// Memakai bentuk [AppDialog] yang sama dengan konfirmasi: sebelumnya dialog
+/// ini rata kiri dengan ikon polos, sementara konfirmasi rata tengah dengan
+/// ikon berkotak — dua dialog yang muncul berurutan di alur masuk terbaca
+/// seperti dua aplikasi.
 Future<void> showAppInfoDialog(
   BuildContext context, {
   required String title,
@@ -13,14 +17,15 @@ Future<void> showAppInfoDialog(
 }) => showDialog<void>(
   context: context,
   barrierDismissible: false,
-  builder: (context) => AlertDialog(
-    icon: icon == null ? null : Icon(icon),
-    title: Text(title),
-    content: Text(message),
-    actions: [
-      FilledButton(
-        onPressed: () => Navigator.of(context).pop(),
-        child: const Text('Mengerti'),
+  builder: (BuildContext dialogContext) => AppDialog(
+    icon: icon,
+    tone: AppDialogTone.info,
+    title: title,
+    message: message,
+    actions: <Widget>[
+      AppDialog.button(
+        label: 'Mengerti',
+        onPressed: () => Navigator.of(dialogContext).pop(),
       ),
     ],
   ),
@@ -45,70 +50,23 @@ Future<bool> showAppConfirmDialog(
   IconData? icon,
   bool destructive = false,
 }) async {
-  final theme = Theme.of(context);
-  final palette = theme.palette;
-  final Color accent = destructive
-      ? palette.danger.foreground
-      : theme.colorScheme.primary;
-
   final bool? result = await showDialog<bool>(
     context: context,
-    builder: (context) => AlertDialog(
-      icon: icon == null
-          ? null
-          : Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: destructive
-                    ? palette.danger.background
-                    : palette.brandSubtle,
-                borderRadius: AppRadii.xlAll,
-                border: Border.all(
-                  color: destructive
-                      ? palette.danger.border
-                      : accent.withValues(alpha: 0.28),
-                ),
-              ),
-              child: Icon(icon, size: 20, color: accent),
-            ),
-      iconPadding: const EdgeInsets.only(top: AppSpacing.xxl),
-      title: Text(title, textAlign: TextAlign.center),
-      content: Text(
-        message,
-        textAlign: TextAlign.center,
-        style: theme.textTheme.bodyMedium?.copyWith(color: palette.textMuted),
-      ),
-      actionsPadding: const EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        AppSpacing.sm,
-        AppSpacing.xl,
-        AppSpacing.xl,
-      ),
-      actions: [
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text(cancelLabel),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: destructive
-                    ? FilledButton.styleFrom(
-                        backgroundColor: theme.colorScheme.error,
-                        foregroundColor: theme.colorScheme.onError,
-                      )
-                    : null,
-                child: Text(confirmLabel),
-              ),
-            ),
-          ],
+    builder: (BuildContext dialogContext) => AppDialog(
+      icon: icon,
+      tone: destructive ? AppDialogTone.danger : AppDialogTone.brand,
+      title: title,
+      message: message,
+      actions: <Widget>[
+        AppDialog.button(
+          label: cancelLabel,
+          primary: false,
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+        ),
+        AppDialog.button(
+          label: confirmLabel,
+          destructive: destructive,
+          onPressed: () => Navigator.of(dialogContext).pop(true),
         ),
       ],
     ),

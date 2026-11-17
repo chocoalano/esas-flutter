@@ -9,7 +9,9 @@ import '../../../../core/ui/components/app_card.dart';
 import '../../../../core/ui/components/app_empty_state.dart';
 import '../../../../core/ui/components/app_error_state.dart';
 import '../../../../core/ui/components/app_inline_notice.dart';
+import '../../../../core/ui/components/app_input_decoration.dart';
 import '../../../../core/ui/components/app_skeleton.dart';
+import '../../../../core/ui/dialogs/app_dialog.dart';
 import '../../../../core/ui/dialogs/app_snackbar.dart';
 import '../controllers/gams_request_tracking_controllers.dart';
 import '../routes/gams_routes.dart';
@@ -340,6 +342,10 @@ Future<bool> confirmGamsCancellation(
 }) async {
   final done = await showDialog<bool>(
     context: context,
+    // Tidak bisa ditutup dengan ketukan di luar: dialog ini menahan alasan yang
+    // sudah diketik dan sebuah permintaan yang mungkin sedang berjalan, dan
+    // keduanya hilang bila barrier-nya sempat tersentuh.
+    barrierDismissible: false,
     builder: (_) => _CancelDialog(
       title: title,
       consequence: consequence,
@@ -402,42 +408,53 @@ class _CancelDialogState extends State<_CancelDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.title),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.consequence),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _reason,
-              maxLength: 1000,
-              minLines: 2,
-              maxLines: 4,
-              decoration: InputDecoration(
-                labelText: widget.reasonRequired
-                    ? 'Alasan pembatalan'
-                    : 'Alasan pembatalan (opsional)',
-                border: const OutlineInputBorder(),
-              ),
+    final ThemeData theme = Theme.of(context);
+
+    return AppDialog(
+      tone: AppDialogTone.danger,
+      icon: Icons.cancel_outlined,
+      title: widget.title,
+      message: widget.consequence,
+      // Selama permintaan berjalan dialog tidak bisa ditutup dengan tombol
+      // kembali, dan kolom alasannya dikunci: mengetik di tengah pengiriman
+      // menghasilkan alasan yang tidak pernah terkirim.
+      busy: _sending,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextField(
+            controller: _reason,
+            enabled: !_sending,
+            maxLength: 1000,
+            minLines: 2,
+            maxLines: 4,
+            // Dari tema, bukan `OutlineInputBorder()` polos: yang polos
+            // melepas warna garis, fokus, dan sudut dari sistem desain.
+            decoration: appInputDecoration(
+              theme,
+              widget.reasonRequired
+                  ? 'Alasan pembatalan'
+                  : 'Alasan pembatalan (opsional)',
             ),
-            if (_error case final message?) ...[
-              const SizedBox(height: 8),
-              AppInlineNotice(message: message),
-            ],
+          ),
+          if (_error case final message?) ...[
+            const SizedBox(height: 8),
+            AppInlineNotice(message: message),
           ],
-        ),
+        ],
       ),
       actions: [
-        TextButton(
+        AppDialog.button(
+          label: 'Kembali',
+          primary: false,
           onPressed: _sending ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Kembali'),
         ),
-        FilledButton(
+        AppDialog.button(
+          label: _sending ? 'Membatalkan…' : 'Batalkan',
+          destructive: true,
+          busy: _sending,
           onPressed: _sending ? null : _submit,
-          child: Text(_sending ? 'Membatalkan…' : 'Batalkan'),
         ),
       ],
     );

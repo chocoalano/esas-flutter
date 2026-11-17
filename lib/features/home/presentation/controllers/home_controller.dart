@@ -69,6 +69,28 @@ enum HomeTodayState {
   done,
 }
 
+/// Seberapa segar data di layar, dalam empat keadaan — untuk pil status di
+/// kepala Beranda.
+///
+/// Ia menjawab satu pertanyaan yang sebelumnya hanya dijawab oleh sebuah
+/// kalimat yang ditulis mati: "apakah yang saya lihat ini terbaru?". Keempat
+/// jawabannya datang dari keadaan yang SUDAH dipegang controller, bukan dari
+/// permintaan tambahan.
+enum HomeSyncStatus {
+  /// Pembukaan dingin: belum ada data sama sekali.
+  loading,
+
+  /// Data lama masih di layar, dan penyegaran sedang berjalan.
+  refreshing,
+
+  /// Sebuah panel gagal karena sinyal (bukan karena server menolak). Data di
+  /// layar adalah data terakhir yang berhasil sampai.
+  offline,
+
+  /// Penyegaran terakhir sampai tanpa kegagalan transport.
+  synced,
+}
+
 /// Ketukan absen berikutnya, sebagai tipe dan bukan sebagai string.
 ///
 /// `'in'` dan `'out'` adalah ejaan KAWAT, dan ejaan kawat berhenti di
@@ -127,6 +149,55 @@ class HomeController extends GetxController {
   final userName = 'Anonymous'.obs;
   final userAvatarUrl = ''.obs;
   final currentDate = ''.obs;
+
+  /// Tanggal yang sama dalam bentuk ringkas ("Kamis, 24 Okt 2024") — muat di
+  /// satu baris di samping pil status, yang tidak dimuat bentuk panjangnya.
+  final currentDateShort = ''.obs;
+
+  /// Jabatan, departemen, dan nama perusahaan dari sesi. `null` berarti payload
+  /// sesi tidak mengirimnya, dan kepala Beranda tidak menggambar barisnya —
+  /// tidak ada pengganti yang dikarang.
+  final Rxn<String> userPosition = Rxn<String>();
+  final Rxn<String> userDepartment = Rxn<String>();
+  final Rxn<String> companyName = Rxn<String>();
+
+  /// Kapan penyegaran terakhir yang berhasil selesai, pada jam workspace.
+  /// `null` sampai ada penyegaran yang berhasil.
+  final Rxn<DateTime> lastSyncedAt = Rxn<DateTime>();
+
+  /// Seberapa segar data di layar. Lihat [HomeSyncStatus].
+  ///
+  /// Hanya kegagalan TRANSPORT yang dihitung "luring". Penolakan server pada
+  /// satu panel (misalnya 403 absensi pada akun tanpa izin) adalah keadaan
+  /// akun, bukan keadaan jaringan, dan sebuah pil peringatan permanen untuk
+  /// akun itu hanya akan mengajari orang mengabaikan pil tersebut.
+  HomeSyncStatus get syncStatus {
+    if (isLoading.value) {
+      return hasLoaded.value
+          ? HomeSyncStatus.refreshing
+          : HomeSyncStatus.loading;
+    }
+
+    if (!hasLoaded.value) return HomeSyncStatus.loading;
+
+    return _hasTransportFailure ? HomeSyncStatus.offline : HomeSyncStatus.synced;
+  }
+
+  bool get _hasTransportFailure => <Rxn<ApiException>>[
+    attendanceError,
+    announcementError,
+    leaveError,
+    summaryError,
+    activityError,
+  ].any((Rxn<ApiException> slot) => slot.value?.isTransportFailure ?? false);
+
+  /// Membaca ulang identitas dari sesi. Murah — sumbernya memori — dan perlu
+  /// diulang karena profil yang dimuat belakangan memperbarui sesi.
+  void _readIdentity() {
+    userPosition.value = _repository.userPosition;
+    userDepartment.value = _repository.userDepartment;
+    companyName.value = _repository.companyName;
+  }
 
   /// Notifikasi belum dibaca, `null` selama belum pernah diketahui.
   ///
@@ -231,6 +302,8 @@ class HomeController extends GetxController {
     // The workspace's today, not the handset's. A phone an hour the wrong side
     // of midnight showed a date the attendance below it disagreed with.
     currentDate.value = DateFormatter.nowFormatted('EEEE, d MMMM yyyy');
+    currentDateShort.value = DateFormatter.nowFormatted('EEEE, d MMM yyyy');
+    _readIdentity();
 
     if (Get.isRegistered<BottomNavController>()) {
       _scrollToTopWorker = ever(
@@ -449,6 +522,8 @@ class HomeController extends GetxController {
     // Tanggalnya juga (HOME-04): aplikasi yang dibuka Rabu malam lalu
     // dilanjutkan Kamis pagi menyegarkan datanya, dan judulnya tetap Rabu.
     currentDate.value = DateFormatter.nowFormatted('EEEE, d MMMM yyyy');
+    currentDateShort.value = DateFormatter.nowFormatted('EEEE, d MMM yyyy');
+    _readIdentity();
 
     isLoading.value = true;
 
@@ -504,6 +579,12 @@ class HomeController extends GetxController {
       // Penyegaran yang sudah kedaluwarsa juga tidak boleh mematikan indikator
       // milik penyegaran yang masih berjalan.
       if (!_isStale(generation)) {
+        // Dicap SEBELUM indikator dimatikan, supaya pil status tidak pernah
+        // sempat menggambar "tersinkronisasi" dengan jam penyegaran lama.
+        if (!_hasTransportFailure) {
+          lastSyncedAt.value = WorkspaceClock.current.now();
+        }
+
         isLoading.value = false;
         hasLoaded.value = true;
       }

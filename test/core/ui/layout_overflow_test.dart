@@ -357,16 +357,23 @@ void main() {
     ),
     'HomeHeader': const HomeHeader(
       userName: 'Budi Santoso Wijaya Kusumaningrat',
-      userAvatarUrl: '',
     ),
-    // Menggantikan subjek `HomeDateStrip`, yang dibubarkan menjadi baris ketiga
-    // di dalam kepala Beranda: yang perlu tetap dipompa adalah baris tanggalnya,
-    // bukan kotak yang dulu memuatnya.
-    'HomeHeader.date': const HomeHeader(
+    // Baris status (pil sinkron + tanggal) dan baris peran dipompa dengan
+    // teks terpanjang yang mungkin: ketiganya harus terpotong, bukan meluap.
+    'HomeHeader.full': HomeHeader(
       userName: 'Budi Santoso Wijaya Kusumaningrat',
-      userAvatarUrl: '',
       date: 'Rabu, 3 September 2026',
-      notificationCount: 99,
+      position: longLabel,
+      department: longLabel,
+      syncStatus: HomeSyncStatus.offline,
+      syncedAt: DateTime(2026, 9, 3, 8, 24),
+    ),
+    'HomeHeader.synced': HomeHeader(
+      userName: 'Budi',
+      date: 'Rabu, 3 Sep 2026',
+      position: 'Lead UI/UX Engineer',
+      syncStatus: HomeSyncStatus.synced,
+      syncedAt: DateTime(2026, 9, 3, 8, 24),
     ),
     'AttendanceListItem.late': AttendanceListItem(
       attendance: attendanceLate,

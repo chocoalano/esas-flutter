@@ -50,6 +50,11 @@ class AppRadii {
   static const double lg = 10;
   static const double xl = 12;
   static const double xxl = 16;
+
+  /// Panel utama sebuah layar (kartu hero Beranda). Hanya satu tingkat di atas
+  /// [xxl], supaya panel terpenting terbaca lebih "lunak" daripada kartu biasa
+  /// tanpa membuat seluruh aplikasi ikut membulat.
+  static const double xxxl = 20;
   static const double pill = 999;
 
   static const BorderRadius smAll = BorderRadius.all(Radius.circular(sm));
@@ -57,6 +62,7 @@ class AppRadii {
   static const BorderRadius lgAll = BorderRadius.all(Radius.circular(lg));
   static const BorderRadius xlAll = BorderRadius.all(Radius.circular(xl));
   static const BorderRadius xxlAll = BorderRadius.all(Radius.circular(xxl));
+  static const BorderRadius xxxlAll = BorderRadius.all(Radius.circular(xxxl));
   static const BorderRadius pillAll = BorderRadius.all(Radius.circular(pill));
 }
 

@@ -144,6 +144,36 @@ class AuthUser {
     return null;
   }
 
+  /// The department's name, as whichever payload sent it.
+  ///
+  /// Login sends `departement` flat as a string, `/profile` sends it on
+  /// `employee` as a name, and an older backend nested it as `{name}`. Null
+  /// when none of them did — the caller draws nothing rather than a dash.
+  String? get departmentName => _firstLabel([
+    raw['departement'],
+    dig(raw, ['employee', 'departement']),
+    dig(raw, ['departement', 'name']),
+    dig(raw, ['employee', 'departement', 'name']),
+  ]);
+
+  /// The company's name. `tenancy-app` flattens `company` to a bare string
+  /// (gap G-1); `/profile` sends an object with a `name`. Both are read.
+  String? get companyName => _firstLabel([
+    raw['company'],
+    dig(raw, ['company', 'name']),
+  ]);
+
+  /// The first candidate that is a non-blank string, trimmed.
+  static String? _firstLabel(Iterable<Object?> candidates) {
+    for (final candidate in candidates) {
+      if (candidate is String && candidate.trim().isNotEmpty) {
+        return candidate.trim();
+      }
+    }
+
+    return null;
+  }
+
   DateTime? get signDate => asDate(dig(raw, ['employee', 'sign_date']));
 
   Map<String, dynamic> toJson() => raw;

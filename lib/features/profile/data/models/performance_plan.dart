@@ -34,4 +34,3 @@ class PerformancePlan {
   final double totalWeight;
   final String? createdAt;
 }
-

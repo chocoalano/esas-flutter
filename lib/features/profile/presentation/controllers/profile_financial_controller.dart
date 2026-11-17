@@ -7,7 +7,7 @@ import '../../data/repositories/payroll_repository.dart';
 
 class ProfileFinancialController extends GetxController {
   ProfileFinancialController({required PayrollRepository repository})
-      : _repository = repository;
+    : _repository = repository;
 
   final PayrollRepository _repository;
 
@@ -45,4 +45,3 @@ class ProfileFinancialController extends GetxController {
     }
   }
 }
-

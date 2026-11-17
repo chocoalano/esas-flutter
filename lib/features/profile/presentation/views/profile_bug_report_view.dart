@@ -57,7 +57,8 @@ class ProfileBugReportView extends GetView<ProfileBugReportController> {
                   children: [
                     const AppSectionHeader(
                       title: 'Detail Kendala',
-                      subtitle: 'Informasi masalah yang ditemukan pada aplikasi',
+                      subtitle:
+                          'Informasi masalah yang ditemukan pada aplikasi',
                       dense: true,
                       naturalCase: true,
                     ),

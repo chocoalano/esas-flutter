@@ -34,4 +34,3 @@ class CompanyPolicy {
   final String? effectiveDate;
   final String? publishedAt;
 }
-

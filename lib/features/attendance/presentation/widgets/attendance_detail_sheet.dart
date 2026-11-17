@@ -7,6 +7,7 @@ import 'package:esas/core/ui/components/app_badge.dart';
 import 'package:esas/core/ui/components/app_data_row.dart';
 import 'package:esas/core/ui/components/app_section_header.dart';
 import 'package:esas/core/ui/dialogs/app_bottom_sheet.dart';
+import 'package:esas/core/ui/dialogs/app_image_viewer.dart';
 import 'package:esas/features/attendance/data/models/attendance.dart';
 import 'package:esas/features/attendance/presentation/attendance_labels.dart';
 import 'package:flutter/material.dart';
@@ -358,21 +359,8 @@ class _PhotoTile extends StatelessWidget {
 
     return InkWell(
       borderRadius: AppRadii.xlAll,
-      onTap: () => showDialog<void>(
-        context: context,
-        builder: (_) => Dialog(
-          insetPadding: const EdgeInsets.all(AppSpacing.lg),
-          // Kerudung yang sama dengan lapisan di atas kamera, bukan ejaan
-          // keempat dari hitam transparan.
-          backgroundColor: palette.overlayScrim,
-          child: ClipRRect(
-            borderRadius: AppRadii.xlAll,
-            child: InteractiveViewer(
-              child: Image.network(url, fit: BoxFit.contain),
-            ),
-          ),
-        ),
-      ),
+      onTap: () =>
+          showAppImageViewer(context, image: NetworkImage(url), title: title),
       child: Container(
         height: 140,
         decoration: BoxDecoration(

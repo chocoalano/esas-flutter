@@ -131,100 +131,100 @@ class ProfileView extends GetView<ProfileController> {
         },
         child: Scaffold(
           body: SafeArea(
-          bottom: false,
-          child: RefreshIndicator(
-            onRefresh: controller.loadSummary,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.page,
-                AppSpacing.xl,
-                AppSpacing.page,
-                AppSpacing.bottomSafe,
-              ),
-              children: [
-                const AppPageTitle(title: 'Profil'),
-                const SizedBox(height: AppSpacing.xl),
-
-                const _IdentityCard(),
-                const SizedBox(height: AppSpacing.xl),
-
-                const AppSectionHeader(
-                  title: 'Performa & Kehadiran',
-                  subtitle: 'Ringkasan statistik kehadiran Anda',
-                  dense: true,
+            bottom: false,
+            child: RefreshIndicator(
+              onRefresh: controller.loadSummary,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.page,
+                  AppSpacing.xl,
+                  AppSpacing.page,
+                  AppSpacing.bottomSafe,
                 ),
-                const _PerformanceCard(),
-                const SizedBox(height: AppSpacing.md),
-                const _AttendanceStats(),
+                children: [
+                  const AppPageTitle(title: 'Profil'),
+                  const SizedBox(height: AppSpacing.xl),
 
-                for (final group in _groups) ...[
-                  const SizedBox(height: AppSpacing.xxl),
-                  AppSectionHeader(title: group.title, dense: true),
-                  _MenuPanel(
-                    children: [
-                      for (final item in group.items)
-                        _MenuRow(
-                          item: item,
-                          onTap: () => Get.toNamed(item.route!),
-                        ),
-                    ],
+                  const _IdentityCard(),
+                  const SizedBox(height: AppSpacing.xl),
+
+                  const AppSectionHeader(
+                    title: 'Performa & Kehadiran',
+                    subtitle: 'Ringkasan statistik kehadiran Anda',
+                    dense: true,
                   ),
-                ],
+                  const _PerformanceCard(),
+                  const SizedBox(height: AppSpacing.md),
+                  const _AttendanceStats(),
 
-                const SizedBox(height: AppSpacing.xxl),
-                const AppSectionHeader(
-                  title: 'Tampilan',
-                  subtitle: 'Mode terang atau gelap untuk perangkat ini',
-                  dense: true,
-                ),
-                const _MenuPanel(children: [_ThemeRow()]),
-
-                const SizedBox(height: AppSpacing.xxl),
-                const AppSectionHeader(
-                  title: 'Sesi',
-                  subtitle: 'Kelola perangkat dan sesi login',
-                  dense: true,
-                ),
-                _MenuPanel(
-                  children: [
-                    _MenuRow(
-                      item: const ProfileMenuItem(
-                        Icons.swap_horiz_rounded,
-                        'Pindah workspace',
-                        null,
-                        subtitle: 'Lepas perangkat dari workspace saat ini',
-                      ),
-                      onTap: () => _confirmSwitchWorkspace(context),
-                    ),
-                    // Says it is working while it is (PROF-10): a sign-out
-                    // waits on the server, and a row that looks idle invites
-                    // the second tap.
-                    Obx(
-                      () => _MenuRow(
-                        item: ProfileMenuItem(
-                          Icons.logout_rounded,
-                          'Keluar',
-                          null,
-                          subtitle: controller.isLoggingOut.value
-                              ? 'Sedang keluar…'
-                              : 'Akhiri sesi di perangkat ini',
-                        ),
-                        destructive: true,
-                        onTap: () => _confirmLogout(context),
-                      ),
+                  for (final group in _groups) ...[
+                    const SizedBox(height: AppSpacing.xxl),
+                    AppSectionHeader(title: group.title, dense: true),
+                    _MenuPanel(
+                      children: [
+                        for (final item in group.items)
+                          _MenuRow(
+                            item: item,
+                            onTap: () => Get.toNamed(item.route!),
+                          ),
+                      ],
                     ),
                   ],
-                ),
 
-                const SizedBox(height: AppSpacing.xl),
-                const _WorkspaceFooter(),
-              ],
+                  const SizedBox(height: AppSpacing.xxl),
+                  const AppSectionHeader(
+                    title: 'Tampilan',
+                    subtitle: 'Mode terang atau gelap untuk perangkat ini',
+                    dense: true,
+                  ),
+                  const _MenuPanel(children: [_ThemeRow()]),
+
+                  const SizedBox(height: AppSpacing.xxl),
+                  const AppSectionHeader(
+                    title: 'Sesi',
+                    subtitle: 'Kelola perangkat dan sesi login',
+                    dense: true,
+                  ),
+                  _MenuPanel(
+                    children: [
+                      _MenuRow(
+                        item: const ProfileMenuItem(
+                          Icons.swap_horiz_rounded,
+                          'Pindah workspace',
+                          null,
+                          subtitle: 'Lepas perangkat dari workspace saat ini',
+                        ),
+                        onTap: () => _confirmSwitchWorkspace(context),
+                      ),
+                      // Says it is working while it is (PROF-10): a sign-out
+                      // waits on the server, and a row that looks idle invites
+                      // the second tap.
+                      Obx(
+                        () => _MenuRow(
+                          item: ProfileMenuItem(
+                            Icons.logout_rounded,
+                            'Keluar',
+                            null,
+                            subtitle: controller.isLoggingOut.value
+                                ? 'Sedang keluar…'
+                                : 'Akhiri sesi di perangkat ini',
+                          ),
+                          destructive: true,
+                          onTap: () => _confirmLogout(context),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: AppSpacing.xl),
+                  const _WorkspaceFooter(),
+                ],
+              ),
             ),
           ),
+          bottomNavigationBar: const CustomBottomNavBar(),
         ),
-        bottomNavigationBar: const CustomBottomNavBar(),
       ),
-    ),
     );
   }
 
@@ -911,4 +911,3 @@ class _SummaryUnavailable extends StatelessWidget {
     );
   }
 }
-

@@ -68,7 +68,9 @@ class _AnnouncementCarouselState extends State<AnnouncementCarousel> {
     final double scale = (MediaQuery.textScalerOf(context).scale(14) / 14)
         .clamp(1.0, 1.6);
     final double height = 160 * scale;
-    final bool stacked = AppLayout.of(context).twoColumn;
+    final layout = AppLayout.of(context);
+    final double pagePadding = layout.pagePadding;
+    final bool stacked = layout.twoColumn;
 
     return Obx(() {
       final HomeController controller = widget.controller;
@@ -78,10 +80,13 @@ class _AnnouncementCarouselState extends State<AnnouncementCarousel> {
       // permintaan yang belum selesai adalah kebohongan yang paling mudah
       // dikirim sebuah dasbor.
       if (!controller.hasLoaded.value && controller.isLoading.value) {
-        return AppSkeleton(
-          height: height,
-          width: double.infinity,
-          borderRadius: AppRadii.xxlAll,
+        return Padding(
+          padding: EdgeInsets.symmetric(horizontal: pagePadding),
+          child: AppSkeleton(
+            height: height,
+            width: double.infinity,
+            borderRadius: BorderRadius.circular(16),
+          ),
         );
       }
 
@@ -91,61 +96,73 @@ class _AnnouncementCarouselState extends State<AnnouncementCarousel> {
       // koneksinya putus diberi tahu bahwa perusahaannya tidak mengumumkan
       // apa pun.
       if (items.isEmpty && failed) {
-        return AppInlineNotice(
-          message: 'Pengumuman belum dapat dimuat.',
-          tone: AppNoticeTone.neutral,
-          actionLabel: 'Coba lagi',
-          onAction: () => controller.refreshDashboard(force: true),
+        return Padding(
+          padding: EdgeInsets.symmetric(horizontal: pagePadding),
+          child: AppInlineNotice(
+            message: 'Pengumuman belum dapat dimuat.',
+            tone: AppNoticeTone.neutral,
+            actionLabel: 'Coba lagi',
+            onAction: () => controller.refreshDashboard(force: true),
+          ),
         );
       }
 
       if (items.isEmpty) {
-        return AppCard(
-          borderRadius: AppRadii.xxlAll,
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Row(
-            children: <Widget>[
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: palette.surfaceSubtle,
-                  borderRadius: AppRadii.mdAll,
-                  border: Border.all(color: palette.borderSubtle),
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.campaign_outlined,
-                  size: AppIconSizes.lg,
-                  color: palette.textMuted,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Text(
-                      'Belum ada pengumuman baru.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: theme.colorScheme.onSurface,
-                      ),
+        return Padding(
+          padding: EdgeInsets.symmetric(horizontal: pagePadding),
+          child: AppCard(
+            borderRadius: BorderRadius.circular(16),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.xl,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: palette.surfaceSubtle,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: palette.borderSubtle,
+                      width: 1.0,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Informasi dan kebijakan penting akan muncul di sini.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: palette.textMuted,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    Icons.campaign_outlined,
+                    size: 24,
+                    color: palette.textMuted,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Belum ada pengumuman baru.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Informasi dan kebijakan penting akan muncul di sini.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: palette.textMuted,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         );
       }
@@ -155,37 +172,47 @@ class _AnnouncementCarouselState extends State<AnnouncementCarousel> {
             .take(_stackedLimit)
             .toList(growable: false);
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            for (int i = 0; i < shown.length; i++) ...<Widget>[
-              if (i > 0) const SizedBox(height: AppSpacing.md),
-              SizedBox(
-                height: height,
-                child: _AnnouncementCard(item: shown[i]),
-              ),
+        return Padding(
+          padding: EdgeInsets.symmetric(horizontal: pagePadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              for (int i = 0; i < shown.length; i++) ...<Widget>[
+                if (i > 0) const SizedBox(height: AppSpacing.md),
+                SizedBox(
+                  height: height,
+                  child: _AnnouncementCard(item: shown[i]),
+                ),
+              ],
             ],
-          ],
+          ),
         );
       }
 
+      final EdgeInsetsGeometry carouselPadding = layout.heroBleeds
+          ? EdgeInsets.only(left: pagePadding)
+          : EdgeInsets.symmetric(horizontal: pagePadding);
+
       return Column(
         children: <Widget>[
-          SizedBox(
-            height: height,
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: items.length,
-              padEnds: false,
-              onPageChanged: (int i) => setState(() => _current = i),
-              itemBuilder: (BuildContext context, int index) {
-                return Padding(
-                  padding: EdgeInsets.only(
-                    right: index == items.length - 1 ? 0 : AppSpacing.md,
-                  ),
-                  child: _AnnouncementCard(item: items[index]),
-                );
-              },
+          Padding(
+            padding: carouselPadding,
+            child: SizedBox(
+              height: height,
+              child: PageView.builder(
+                controller: _pageController,
+                itemCount: items.length,
+                padEnds: false,
+                onPageChanged: (int i) => setState(() => _current = i),
+                itemBuilder: (BuildContext context, int index) {
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      right: index == items.length - 1 ? 0 : AppSpacing.md,
+                    ),
+                    child: _AnnouncementCard(item: items[index]),
+                  );
+                },
+              ),
             ),
           ),
           if (items.length > 1) ...<Widget>[
@@ -267,6 +294,26 @@ class _AnnouncementCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
+          Row(
+            children: <Widget>[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: palette.brandSubtle,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'HR Broadcast',
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
           Text(
             title,
             style: theme.textTheme.titleMedium?.copyWith(

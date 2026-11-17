@@ -12,6 +12,7 @@ import '../controllers/profile_bug_report_controller.dart';
 import '../controllers/profile_controller.dart';
 import '../controllers/profile_financial_controller.dart';
 import '../controllers/profile_tab_controllers.dart';
+import '../views/payslip_password_dialog.dart';
 
 /// One repository across the profile tabs, so the five that used to fetch the
 /// same user object independently now share a single cached read.
@@ -82,7 +83,11 @@ class ProfilePayrollBinding extends Bindings {
   @override
   void dependencies() => Get.lazyPut<ProfilePayrollController>(
     () => ProfilePayrollController(
-      repository: PayrollRepository(ProfileApiService(Get.find<ApiClient>())),
+      // WP-01 Final, G5: pay is read behind a password step-up.
+      repository: PayrollRepository(
+        ProfileApiService(Get.find<ApiClient>()),
+        askPassword: askPayslipPassword,
+      ),
       session: Get.find<SessionRepository>(),
     ),
   );
@@ -92,7 +97,11 @@ class ProfileFinancialBinding extends Bindings {
   @override
   void dependencies() => Get.lazyPut<ProfileFinancialController>(
     () => ProfileFinancialController(
-      repository: PayrollRepository(ProfileApiService(Get.find<ApiClient>())),
+      // WP-01 Final, G5: loans and advances are pay, behind the same step-up.
+      repository: PayrollRepository(
+        ProfileApiService(Get.find<ApiClient>()),
+        askPassword: askPayslipPassword,
+      ),
     ),
   );
 }

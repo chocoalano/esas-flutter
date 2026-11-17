@@ -126,6 +126,10 @@ class ApiRoutes {
   static String payslip(int id) => '$payslips/$id';
   static String payslipPdf(int id) => '$payslips/$id/pdf';
 
+  /// Re-enter the password to unlock pay on this handset (WP-01 Final, G5):
+  /// returns a short-lived grant sent back as `X-Payslip-Grant`.
+  static const String payslipStepUp = '/payroll/step-up';
+
   // ── Home ─────────────────────────────────────────────────────────────────
 
   /// The clock-in screen's whole context: shift, today's attendance,

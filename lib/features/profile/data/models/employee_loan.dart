@@ -33,16 +33,13 @@ class EmployeeLoan {
 }
 
 class LoansResponse {
-  const LoansResponse({
-    required this.loans,
-    required this.outstandingTotal,
-  });
+  const LoansResponse({required this.loans, required this.outstandingTotal});
 
   factory LoansResponse.fromJson(Map<String, dynamic> json) {
     return LoansResponse(
-      loans: asList(json['loans'])
-          .map((item) => EmployeeLoan.fromJson(asObject(item)))
-          .toList(),
+      loans: asList(
+        json['loans'],
+      ).map((item) => EmployeeLoan.fromJson(asObject(item))).toList(),
       outstandingTotal: asDouble(json['outstanding_total']) ?? 0.0,
     );
   }
@@ -50,4 +47,3 @@ class LoansResponse {
   final List<EmployeeLoan> loans;
   final double outstandingTotal;
 }
-

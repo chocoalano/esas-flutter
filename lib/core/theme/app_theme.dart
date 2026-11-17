@@ -252,14 +252,30 @@ class AppTheme {
         ),
       ),
 
+      // Dialog polos (`AlertDialog` tanpa `AppDialog`) tetap harus tampil
+      // benar: jarak tepi layar yang tidak menempel di ponsel 320dp, dan
+      // padding aksi yang selaras dengan padding isinya.
       dialogTheme: DialogThemeData(
         backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        iconColor: scheme.primary,
         titleTextStyle: textTheme.titleLarge,
         contentTextStyle: textTheme.bodyMedium,
+        insetPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.xl,
+          vertical: AppSpacing.xxl,
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(
+          AppSpacing.xl,
+          AppSpacing.sm,
+          AppSpacing.xl,
+          AppSpacing.xl,
+        ),
+        // 16, bukan 20: sheet dan dialog berbagi radius 16 (DESIGN_SYSTEM.md),
+        // dan 20 hanya milik panel hero Beranda.
         shape: RoundedRectangleBorder(
-          borderRadius: AppRadii.xlAll,
+          borderRadius: AppRadii.xxlAll,
           side: BorderSide(color: palette.borderSubtle),
         ),
       ),

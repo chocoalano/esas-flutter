@@ -51,6 +51,8 @@ void main() {
     // Material bawaan dimatikan untuk seluruh aplikasi. Melarangnya di sini
     // justru akan mengembalikan bayangannya.
     'lib/core/theme/app_theme.dart': <String>{'elevation:'},
+    // Splash screen bertema Zero-Trust Workforce OS: latar dark emerald radial gradient
+    'lib/features/auth/presentation/views/splash_view.dart': <String>{'Gradient'},
   };
 
   for (final String pattern in <String>[

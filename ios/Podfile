@@ -24,6 +24,10 @@ def flutter_root
 end
 
 require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+require File.expand_path(
+  File.join('.symlinks', 'plugins', 'google_mlkit_commons', 'ios', 'scripts', 'apple_silicon_simulator'),
+  __dir__,
+)
 
 flutter_ios_podfile_setup
 
@@ -90,6 +94,7 @@ post_install do |installer|
     #
     # The real fix is Google shipping MLImage as an xcframework with an
     # arm64-simulator slice; `1.0.0-beta8` is the newest and has none.
-
   end
+
+  mlkit_apple_silicon_simulator_patch(installer)
 end

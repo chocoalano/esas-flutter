@@ -9,6 +9,7 @@ import '../../../../core/ui/components/app_empty_state.dart';
 import '../../../../core/ui/components/app_error_state.dart';
 import '../../../../core/ui/components/app_inline_notice.dart';
 import '../../../../core/ui/components/app_input_decoration.dart';
+import '../../../../core/ui/dialogs/app_dialog.dart';
 import '../../../../core/ui/dialogs/app_dialogs.dart';
 import '../../../../core/ui/dialogs/app_snackbar.dart';
 import '../../data/models/atk_models.dart';
@@ -254,9 +255,11 @@ class _AtkRejectDialogState extends State<AtkRejectDialog> {
       final busy = controller.submitting.value == AtkDeskAction.reject;
       final failure = controller.notice.value;
 
-      return AlertDialog(
-        scrollable: true,
-        title: const Text('Tolak permintaan'),
+      return AppDialog(
+        tone: AppDialogTone.danger,
+        icon: Icons.do_not_disturb_on_outlined,
+        title: 'Tolak permintaan',
+        busy: busy,
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -286,13 +289,14 @@ class _AtkRejectDialogState extends State<AtkRejectDialog> {
           ],
         ),
         actions: [
-          TextButton(
+          AppDialog.button(
+            label: 'Batal',
+            primary: false,
             onPressed: busy ? null : () => Navigator.of(context).pop(false),
-            child: const Text('Batal'),
           ),
-          AppButton(
+          AppDialog.button(
             label: 'Tolak permintaan',
-            expand: false,
+            destructive: true,
             busy: busy,
             onPressed: busy ? null : _submit,
           ),
@@ -350,9 +354,10 @@ class _AtkIssueDialogState extends State<AtkIssueDialog> {
       final detail = controller.detail.value;
       final unit = detail?.request.unit ?? '';
 
-      return AlertDialog(
-        scrollable: true,
-        title: const Text('Serahkan barang'),
+      return AppDialog(
+        icon: Icons.inventory_2_outlined,
+        title: 'Serahkan barang',
+        busy: busy,
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -384,13 +389,13 @@ class _AtkIssueDialogState extends State<AtkIssueDialog> {
           ],
         ),
         actions: [
-          TextButton(
+          AppDialog.button(
+            label: 'Batal',
+            primary: false,
             onPressed: busy ? null : () => Navigator.of(context).pop(false),
-            child: const Text('Batal'),
           ),
-          AppButton(
+          AppDialog.button(
             label: 'Serahkan barang',
-            expand: false,
             busy: busy,
             onPressed: busy ? null : _submit,
           ),
@@ -487,9 +492,10 @@ class _AtkReturnDialogState extends State<AtkReturnDialog> {
       final open = issue?.isReturnable ?? false;
       final typed = _typed;
 
-      return AlertDialog(
-        scrollable: true,
-        title: const Text('Terima pengembalian barang'),
+      return AppDialog(
+        icon: Icons.assignment_return_outlined,
+        title: 'Terima pengembalian barang',
+        busy: busy,
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -562,13 +568,13 @@ class _AtkReturnDialogState extends State<AtkReturnDialog> {
           ],
         ),
         actions: [
-          TextButton(
+          AppDialog.button(
+            label: 'Batal',
+            primary: false,
             onPressed: busy ? null : () => Navigator.of(context).pop(),
-            child: const Text('Batal'),
           ),
-          AppButton(
+          AppDialog.button(
             label: 'Catat pengembalian',
-            expand: false,
             busy: busy,
             onPressed: busy || !open ? null : _submit,
           ),

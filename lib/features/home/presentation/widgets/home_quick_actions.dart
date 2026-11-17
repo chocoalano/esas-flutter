@@ -9,7 +9,9 @@ class HomeQuickAction {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.subtitle,
     this.accent = false,
+    this.badge,
   });
 
   final IconData icon;
@@ -19,17 +21,17 @@ class HomeQuickAction {
   /// daripada ikonnya.
   final String label;
 
+  /// Sublabel pendukung (misal: "Pulang", "Formulir", "Log Bulan").
+  final String? subtitle;
+
   final VoidCallback onTap;
 
   /// Sorotan hijau tipis untuk SATU petak, dan hanya ketika jalurnya benar-benar
   /// terbuka.
-  ///
-  /// Petak ini pernah punya rupa "ditekankan" berisian hijau penuh, dan itu
-  /// dilepas karena aksen tunggal produk dibelanjakan pada elemen paling tidak
-  /// penting. Yang kembali sekarang jauh lebih pelan — isian `brandSubtle` dan
-  /// ikon hijau pada satu petak dari empat — dan ia mati sendiri ketika absensi
-  /// tidak tersedia, sehingga tidak pernah menjanjikan pintu yang terkunci.
   final bool accent;
+
+  /// Lencana teks/angka opsional (misal: "2").
+  final String? badge;
 }
 
 /// Akses cepat, sebagai petak ikon — bukan sebagai deretan kartu.
@@ -120,31 +122,19 @@ class _QuickActionTileState extends State<_QuickActionTile> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = theme.palette;
+    final bool isDark = theme.brightness == Brightness.dark;
     final HomeQuickAction action = widget.action;
 
-    // Netral, dan itu seluruh maksudnya. Petak ini pernah punya dua rupa —
-    // hijau penuh untuk aksi utama, hijau tipis untuk sisanya — dan tangkapan
-    // layar membuktikan hasilnya: satu-satunya momen berwarna di seluruh
-    // dasbor adalah petak "Absen", yaitu aksen tunggal produk ini dibelanjakan
-    // pada elemen paling tidak penting, sementara jalur yang sama sudah
-    // ditawarkan sebagai tombol selebar penuh di dalam panel protagonis.
-    //
-    // Melepas `emphasized` saja tidak cukup: empat kotak ikon 52dp berisian
-    // `brandSubtle` berjumlah ~10.800 dp² nada brand di dalam pita Tingkat 2,
-    // hampir empat kali luas nada yang dipegang panel protagonis sendiri. Pita
-    // penopang yang lebih berwarna daripada protagonisnya membatalkan seluruh
-    // hierarki, jadi petaknya sekarang memakai permukaan yang sama dengan ubin
-    // sisa cuti di sebelahnya: satu langkah permukaan di atas pita, garis
-    // rambut, tinta biasa. Yang membuat Tingkat 1 terbaca lebih penting bukan
-    // karena ia lebih berwarna, melainkan karena di sini tidak ada warna.
     final Color background = action.accent
         ? palette.brandSubtle
-        : theme.colorScheme.surface;
+        : palette.surfaceSubtle;
     final Color foreground = action.accent
         ? theme.colorScheme.primary
-        : theme.colorScheme.onSurface;
+        : (action.badge != null
+            ? palette.warning.foreground
+            : theme.colorScheme.onSurface);
     final Color edge = action.accent
-        ? theme.colorScheme.primary.withValues(alpha: 0.22)
+        ? theme.colorScheme.primary.withValues(alpha: isDark ? 0.35 : 0.22)
         : palette.borderSubtle;
 
     return Semantics(
@@ -155,78 +145,135 @@ class _QuickActionTileState extends State<_QuickActionTile> {
         type: MaterialType.transparency,
         child: InkWell(
           onTap: action.onTap,
-          borderRadius: AppRadii.xlAll,
+          borderRadius: BorderRadius.circular(14),
           // Sumbernya `onHighlightChanged`, bukan `GestureDetector`: awal gulir
           // membatalkan penekanan alih-alih melawan `ListView` di atasnya.
           onHighlightChanged: _setPressed,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                AnimatedScale(
-                  scale: _pressed ? 0.94 : 1,
-                  duration: AppDurations.fast,
-                  curve: AppMotion.standard,
-                  child: AnimatedContainer(
-                    duration: AppDurations.fast,
-                    curve: AppMotion.standard,
-                    width: 52,
-                    height: 52,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: _pressed
-                          ? (action.accent ? palette.brandSubtle : palette.surfaceSubtle)
-                          : background,
-                      borderRadius: AppRadii.xlAll,
-                      border: Border.all(
-                        color: _pressed
-                            ? theme.colorScheme.primary.withValues(alpha: 0.4)
-                            : edge,
-                        width: _pressed ? 1.5 : 1.0,
-                      ),
-                    ),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      alignment: Alignment.center,
-                      children: <Widget>[
-                        Icon(
-                          action.icon,
-                          size: AppIconSizes.xl,
-                          color: foreground,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: action.accent
+                  ? palette.brandSubtle
+                  : theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: action.accent
+                    ? theme.colorScheme.primary.withValues(alpha: isDark ? 0.45 : 0.35)
+                    : palette.borderSubtle,
+                width: 1.0,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                vertical: AppSpacing.sm,
+                horizontal: AppSpacing.xs,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: <Widget>[
+                      AnimatedScale(
+                        scale: _pressed ? 0.94 : 1,
+                        duration: AppDurations.fast,
+                        curve: AppMotion.standard,
+                        child: AnimatedContainer(
+                          duration: AppDurations.fast,
+                          curve: AppMotion.standard,
+                          width: 46,
+                          height: 46,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: _pressed
+                                ? (action.accent ? palette.brandSubtle : palette.surfaceSubtle)
+                                : background,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _pressed
+                                  ? theme.colorScheme.primary.withValues(alpha: 0.4)
+                                  : edge,
+                              width: _pressed ? 1.5 : 1.0,
+                            ),
+                          ),
+                          child: Icon(
+                            action.icon,
+                            size: 22,
+                            color: foreground,
+                          ),
                         ),
-                        if (action.accent)
-                          Positioned(
-                            top: 5,
-                            right: 5,
-                            child: Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primary,
-                                shape: BoxShape.circle,
+                      ),
+                      if (action.badge != null)
+                        Positioned(
+                          top: -3,
+                          right: -3,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFFD97706)
+                                  : const Color(0xFFF59E0B),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: theme.colorScheme.surface,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Text(
+                              action.badge!,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                height: 1.1,
                               ),
                             ),
                           ),
-                      ],
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      action.label,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: action.accent
+                            ? (isDark
+                                ? theme.colorScheme.primary
+                                : const Color(0xFF047857))
+                            : theme.colorScheme.onSurface,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
-                ),
-                // 6, bukan 8. Kotak ikon dan labelnya adalah SATU benda, dan
-                // jarak yang sama dengan jarak antar petak membuat keduanya
-                // terbaca sebagai dua benda yang berdekatan.
-                const SizedBox(height: AppSpacing.tight),
-                Text(
-                  action.label,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+                  if (action.subtitle != null) ...<Widget>[
+                    const SizedBox(height: 2),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        action.subtitle!,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: action.accent
+                              ? theme.colorScheme.primary
+                              : (action.badge != null
+                                  ? palette.warning.foreground
+                                  : palette.textMuted),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
         ),

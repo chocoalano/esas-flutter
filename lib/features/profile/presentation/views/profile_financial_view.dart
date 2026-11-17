@@ -45,7 +45,11 @@ class ProfileFinancialView extends GetView<ProfileFinancialController> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.error_outline, size: 48, color: palette.danger.foreground),
+                    Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: palette.danger.foreground,
+                    ),
                     const SizedBox(height: AppSpacing.md),
                     Text(
                       controller.error.value!.message,
@@ -83,10 +87,14 @@ class ProfileFinancialView extends GetView<ProfileFinancialController> {
                 const SizedBox(height: AppSpacing.sm),
                 if (controller.loans.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm,
+                    ),
                     child: Text(
                       'Tidak ada catatan pinjaman aktif.',
-                      style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: palette.textMuted,
+                      ),
                     ),
                   )
                 else
@@ -106,14 +114,19 @@ class ProfileFinancialView extends GetView<ProfileFinancialController> {
                 const SizedBox(height: AppSpacing.sm),
                 if (controller.advances.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sm,
+                    ),
                     child: Text(
                       'Tidak ada catatan kasbon yang belum dipertanggungjawabkan.',
-                      style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: palette.textMuted,
+                      ),
                     ),
                   )
                 else
-                  for (final advance in controller.advances) _AdvanceCard(advance: advance),
+                  for (final advance in controller.advances)
+                    _AdvanceCard(advance: advance),
               ],
             ),
           );
@@ -143,12 +156,19 @@ class _LoanCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    loan.purpose.isNotEmpty ? loan.purpose : 'Pinjaman Karyawan',
-                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    loan.purpose.isNotEmpty
+                        ? loan.purpose
+                        : 'Pinjaman Karyawan',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: palette.brandSubtle,
                     borderRadius: AppRadii.mdAll,
@@ -169,7 +189,9 @@ class _LoanCard extends StatelessWidget {
               children: [
                 Text(
                   'Sisa Pinjaman:',
-                  style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: palette.textMuted,
+                  ),
                 ),
                 Text(
                   ProfileFinancialView._currencyFormat.format(loan.outstanding),
@@ -186,7 +208,9 @@ class _LoanCard extends StatelessWidget {
               children: [
                 Text(
                   'Pokok Pinjaman:',
-                  style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: palette.textMuted,
+                  ),
                 ),
                 Text(
                   ProfileFinancialView._currencyFormat.format(loan.principal),
@@ -200,11 +224,15 @@ class _LoanCard extends StatelessWidget {
               children: [
                 Text(
                   'Sisa Angsuran:',
-                  style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: palette.textMuted,
+                  ),
                 ),
                 Text(
                   '${loan.instalmentsLeft}x (${ProfileFinancialView._currencyFormat.format(loan.instalmentAmount)} / bln)',
-                  style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -235,12 +263,19 @@ class _AdvanceCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    advance.purpose.isNotEmpty ? advance.purpose : 'Kasbon Operasional',
-                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    advance.purpose.isNotEmpty
+                        ? advance.purpose
+                        : 'Kasbon Operasional',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: palette.warning.background,
                     borderRadius: AppRadii.mdAll,
@@ -262,7 +297,9 @@ class _AdvanceCard extends StatelessWidget {
               children: [
                 Text(
                   'Nominal Kasbon:',
-                  style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: palette.textMuted,
+                  ),
                 ),
                 Text(
                   ProfileFinancialView._currencyFormat.format(advance.amount),
@@ -280,12 +317,11 @@ class _AdvanceCard extends StatelessWidget {
                 children: [
                   Text(
                     'Tanggal Cair:',
-                    style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: palette.textMuted,
+                    ),
                   ),
-                  Text(
-                    advance.disbursedAt!,
-                    style: theme.textTheme.bodySmall,
-                  ),
+                  Text(advance.disbursedAt!, style: theme.textTheme.bodySmall),
                 ],
               ),
             ],
@@ -295,4 +331,3 @@ class _AdvanceCard extends StatelessWidget {
     );
   }
 }
-

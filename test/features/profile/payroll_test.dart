@@ -76,15 +76,41 @@ void main() {
     when(() => api.payslipPdf(7)).thenAnswer(
       (_) async => {
         'content_base64': base64Encode(utf8.encode('%PDF-1.4 fixture')),
+        'encrypted': true,
+        'password': 'Kp7mQx2RtV9wLz4N',
       },
     );
-    expect((await PayrollRepository(api).pdf(7)).filename, 'slip-gaji-7.pdf');
+    final pdf = await PayrollRepository(api).pdf(7);
+    expect(pdf.filename, 'slip-gaji-7.pdf');
+    expect(pdf.password, 'Kp7mQx2RtV9wLz4N');
     when(() => api.payslipPdf(7)).thenAnswer(
       (_) async => {
         'content_base64': base64Encode(utf8.encode('<html>error</html>')),
+        'encrypted': true,
+        'password': 'Kp7mQx2RtV9wLz4N',
       },
     );
     await expectLater(PayrollRepository(api).pdf(7), throwsFormatException);
+  });
+
+  test('a payslip PDF the server does not say is encrypted is never saved '
+      '(WP-01 Final, G6)', () async {
+    final api = MockProfileApi();
+    for (final response in <Map<String, dynamic>>[
+      {'content_base64': base64Encode(utf8.encode('%PDF-1.4 fixture'))},
+      {
+        'content_base64': base64Encode(utf8.encode('%PDF-1.4 fixture')),
+        'encrypted': true,
+      },
+      {
+        'content_base64': base64Encode(utf8.encode('%PDF-1.4 fixture')),
+        'encrypted': false,
+        'password': 'Kp7mQx2RtV9wLz4N',
+      },
+    ]) {
+      when(() => api.payslipPdf(7)).thenAnswer((_) async => response);
+      await expectLater(PayrollRepository(api).pdf(7), throwsFormatException);
+    }
   });
 
   test(

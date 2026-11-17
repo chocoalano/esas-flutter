@@ -4,6 +4,7 @@ import '../../../../core/config/api_routes.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/idempotency_key.dart';
 import '../../../../core/network/upload.dart';
+import 'payslip_step_up.dart';
 
 class ProfileApiService {
   const ProfileApiService(this._client);
@@ -21,8 +22,13 @@ class ProfileApiService {
   /// not read its geofence from them — it has `attendance/context`, asked fresh
   /// at the moment of clocking, and a coordinate cached from an old session is
   /// the wrong geofence the day the office moves.
-  Future<Map<String, dynamic>> profile() =>
-      _client.getObject(ApiRoutes.profile);
+  /// The wage and bank account come back only while a payslip step-up grant
+  /// is held (WP-01 Final, G5); without one they are null and the rest of the
+  /// profile is unchanged.
+  Future<Map<String, dynamic>> profile() => _client.getObject(
+    ApiRoutes.profile,
+    headers: _payslipGrant(PayslipGrantCache.instance.viewGrant),
+  );
 
   /// Who this token belongs to — the light answer, for the splash probe.
   Future<Map<String, dynamic>> currentUser() =>
@@ -31,24 +37,40 @@ class ProfileApiService {
   /// Wage components: salary, grade, bank details, and the runs already paid.
   ///
   /// Detailed slips are read through [payslips] and [payslip].
-  Future<Map<String, dynamic>> payroll() =>
-      _client.getObject(ApiRoutes.payroll);
+  Future<Map<String, dynamic>> payroll({String? grant}) =>
+      _client.getObject(ApiRoutes.payroll, headers: _payslipGrant(grant));
 
-  Future<Map<String, dynamic>> payslips({int page = 1}) => _client.getObject(
-    ApiRoutes.payslips,
-    query: {'page': page, 'per_page': 12},
-  );
+  Future<Map<String, dynamic>> payslips({int page = 1, String? grant}) =>
+      _client.getObject(
+        ApiRoutes.payslips,
+        query: {'page': page, 'per_page': 12},
+        headers: _payslipGrant(grant),
+      );
 
-  Future<Map<String, dynamic>> payslip(int id) =>
-      _client.getObject(ApiRoutes.payslip(id));
-  Future<Map<String, dynamic>> payslipPdf(int id) =>
-      _client.getObject(ApiRoutes.payslipPdf(id));
+  Future<Map<String, dynamic>> payslip(int id, {String? grant}) =>
+      _client.getObject(ApiRoutes.payslip(id), headers: _payslipGrant(grant));
+  Future<Map<String, dynamic>> payslipPdf(int id, {String? grant}) => _client
+      .getObject(ApiRoutes.payslipPdf(id), headers: _payslipGrant(grant));
 
-  Future<Map<String, dynamic>> loans() =>
-      _client.getObject(ApiRoutes.loans);
+  /// The password is checked by the server, never by the app (WP-01 Final, G5).
+  Future<Map<String, dynamic>> payslipStepUp({
+    required String password,
+    required String purpose,
+    int? slipId,
+  }) => _client.postObject(ApiRoutes.payslipStepUp, {
+    'password': password,
+    'purpose': purpose,
+    if (slipId != null) 'slip_id': slipId,
+  });
 
-  Future<Map<String, dynamic>> advances() =>
-      _client.getObject(ApiRoutes.advances);
+  static Map<String, String>? _payslipGrant(String? grant) =>
+      grant == null ? null : {'X-Payslip-Grant': grant};
+
+  Future<Map<String, dynamic>> loans({String? grant}) =>
+      _client.getObject(ApiRoutes.loans, headers: _payslipGrant(grant));
+
+  Future<Map<String, dynamic>> advances({String? grant}) =>
+      _client.getObject(ApiRoutes.advances, headers: _payslipGrant(grant));
 
   Future<Map<String, dynamic>> expenseClaims({int page = 1}) =>
       _client.getObject(ApiRoutes.expenseClaims, query: {'page': page});
@@ -56,11 +78,10 @@ class ProfileApiService {
   Future<Map<String, dynamic>> submitExpenseClaim({
     required String title,
     required List<Map<String, dynamic>> items,
-  }) =>
-      _client.postObject(ApiRoutes.expenseClaims, {
-        'title': title,
-        'items': items,
-      });
+  }) => _client.postObject(ApiRoutes.expenseClaims, {
+    'title': title,
+    'items': items,
+  });
 
   Future<Map<String, dynamic>> travelRequests({int page = 1}) =>
       _client.getObject(ApiRoutes.travelRequests, query: {'page': page});
@@ -71,14 +92,13 @@ class ProfileApiService {
     required String departureDate,
     required String returnDate,
     double? estimatedCost,
-  }) =>
-      _client.postObject(ApiRoutes.travelRequests, {
-        'destination': destination,
-        'purpose': purpose,
-        'departure_date': departureDate,
-        'return_date': returnDate,
-        if (estimatedCost != null) 'estimated_cost': estimatedCost,
-      });
+  }) => _client.postObject(ApiRoutes.travelRequests, {
+    'destination': destination,
+    'purpose': purpose,
+    'departure_date': departureDate,
+    'return_date': returnDate,
+    if (estimatedCost != null) 'estimated_cost': estimatedCost,
+  });
 
   Future<Map<String, dynamic>> performancePlans({int page = 1}) =>
       _client.getObject(ApiRoutes.performancePlans, query: {'page': page});
@@ -98,8 +118,7 @@ class ProfileApiService {
   Future<Map<String, dynamic>> companyPolicy(int id) =>
       _client.getObject(ApiRoutes.companyPolicy(id));
 
-  Future<Map<String, dynamic>> skills() =>
-      _client.getObject(ApiRoutes.skills);
+  Future<Map<String, dynamic>> skills() => _client.getObject(ApiRoutes.skills);
 
   Future<Map<String, dynamic>> devices() =>
       _client.getObject(ApiRoutes.devices);

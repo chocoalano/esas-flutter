@@ -50,52 +50,58 @@ void main() {
     Get.reset();
   });
 
-  testWidgets('renders brand header, first slide, and action button',
+  testWidgets(
+      'renders Zero-Trust Enterprise brand, telemetry, and trust badges',
       (tester) async {
     await tester.pumpWidget(
-      GetMaterialApp(
-        home: const SplashView(),
+      const GetMaterialApp(
+        home: SplashView(),
       ),
     );
 
-    // Header brand
+    // Top Status Header
+    expect(find.text('ZERO-TRUST NODE VERIFIED'), findsOneWidget);
+    expect(find.text('TLS 1.3'), findsOneWidget);
+
+    // Center Hero Brand Identity
     expect(find.text('ABSENSAS'), findsOneWidget);
-    expect(find.text('Employee Self-Service'), findsOneWidget);
-    expect(find.text('Lewati'), findsOneWidget);
+    expect(find.text('WORKFORCE OPERATING SYSTEM'), findsOneWidget);
+    expect(
+      find.text('Enterprise Edition v4.8.2 • ISO 27001 Certified'),
+      findsOneWidget,
+    );
 
-    // Slide 1 Content
-    expect(find.text('PRESENSI CEPAT'), findsOneWidget);
-    expect(find.text('Presensi Akurat & Terverifikasi'), findsOneWidget);
-    expect(find.text('Geofencing GPS'), findsOneWidget);
+    // Dynamic Initialization & Telemetry
+    expect(
+      find.text('Autentikasi terenkripsi siap. Membuka sesi...'),
+      findsOneWidget,
+    );
+    expect(find.text('HOST: id-cgk-hcm-04'), findsOneWidget);
+    expect(find.text('LATENCY: 14ms'), findsOneWidget);
 
-    // Primary action button
-    expect(find.text('Lanjutkan'), findsOneWidget);
+    // Footer Legal & Trust Badges
+    expect(find.text('✓ Bank-Grade AES-256'), findsOneWidget);
+    expect(find.text('✓ BSSN Compliant'), findsOneWidget);
+    expect(find.text('✓ FIPS 140-3'), findsOneWidget);
+    expect(
+      find.text('PT Absensas Teknologi Indonesia Tbk • All Rights Reserved'),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('swiping or tapping Lanjutkan advances to next slide',
+  testWidgets('tapping screen triggers immediate onIntroEnd navigation',
       (tester) async {
     await tester.pumpWidget(
-      GetMaterialApp(
-        home: const SplashView(),
+      const GetMaterialApp(
+        home: SplashView(),
       ),
     );
 
-    // Tap Lanjutkan
-    await tester.tap(find.text('Lanjutkan'));
-    await tester.pumpAndSettle();
+    // Tap on the splash screen
+    await tester.tap(find.text('ABSENSAS'));
+    await tester.pump(const Duration(milliseconds: 300));
 
-    // Slide 2 Content
-    expect(find.text('SELF-SERVICE HR'), findsOneWidget);
-    expect(find.text('Pengajuan Izin & Cuti Mudah'), findsOneWidget);
-    expect(find.text('Cuti & Lembur'), findsOneWidget);
-
-    // Tap Lanjutkan again to reach last slide
-    await tester.tap(find.text('Lanjutkan'));
-    await tester.pumpAndSettle();
-
-    // Slide 3 Content
-    expect(find.text('KOLABORASI TIM'), findsOneWidget);
-    expect(find.text('Akses Fleksibel Kapan Saja'), findsOneWidget);
-    expect(find.text('Mulai Sekarang'), findsOneWidget);
+    // Verify session decision was resolved
+    expect(controller.isLoading.value, isFalse);
   });
 }

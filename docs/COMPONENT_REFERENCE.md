@@ -371,6 +371,45 @@ showSuccessSnackbar('Pengajuan terkirim');
 showErrorSnackbar('Gagal memuat data');
 ```
 
+### Dialog berformulir: `AppDialog`
+
+Setiap dialog selain konfirmasi/info sederhana dibangun dari `AppDialog`
+(`dialogs/app_dialog.dart`), **bukan** dari `AlertDialog`, `Get.defaultDialog`,
+atau `Get.dialog` + `AlertDialog` yang ditulis sendiri.
+
+```dart
+AppDialog(
+  tone: AppDialogTone.danger,
+  icon: Icons.do_not_disturb_on_outlined,
+  title: 'Tolak permintaan',
+  message: 'Alasan ini dikirim ke pemohon.',
+  busy: sending,                       // mengunci tombol kembali selama permintaan
+  content: TextField(/* … */),         // formulir, opsional
+  actions: [                           // yang terakhir = aksi utama
+    AppDialog.button(label: 'Batal', primary: false, onPressed: …),
+    AppDialog.button(label: 'Tolak', destructive: true, busy: sending, onPressed: …),
+  ],
+);
+```
+
+Yang dijamin bentuk ini, dan yang dulu hilang di sebagian dialog:
+
+- **Bisa digulir** — dialog berisi kolom teks tidak meluap saat keyboard naik
+  atau skala teks 1,5.
+- **Tidak bisa ditutup selagi `busy`** — dialog yang bisa ditutup di tengah
+  permintaan kehilangan galatnya sendiri dan membuka jalan bagi pengiriman kedua.
+  Dialog yang menahan input pengguna juga memakai `barrierDismissible: false`.
+- **Aksi sama lebar, menumpuk dengan aksi utama di atas** di atas skala teks 1,25.
+- **Aksi destruktif = `ColorScheme.error`/`onError`** (`destructive: true`), bukan
+  `Colors.white` di atas warna brand — di mode gelap itu hanya 1,9:1.
+- **Tutup dengan `Navigator.of(context).pop`, bukan `Get.back()`.** Selagi ada
+  snackbar tampil, `Get.back()` menutup snackbar-nya dan dialog tetap terbuka.
+- **Kolom isian lewat `appInputDecoration`**, tanpa `OutlineInputBorder()` polos.
+
+`showAppImageViewer(context, image: …, title: …)` (`dialogs/app_image_viewer.dart`)
+memperbesar foto/lampiran layar penuh, dengan tombol tutup 48dp serta keadaan
+memuat dan gagal. Jangan membuka `Dialog` + `InteractiveViewer` sendiri.
+
 `AppDetailRow(label:, value:, valueStyle:, trailing:)` menyejajarkan nilai pada
 satu kolom. Nilai kosong ditulis em dash (`—`), bukan string kosong atau `-`.
 

@@ -8,6 +8,8 @@ import 'package:esas/core/ui/components/app_empty_state.dart';
 import 'package:esas/core/ui/components/app_section_header.dart';
 import 'package:esas/core/ui/components/app_skeleton.dart';
 import 'package:esas/core/ui/dialogs/app_bottom_sheet.dart';
+import 'package:esas/core/ui/dialogs/app_dialogs.dart';
+import 'package:esas/core/ui/dialogs/app_image_viewer.dart';
 import 'package:esas/core/ui/dialogs/app_snackbar.dart';
 import 'package:esas/features/permit/data/models/leave_list.dart';
 import 'package:esas/features/permit/data/models/permit_variant.dart';
@@ -606,14 +608,10 @@ class _AttachmentCard extends StatelessWidget {
     if (attachment == null || !context.mounted) return;
 
     if (attachment.isImage) {
-      await showDialog<void>(
-        context: context,
-        builder: (context) => Dialog(
-          clipBehavior: Clip.antiAlias,
-          child: InteractiveViewer(
-            child: Image.memory(attachment.bytes, fit: BoxFit.contain),
-          ),
-        ),
+      await showAppImageViewer(
+        context,
+        image: MemoryImage(attachment.bytes),
+        title: attachment.filename,
       );
       return;
     }
@@ -705,26 +703,15 @@ class _ApprovalBar extends StatelessWidget {
   }
 
   Future<void> _confirmApproval(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Setujui pengajuan ini?'),
-        content: const Text(
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: 'Setujui pengajuan ini?',
+      message:
           'Keputusan langsung dikirim dan tidak dapat dibatalkan dari aplikasi.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Batal'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Setujui'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Setujui',
+      icon: Icons.check_circle_outline_rounded,
     );
-    if (confirmed == true) await controller.submitApproval(approve: true);
+    if (confirmed) await controller.submitApproval(approve: true);
   }
 
   void _askReason(BuildContext context) {

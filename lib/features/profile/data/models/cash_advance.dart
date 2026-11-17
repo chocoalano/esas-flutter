@@ -31,9 +31,9 @@ class AdvancesResponse {
 
   factory AdvancesResponse.fromJson(Map<String, dynamic> json) {
     return AdvancesResponse(
-      advances: asList(json['advances'])
-          .map((item) => CashAdvance.fromJson(asObject(item)))
-          .toList(),
+      advances: asList(
+        json['advances'],
+      ).map((item) => CashAdvance.fromJson(asObject(item))).toList(),
       unaccountedTotal: asDouble(json['unaccounted_total']) ?? 0.0,
     );
   }
@@ -41,4 +41,3 @@ class AdvancesResponse {
   final List<CashAdvance> advances;
   final double unaccountedTotal;
 }
-

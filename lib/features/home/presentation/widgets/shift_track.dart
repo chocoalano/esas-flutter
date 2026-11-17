@@ -152,7 +152,7 @@ class ShiftTrack extends StatelessWidget {
                         Positioned(
                           left: (width * progress - _markerSize / 2).clamp(
                             0.0,
-                            width - _markerSize,
+                            (width - _markerSize) < 0.0 ? 0.0 : width - _markerSize,
                           ),
                           child: Container(
                             width: _markerSize,

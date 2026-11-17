@@ -316,7 +316,9 @@ class ProfilePayrollController extends GetxController
     detail.value = null;
   }
 
-  Future<({String filename, Uint8List bytes})> download(int id) async {
+  Future<({String filename, Uint8List bytes, String password})> download(
+    int id,
+  ) async {
     final token = _session?.token;
     final pdf = await _repository.pdf(id);
     if (token != _session?.token) {

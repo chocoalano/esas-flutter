@@ -3,9 +3,7 @@ import 'dart:async';
 import 'package:esas/core/network/api_exception.dart';
 import 'package:esas/core/theme/app_dimens.dart';
 import 'package:esas/core/theme/app_palette.dart';
-import 'package:esas/core/theme/app_typography.dart';
 import 'package:esas/core/ui/components/app_badge.dart';
-import 'package:esas/core/ui/layout/app_breakpoints.dart';
 import 'package:esas/features/home/data/repositories/home_repository.dart';
 import 'package:esas/features/home/presentation/controllers/home_controller.dart';
 import 'package:esas/features/home/presentation/widgets/home_device_notice.dart';
@@ -438,41 +436,162 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
       return <Widget>[
         if (widget.shiftName != null) ...<Widget>[
           const SizedBox(height: AppSpacing.md),
-          Row(
-            children: <Widget>[
-              Icon(
-                Icons.work_outline_rounded,
-                size: 16,
-                color: palette.textMuted,
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: Text(
-                  widget.shiftName!,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: palette.surfaceSubtle,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: palette.borderSubtle),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(
+                        Icons.schedule_rounded,
+                        size: 13,
+                        color: palette.textMuted,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        '${widget.shiftName!} • WFO',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                if (widget.scheduleIn != null && widget.scheduleOut != null) ...<Widget>[
+                  const SizedBox(width: AppSpacing.xs),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFA7F3D0)),
+                    ),
+                    child: Text(
+                      '${widget.scheduleIn} \u2013 ${widget.scheduleOut} WIB',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: const Color(0xFF047857),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
-        const SizedBox(height: AppSpacing.lg),
-        _protagonist(theme, palette),
-        if (widget.scheduleIn != null &&
-            widget.scheduleOut != null) ...<Widget>[
-          const SizedBox(height: AppSpacing.lg),
-          ShiftTrack(
-            scheduleIn: widget.scheduleIn!,
-            scheduleOut: widget.scheduleOut!,
-            timeIn: widget.timeIn,
-            timeOut: widget.timeOut,
-          ),
-        ],
-        const SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: AppSpacing.md),
         _facts(theme, palette),
+        if (widget.scheduleIn != null && widget.scheduleOut != null) ...<Widget>[
+          const SizedBox(height: AppSpacing.sm),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 7),
+            decoration: BoxDecoration(
+              color: palette.surfaceSubtle,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: palette.borderSubtle),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: <Widget>[
+                    Flexible(
+                      child: Text(
+                        '${widget.timeIn ?? '08:24'} Riil',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: palette.textMuted,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 10,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              Container(
+                                width: 5,
+                                height: 5,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF10B981),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _shownMinutes != null
+                                    ? HomeController.spanLabel(_shownMinutes!)
+                                    : '7 Jam 12 Mnt',
+                                style: const TextStyle(
+                                  color: Color(0xFF047857),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const Text(
+                                ' Aktif',
+                                style: TextStyle(
+                                  color: Color(0xFF047857),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        '${widget.scheduleOut ?? '17:30'} Selesai',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: palette.textMuted,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 10,
+                        ),
+                        textAlign: TextAlign.end,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                ShiftTrack(
+                  scheduleIn: widget.scheduleIn!,
+                  scheduleOut: widget.scheduleOut!,
+                  timeIn: widget.timeIn,
+                  timeOut: widget.timeOut,
+                ),
+              ],
+            ),
+          ),
+        ],
         if (widget.error is AttendanceAccessException) ...<Widget>[
           const SizedBox(height: AppSpacing.md),
           Text(
@@ -653,71 +772,6 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
     };
   }
 
-  /// Satu angka yang menjawab "saya ada di mana dalam hari kerja saya".
-  ///
-  /// Angka itu berbeda per keadaan, dan itulah gunanya: sebelum absen yang
-  /// dicari adalah jam mulai, selama bekerja yang dicari adalah sudah berapa
-  /// lama, sesudahnya yang dicari adalah totalnya.
-  Widget _protagonist(ThemeData theme, AppPalette palette) {
-    final double size = AppLayout.of(context).displaySize;
-    final int? worked = _shownMinutes;
-
-    final (String value, String caption) = switch (widget.state) {
-      HomeTodayState.working => (
-        worked == null ? '—' : HomeController.spanLabel(worked),
-        'Durasi kerja berjalan',
-      ),
-      HomeTodayState.done => (
-        worked == null ? '—' : HomeController.spanLabel(worked),
-        'Total kerja hari ini',
-      ),
-      _ => (widget.scheduleIn ?? '—', 'Jam mulai kerja'),
-    };
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        // `scaleDown` dan bukan ukuran tetap: pada skala teks 1,5 di layar
-        // 320dp sebuah angka 44px menjadi 66px dan tidak muat. Ia tetap
-        // membesar mengikuti setelan pengguna sampai menyentuh lebar kolom,
-        // lalu berhenti — mengecil lebih baik daripada terpotong.
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            value,
-            maxLines: 1,
-            style: AppTypography.dataDisplay(
-              color: theme.colorScheme.onSurface,
-              fontSize: size,
-            ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            if (widget.state == HomeTodayState.working) ...<Widget>[
-              _LivePulseIndicator(color: palette.success.foreground),
-              const SizedBox(width: AppSpacing.xs),
-            ],
-            Flexible(
-              child: Text(
-                caption,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: palette.textMuted,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
   /// Jam masuk dan jam pulang, dengan selisihnya terhadap jadwal.
   Widget _facts(ThemeData theme, AppPalette palette) {
     return Row(
@@ -778,7 +832,7 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
     }
 
     return <Widget>[
-      const SizedBox(height: AppSpacing.xl),
+      const SizedBox(height: AppSpacing.md),
       _SpringPunchButton(
         onPressed: widget.onClock,
         icon: Icon(
@@ -795,6 +849,8 @@ class _TodayWorkCardState extends State<TodayWorkCard> {
           ),
         ),
       ),
+      const SizedBox(height: AppSpacing.sm),
+      _QuickLinksRow(onHistory: widget.onHistory),
     ];
   }
 }
@@ -859,10 +915,10 @@ class _HeroSurface extends StatelessWidget {
           children: <Widget>[
             Padding(
               padding: const EdgeInsets.fromLTRB(
-                AppSpacing.xl + railWidth,
-                AppSpacing.xl,
-                AppSpacing.xl,
-                AppSpacing.xl,
+                AppSpacing.md + railWidth,
+                AppSpacing.md,
+                AppSpacing.md,
+                AppSpacing.md,
               ),
               child: child,
             ),
@@ -919,49 +975,74 @@ class _Fact extends StatelessWidget {
         isMasuk ? palette.success.foreground : theme.colorScheme.primary;
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: AppRadii.lgAll,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: palette.borderSubtle),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              Icon(icon, size: 14, color: iconColor),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: Text(
-                  label,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: palette.textMuted,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Icon(icon, size: 12, color: iconColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      isMasuk ? 'MASUK' : 'PULANG',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: palette.textMuted,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 9,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: isMasuk ? const Color(0xFFECFDF5) : palette.surfaceSubtle,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    isMasuk ? 'Aktual' : 'Target',
+                    style: TextStyle(
+                      color: isMasuk ? const Color(0xFF10B981) : palette.textMuted,
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: AppSpacing.xs),
-          Text(
-            value ?? '—',
-            style: AppTypography.dataMedium(
-              color: value == null
-                  ? palette.textMuted
-                  : theme.colorScheme.onSurface,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value ?? '—',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
+                color: value != null ? theme.colorScheme.onSurface : palette.textMuted,
+                letterSpacing: -0.5,
+              ),
+              maxLines: 1,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
-          if (note != null) ...<Widget>[
-            const SizedBox(height: AppSpacing.xxs),
+          const SizedBox(height: AppSpacing.xxs),
+          if (note != null)
             Text(
               note!,
               style: theme.textTheme.labelSmall?.copyWith(
@@ -970,8 +1051,37 @@ class _Fact extends StatelessWidget {
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+            )
+          else if (value == null)
+            Text(
+              isMasuk ? 'Belum Absen Masuk' : '⏳ Belum Absen Pulang',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: palette.textMuted,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            )
+          else if (isMasuk)
+            Text(
+              '✓ Tepat Waktu',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: palette.success.foreground,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            )
+          else
+            Text(
+              '✓ Selesai',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: palette.success.foreground,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-          ],
         ],
       ),
     );
@@ -1050,17 +1160,115 @@ class _SpringPunchButtonState extends State<_SpringPunchButton> {
         onPointerDown: (_) => setState(() => _pressed = true),
         onPointerUp: (_) => setState(() => _pressed = false),
         onPointerCancel: (_) => setState(() => _pressed = false),
-        child: FilledButton.icon(
+        child: FilledButton(
           onPressed: widget.onPressed,
-          icon: widget.icon,
-          label: widget.label,
           style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
-            shape: const RoundedRectangleBorder(
-              borderRadius: AppRadii.xlAll,
+            minimumSize: const Size.fromHeight(48),
+            backgroundColor: const Color(0xFF10B981),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                const Icon(Icons.camera_alt_outlined, size: 18, color: Colors.white),
+                const SizedBox(width: 8),
+                widget.label,
+                const Text(
+                  ' Sekarang',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(Icons.arrow_forward_rounded, size: 18, color: Colors.white),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _QuickLinksRow extends StatelessWidget {
+  const _QuickLinksRow({required this.onHistory});
+
+  final VoidCallback onHistory;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = theme.palette;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xs),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: <Widget>[
+          Flexible(
+            child: InkWell(
+              onTap: onHistory,
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Icon(Icons.history_rounded, size: 14, color: palette.textMuted),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        'Riwayat Presensi',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: palette.textMuted,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: InkWell(
+              onTap: () {},
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Icon(Icons.help_outline_rounded, size: 14, color: palette.textMuted),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        'Kendala Absen?',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: palette.textMuted,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

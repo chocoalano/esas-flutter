@@ -279,6 +279,87 @@ void main() {
     });
   });
 
+  group('syncStatus', () {
+    test('pembukaan dingin adalah memuat', () {
+      final controller = subject();
+
+      controller.isLoading.value = true;
+      controller.hasLoaded.value = false;
+
+      expect(controller.syncStatus, HomeSyncStatus.loading);
+    });
+
+    test('penyegaran di atas data lama adalah memperbarui', () {
+      final controller = subject();
+
+      controller.isLoading.value = true;
+      controller.hasLoaded.value = true;
+
+      expect(controller.syncStatus, HomeSyncStatus.refreshing);
+    });
+
+    test('penyegaran yang sampai adalah tersinkronisasi, dengan jamnya', () async {
+      final controller = subject();
+
+      expect(controller.lastSyncedAt.value, isNull);
+
+      await controller.refreshDashboard();
+
+      expect(controller.syncStatus, HomeSyncStatus.synced);
+      expect(controller.lastSyncedAt.value, isNotNull);
+    });
+
+    test('gagal karena sinyal adalah luring dan tidak mencap jam baru', () async {
+      when(
+        () => repository.todayAttendance(),
+      ).thenThrow(const ApiException('Koneksi terputus.'));
+
+      final controller = subject();
+      await controller.refreshDashboard();
+
+      expect(controller.syncStatus, HomeSyncStatus.offline);
+      expect(controller.lastSyncedAt.value, isNull);
+    });
+
+    test('ditolak server bukan luring', () async {
+      // Penolakan izin pada satu panel adalah keadaan AKUN, bukan jaringan.
+      // Pil peringatan permanen untuk akun itu hanya mengajari orang
+      // mengabaikan pil tersebut.
+      when(() => repository.todayAttendance()).thenThrow(
+        const ApiException('Tidak diizinkan.', status: 403),
+      );
+
+      final controller = subject();
+      await controller.refreshDashboard();
+
+      expect(controller.syncStatus, HomeSyncStatus.synced);
+    });
+  });
+
+  group('identitas kepala', () {
+    test('jabatan, departemen, dan perusahaan dibaca dari sesi', () async {
+      when(() => repository.userPosition).thenReturn('Lead UI/UX Engineer');
+      when(() => repository.userDepartment).thenReturn('Tech Division');
+      when(() => repository.companyName).thenReturn('PT Contoh');
+
+      final controller = subject();
+      await controller.refreshDashboard();
+
+      expect(controller.userPosition.value, 'Lead UI/UX Engineer');
+      expect(controller.userDepartment.value, 'Tech Division');
+      expect(controller.companyName.value, 'PT Contoh');
+    });
+
+    test('payload tanpa data itu menghasilkan null, bukan pengganti', () async {
+      final controller = subject();
+      await controller.refreshDashboard();
+
+      expect(controller.userPosition.value, isNull);
+      expect(controller.userDepartment.value, isNull);
+      expect(controller.companyName.value, isNull);
+    });
+  });
+
   group('MonthSummary', () {
     test('tepat waktu diturunkan, tidak diminta sebagai angka ketiga', () {
       const summary = MonthSummary(workedDays: 21, lateCount: 3);
